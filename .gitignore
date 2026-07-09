@@ -1,0 +1,8 @@
+
+# 로컬 검증용 더미 스크린샷 — 공개 레포에 커밋 금지
+test-fixtures/
+
+# 로컬 에이전트 검증 산출물
+eval/results/
+eval/.venv/
+eval/harness/expected.json
