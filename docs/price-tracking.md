@@ -109,9 +109,12 @@ GitHub Actions cron ──(KRX 마감 15:30 KST / NYSE 마감 16:00 ET 직후)
 - [x] **스키마 확정 + 페처(`fetch_prices.py`).** `{symbol,price,currency,marketTime,stale}` + `fx.USDKRW`. 소스 교체 가능.
 - [x] **서버 스케줄 페치 + `/prices`(`server.py`).** 마감 후 UTC 06:45/21:30 갱신, 원자적 쓰기.
 - [x] **staleness.** `marketTime` 기준 `stale` 플래그(STALE_DAYS=4).
-- [x] **T4 수량 역산 엔리치.** 화면에 수량 없는 종목은 **캡처일 종가로 역산**(수량=평가금액/(종가·환율)). 정수 잔차<0.02 게이트로 채택, 추정은 `confidence=estimated`로 표시. 실측: KRW 14/14 정확, USD는 게이트가 거부(재평가불가). unobtainable 7종목 전부 복원.
+- [x] **T4 수량 역산 엔리치.** 화면에 수량 없는 종목은 **캡처 시점(EXIF) 종가로 역산**(수량=평가금액/(종가·환율)).
+  게이트는 **노이즈 전파식**: `잔차 + 주식수×δ < 0.33`(δ KRW≈0/USD≈0.015) — 주식수 적은 종목은 δ 커도 안전, 많으면 위험.
+  실측: KRW 전량+USD 소수주식(GOOGL·VOO·META·ARKF·PLTR) 복원, **오채택 0**. 이미지 EXIF로 캡처시각 자동, 시장 마감 전/후로 기준 세션 선택(KRW 당일·US 직전).
+- [x] **앱 연동.** 사이드카가 Anthropic 호출을 `/complete`로 인터셉트(키 불필요, 다중사진), `/reprice`로 재평가(네이티브 통화, 앱이 ×fx), 수량/평가 두 기준시각 표시. **배포됨**.
 
 **남은 것:**
-- [ ] **앱 연동** — 배포 앱이 `/prices` 소비, 수량×현재가로 재평가. `open.er-api.com` 환율을 `KRW=X`로 흡수. 배포 앱 수정은 외부공개 게이트.
-- [ ] **보안** — `/extract`·`/prices` 터널에 토큰/인증(현재 URL만 알면 접근).
-- [ ] **Orin 이관** — 동일 스택 + named tunnel(고정 도메인).
+- [ ] **보안** — 터널 엔드포인트에 토큰/인증(현재 URL만 알면 접근).
+- [ ] **Orin 이관** — 동일 스택 + named tunnel(고정 도메인) → 사이드카 URL 재입력 불필요.
+- [ ] `open.er-api.com` 환율 완전 대체: 앱 자체 환율 fetch를 `/reprice`의 fx로 이미 덮지만, 앱 초기 로드시 er-api 호출은 남아 있음(선택).
