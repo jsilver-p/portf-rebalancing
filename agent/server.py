@@ -9,7 +9,7 @@
 주의: 이 맥은 CPU라 이미지당 수 분 소요(정상). Orin GPU에선 초 단위.
 """
 import base64, json, os, re, sys, threading, time, urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -27,8 +27,11 @@ PROMPT = open(os.path.join(ROOT, "eval/harness/prompt2.txt")).read().strip()
 DATA_DIR = os.environ.get("DATA_DIR", os.path.expanduser("~/portf-agent/data"))
 PRICES_PATH = os.path.join(DATA_DIR, "prices.json")
 WATCHLIST_PATH = os.path.join(DATA_DIR, "watchlist.json")
+LAST_CAPTURE_PATH = os.path.join(DATA_DIR, "last_capture.json")
 # 마감 후 UTC 시각(EOD): KRX 06:30 마감 +15분, NYSE 20:00~21:00 마감 이후로 안전하게.
 FETCH_TIMES_UTC = os.environ.get("FETCH_TIMES_UTC", "06:45,21:30").split(",")
+# EXIF DateTimeOriginal에 tz가 없다 — 기기 로컬(대개 KST=UTC+9)로 간주. zoneinfo 없는 3.8 호환.
+KST = timezone(timedelta(hours=int(os.environ.get("CAPTURE_UTC_OFFSET", "9"))))
 
 PAGE = """<!doctype html><html lang=ko><head><meta charset=utf-8>
 <meta name=viewport content="width=device-width,initial-scale=1">
@@ -112,20 +115,119 @@ def parse_json(raw):
         try: return json.loads(re.sub(r",\s*([\]}])", r"\1", raw[i:j+1]))
         except Exception: return None
 
-RESID_GATE = 0.02   # T4 수량 추정 채택 잔차 상한(정수 근접). KRW는 통상 0.000, USD는 대부분 걸러짐.
+def exif_capture_dt(b64):
+    """base64 이미지의 EXIF DateTimeOriginal → tz-aware datetime(CAPTURE_TZ) 또는 None.
+    스크린샷(안드로이드 등)은 대개 이 태그를 남긴다 — 기기 로컬 시각이라 CAPTURE_TZ로 간주."""
+    try:
+        import io
+        from PIL import Image, ExifTags
+        ex = Image.open(io.BytesIO(base64.b64decode(b64))).getexif()
+        val = None
+        for k, v in ex.items():
+            if ExifTags.TAGS.get(k) == "DateTime":
+                val = v
+        try:
+            for k, v in ex.get_ifd(0x8769).items():
+                if ExifTags.TAGS.get(k) in ("DateTimeOriginal", "DateTimeDigitized"):
+                    val = v or val
+        except Exception:
+            pass
+        if not val:
+            return None
+        return datetime.strptime(str(val), "%Y:%m:%d %H:%M:%S").replace(tzinfo=KST)
+    except Exception:
+        return None
 
-def enrich(rows, capture_date):
+
+def store_capture(dt):
+    """최신 캡처 시각을 저장(추출 시 여러 장 중 가장 늦은 것 유지)."""
+    try:
+        os.makedirs(DATA_DIR, exist_ok=True)
+        prev = None
+        try:
+            prev = datetime.fromisoformat(json.load(open(LAST_CAPTURE_PATH))["datetime"])
+        except Exception:
+            pass
+        if prev is None or dt > prev:
+            json.dump({"datetime": dt.isoformat(), "source": "exif"}, open(LAST_CAPTURE_PATH, "w"))
+    except Exception:
+        pass
+
+
+def parse_capture(data):
+    """캡처 datetime 결정: 요청 captureDateTime > 저장된 EXIF > captureDate(그날 15:30 KST) > now."""
+    s = data.get("captureDateTime")
+    if s:
+        try:
+            return datetime.fromisoformat(s.replace("Z", "+00:00"))
+        except Exception:
+            pass
+    try:
+        return datetime.fromisoformat(json.load(open(LAST_CAPTURE_PATH))["datetime"])
+    except Exception:
+        pass
+    d = data.get("captureDate")
+    if d:
+        try:
+            y, m, dd = map(int, d.split("-"))
+            return datetime(y, m, dd, 15, 30, tzinfo=KST)
+        except Exception:
+            pass
+    return datetime.now(KST)
+
+
+def complete(body):
+    """Anthropic messages 형식 → 로컬 모델 → Anthropic 형식 응답으로 프록시.
+    앱의 api.anthropic.com 호출을 그대로 받아 처리(키 불필요). 이미지가 있으면 prompt2(정확 추출),
+    없으면(재분류 등) 주어진 텍스트를 프롬프트로. 이미지의 EXIF 캡처시각은 저장해 재평가 기준으로 쓴다."""
+    msgs = body.get("messages", []) if isinstance(body, dict) else []
+    images, texts = [], []
+    for m in msgs:
+        c = m.get("content")
+        if isinstance(c, str):
+            texts.append(c)
+        elif isinstance(c, list):
+            for part in c:
+                if part.get("type") == "image":
+                    d = (part.get("source") or {}).get("data")
+                    if d:
+                        images.append(d)
+                elif part.get("type") == "text":
+                    texts.append(part.get("text", ""))
+    for b in images:
+        dt = exif_capture_dt(b)
+        if dt:
+            store_capture(dt)
+    prompt = PROMPT if images else "\n".join(texts)
+    req = json.dumps({"model": MODEL, "prompt": prompt, "images": images,
+                      "stream": False, "options": {"temperature": 0, "num_ctx": 8192}}).encode()
+    r = urllib.request.Request(OLLAMA, data=req, headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(r, timeout=1800) as resp:
+        out = json.loads(resp.read())
+    return {"content": [{"type": "text", "text": out.get("response", "")}]}
+
+
+# T4 노이즈 전파 게이트: 수량 오차 = 주식수 × δ(기준가 상대오차). 반올림이 노이즈에도
+# 안 뒤집혀야 채택 →  잔차 + 주식수×δ < GATE.  주식수 적은(고가) 종목은 δ 커도 안전, 많은
+# 종목은 작은 δ에도 위험 → 자동으로 KRW·소수주식은 채택, USD·다수주식은 거부.
+# δ: KRW≈0(마감가라 기준가=화면가), USD≈장중가+환율 오차. (캡처시각 알면 축소 — EXIF 경로)
+GATE = 0.33
+DELTA = {"KRW": 0.0006, "USD": 0.015}
+
+def enrich(rows, capture_dt):
     """엔리치 사다리(추측한 값은 반드시 confidence/qty_src로 표시 — 사용자 오해 방지):
       T1 화면 수량            → confidence=exact
       T2 수량·평가금액 → 주가   → price_src=computed:value/qty
-      T4 수량 없음+평가금액+심볼 → 캡처일 종가로 수량 역산(잔차 게이트) → confidence=estimated(-low)
-      복원 실패              → confidence=unreproducible (재평가 불가로 명시)"""
+      T4 수량 없음+평가금액+심볼 → 캡처시각 기준 종가로 수량 역산(노이즈 게이트) → confidence=estimated(-low)
+      복원 실패              → confidence=unreproducible (재평가 불가로 명시)
+    capture_dt: tz-aware datetime (스크린샷 캡처 시각). 시장별 마감 전/후로 기준 종가가 갈린다."""
     cache = resolve.load_cache()
-    fx_cap = ["unset"]  # 캡처일 USD/KRW (lazy)
+    cap_date = capture_dt.strftime("%Y-%m-%d")
+    fx_cap = ["unset"]  # 캡처 시점 USD/KRW (lazy) — 환율은 ~연속이라 캡처일 기준
     def get_fx():
         if fx_cap[0] == "unset":
             try:
-                fx_cap[0] = fetch_prices.history_close("KRW=X", capture_date)[0]
+                fx_cap[0] = fetch_prices.price_asof("KRW=X", capture_dt, "KRW")[0]
             except Exception:
                 fx_cap[0] = None
         return fx_cap[0]
@@ -151,23 +253,25 @@ def enrich(rows, capture_date):
         if (not h.get("qty")) and h.get("value") and rec:
             usd = h.get("currency") == "USD"
             try:
-                close, cday = fetch_prices.history_close(rec["symbol"], capture_date)
+                close, cday = fetch_prices.price_asof(rec["symbol"], capture_dt, h.get("currency"))
             except Exception:
                 close, cday = None, None
             denom = (close * get_fx() if usd and get_fx() else (None if usd else close)) if close else None
             if denom:
                 rawq = h["value"] / denom
                 q = round(rawq); resid = round(abs(rawq - q), 3)
-                if q > 0 and resid < RESID_GATE:
+                delta = DELTA["USD"] if usd else DELTA["KRW"]
+                margin = round(resid + q * delta, 3)   # 노이즈 전파: 반올림 안전 여유
+                if q > 0 and margin < GATE:
                     h["qty"] = q
                     h["qty_src"] = f"추정:캡처일({cday}) 종가 역산" + ("(USD·환율포함)" if usd else "")
                     h["confidence"] = "estimated-low" if usd else "estimated"
-                    h["qty_resid"] = resid
+                    h["qty_resid"] = resid; h["qty_margin"] = margin
                     if h.get("price") is None:
                         h["price"] = round(close, 2); h["price_src"] = f"capture-close:{cday}"
                 else:
                     h["confidence"] = "unreproducible"
-                    h["qty_note"] = f"수량 추정 실패(잔차 {resid}) — 재평가 불가"
+                    h["qty_note"] = f"수량 추정 신뢰 부족(잔차 {resid}, 여유 {margin}≥{GATE}) — 재평가 불가"
             else:
                 h["confidence"] = "unreproducible"
                 h["qty_note"] = "캡처일 종가 미취득 — 재평가 불가"
@@ -195,10 +299,10 @@ def update_watchlist(rows):
         print(f"· watchlist 갱신 실패: {e}")
 
 
-def reprice(holdings, capture_date):
+def reprice(holdings, capture_dt):
     """앱의 보유자산 → 현재가로 재평가. 심볼 해석·T4(수량 복원)·현재가 합성.
-    반환: {fx, asOf, holdings:[... value=수량×현재가×(환율 if USD)]}."""
-    rows = enrich(holdings, capture_date)      # symbol + qty(T4) + confidence
+    반환: {fx, asOf, captureDateTime, holdings:[... value=수량×현재가×(환율 if USD)]}."""
+    rows = enrich(holdings, capture_dt)        # symbol + qty(T4) + confidence
     update_watchlist(rows)
     syms = list({h["symbol"] for h in rows if h.get("symbol")})
     pdata = fetch_prices.build(syms) if syms else {"fx": {"USDKRW": None}, "prices": {}, "asOf": None}
@@ -216,10 +320,11 @@ def reprice(holdings, capture_date):
             h["value_src"] = "reprice:qty*price@current"
         else:
             h["value_src"] = "kept"  # 현금·미해석·수량없음 → 재평가 불가(기존 값 유지)
-    return {"fx": fx, "asOf": pdata.get("asOf"), "holdings": rows}
+    return {"fx": fx, "asOf": pdata.get("asOf"),
+            "captureDateTime": capture_dt.isoformat(), "holdings": rows}
 
 
-def extract(b64, capture_date):
+def extract(b64, capture_dt):
     body = json.dumps({"model": MODEL, "prompt": PROMPT, "images": [b64],
                        "stream": False, "options": {"temperature": 0, "num_ctx": 8192}}).encode()
     t0 = time.time()
@@ -227,14 +332,17 @@ def extract(b64, capture_date):
     with urllib.request.urlopen(req, timeout=1800) as r:
         out = json.loads(r.read())
     raw = out.get("response", "")
+    dt = exif_capture_dt(b64)                  # 이미지에 EXIF 캡처시각 있으면 저장·사용
+    if dt:
+        store_capture(dt); capture_dt = dt
     rows = parse_json(raw) or []
     warnings = []
     if not rows:
         warnings.append("JSON 파싱 실패 — 원문 확인 필요")
-    rows = enrich(rows, capture_date)
+    rows = enrich(rows, capture_dt)
     update_watchlist(rows)
-    return {"holdings": rows, "seconds": round(time.time() - t0, 1),
-            "warnings": warnings, "model": MODEL, "raw": raw, "captureDate": capture_date}
+    return {"holdings": rows, "seconds": round(time.time() - t0, 1), "warnings": warnings,
+            "model": MODEL, "raw": raw, "captureDateTime": capture_dt.isoformat()}
 
 # ── 시세 페치 (결정론적, LLM 무관) ─────────────────────────────
 def refresh_prices():
@@ -300,20 +408,30 @@ class H(BaseHTTPRequestHandler):
             self.send_response(code)
             self.send_header("Content-Type", "application/json; charset=utf-8"); self._cors()
             self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b)
+        elif self.path.split("?")[0] == "/capture":
+            # 마지막 추출 스크린샷의 EXIF 캡처시각(사이드카가 기준시각 프리필·표시용)
+            try:
+                b = open(LAST_CAPTURE_PATH, "rb").read()
+            except Exception:
+                b = b'{"datetime":null}'
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8"); self._cors()
+            self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b)
         else:
             self.send_response(404); self._cors(); self.end_headers()
     def do_POST(self):
         path = self.path.split("?")[0]
-        if path not in ("/extract", "/reprice"):
+        if path not in ("/extract", "/reprice", "/complete"):
             self.send_response(404); self._cors(); self.end_headers(); return
         try:
             n = int(self.headers.get("Content-Length", 0))
             data = json.loads(self.rfile.read(n))
-            cap = data.get("captureDate") or datetime.now(timezone.utc).strftime("%Y-%m-%d")
-            if path == "/reprice":
-                result = reprice(data.get("holdings", []), cap)
+            if path == "/complete":                 # 앱의 Anthropic 호출 대체(키 불필요)
+                result = complete(data)
+            elif path == "/reprice":
+                result = reprice(data.get("holdings", []), parse_capture(data))
             else:
-                result = extract(data["image"], cap)
+                result = extract(data["image"], parse_capture(data))
         except Exception as e:
             result = {"error": str(e)}
         b = json.dumps(result, ensure_ascii=False).encode()

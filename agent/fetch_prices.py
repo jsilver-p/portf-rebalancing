@@ -25,7 +25,7 @@
   }
 """
 import json, sys, time, urllib.parse, urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
 CHART = "https://query1.finance.yahoo.com/v8/finance/chart/"
@@ -94,6 +94,28 @@ def history_close(symbol, date, rng="3mo"):
     if prev:
         return days[prev[-1]], prev[-1]
     return None, None
+
+
+# 시장 마감의 UTC 근사 시각: KRX 15:30 KST=06:30 UTC, US 16:00 ET≈20:00 UTC(EDT).
+# (zoneinfo 없는 3.8 호환. DST로 겨울 US 마감은 21:00 UTC지만, 한국 낮 캡처는 마감과 멀어 무영향.)
+_CLOSE_UTC_H = {"USD": 20.0, "KRW": 6.5}
+
+
+def price_asof(symbol, capture_dt, currency, rng="3mo"):
+    """캡처 시각(capture_dt: tz-aware datetime) 당시 이미 확정돼 있던 마지막 종가.
+    시장 마감(UTC 근사)과 비교해 세션 날짜를 정한다: KRW는 15:30 KST 이후면 당일 종가,
+    US는 20:00 UTC 이후라야 당일 — 한국 낮에 찍으면 미국장 마감 전이라 직전 미국 세션 종가.
+    → (close, close_date). 실패 시 history_close(date) 폴백."""
+    try:
+        cu = capture_dt.astimezone(timezone.utc)
+        h = _CLOSE_UTC_H.get(currency, _CLOSE_UTC_H["KRW"])
+        day = cu.date()
+        close_today = datetime(day.year, day.month, day.day, tzinfo=timezone.utc) + timedelta(hours=h)
+        eff = day if cu >= close_today else day - timedelta(days=1)
+        return history_close(symbol, eff.isoformat(), rng)
+    except Exception:
+        d = capture_dt.strftime("%Y-%m-%d") if hasattr(capture_dt, "strftime") else str(capture_dt)
+        return history_close(symbol, d, rng)
 
 
 def build(symbols, now=None):
