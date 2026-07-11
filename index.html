@@ -219,39 +219,65 @@ document.addEventListener('DOMContentLoaded', async function() {
       return _fetch(input,init);
     };
     var fmtDT=function(s){if(!s)return '—';var d=new Date(s);return isNaN(d)?s:d.toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});};
+    // 배포 번들의 파일 input은 multiple=false로 컴파일됨 → 사진 1장만 선택 가능. 강제로 켠다.
+    // (앱 extractFiles는 이미 여러 파일을 루프 처리하므로 input만 열어주면 다중 첨부됨)
+    function patchFileInputs(){try{var a=document.querySelectorAll('input[type=file]');for(var i=0;i<a.length;i++){if(!a[i].multiple)a[i].multiple=true;}}catch(e){}}
+    document.addEventListener('click',patchFileInputs,true);   // picker 열기 직전(capture)에도 보장
+    // 연결 상태: 에이전트 /health 실제 핑
+    function setDot(el,cls,txt){if(el){el.className='dot '+cls;el.textContent=txt;}}
+    function pingHealth(){
+      var el=document.getElementById('pf-stat');if(!el)return;
+      var b=agent();
+      if(!b){setDot(el,'off','○ 미설정');return;}
+      setDot(el,'wait','… 확인 중');
+      var ctl=('AbortController'in window)?new AbortController():null;
+      var to=ctl?setTimeout(function(){ctl.abort();},6000):null;
+      _fetch(b+'/health',{signal:ctl?ctl.signal:undefined}).then(function(r){
+        if(to)clearTimeout(to);
+        setDot(el,(r&&r.ok)?'ok':'warn',(r&&r.ok)?'● 연결됨':'△ 응답없음');
+      }).catch(function(){if(to)clearTimeout(to);setDot(el,'warn','△ 응답없음');});
+    }
     function build(){
-    syncKey();   // 매 틱마다 URL↔더미키 동기화 (setInterval로 재실행)
-    if(document.getElementById('pf-sc')||!document.body) return;   // 이미 있으면 skip
-    var css='#pf-sc{position:fixed;left:16px;bottom:16px;z-index:99999;width:290px;'
-      +'font:13px/1.45 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",sans-serif;'
-      +'background:#fff;color:#26262b;border:1px solid #e4e1d9;border-radius:12px;box-shadow:0 6px 22px rgba(0,0,0,.14)}'
-      +'#pf-sc .hd{padding:10px 13px;font-weight:700;display:flex;justify-content:space-between;'
-      +'align-items:center;cursor:pointer;border-bottom:1px solid #efece5}'
-      +'#pf-sc .bd{padding:12px 13px;display:flex;flex-direction:column;gap:7px}'
-      +'#pf-sc.min .bd{display:none}'
-      +'#pf-sc label{font-size:11px;color:#8a8a93;margin-top:2px}'
-      +'#pf-sc input{width:100%;padding:8px;border:1px solid #ddd8cf;border-radius:8px;font:inherit;color:#26262b;background:#fff}'
-      +'#pf-sc button{padding:10px;border:0;border-radius:8px;background:#4f5bd5;color:#fff;font-weight:700;font:inherit;cursor:pointer}'
-      +'#pf-sc button:disabled{opacity:.5;cursor:default}'
-      +'#pf-sc .st{font-size:12px;color:#7a7a82;min-height:15px}'
-      +'#pf-sc .ref{font-size:11px;color:#6e6e77;line-height:1.7}'
-      +'#pf-sc .ref b{color:#3a3a42;font-weight:600}'
-      +'#pf-sc .est{margin-top:4px;font-size:11.5px;color:#9a7a1e;background:#fbf5e3;border-radius:8px;padding:7px 9px}'
-      +'#pf-sc .est b{color:#7a5e10}';
+    syncKey(); patchFileInputs();   // 매 틱마다 URL↔더미키 동기화 + 파일input 다중 강제
+    if(document.getElementById('pf-wrap')||!document.body) return;   // 이미 있으면 skip
+    var css='#pf-wrap{position:fixed;left:16px;bottom:16px;z-index:99999;width:290px;display:flex;flex-direction:column;gap:10px;'
+      +'font:13px/1.45 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",sans-serif}'
+      +'.pf-card{background:#fff;color:#26262b;border:1px solid #e4e1d9;border-radius:12px;box-shadow:0 6px 22px rgba(0,0,0,.14)}'
+      +'.pf-card>.hd{padding:10px 13px;font-weight:700;display:flex;justify-content:space-between;align-items:center;gap:8px}'
+      +'.pf-card>.hd.clk{cursor:pointer}'
+      +'.pf-card>.bd{padding:0 13px 12px;display:flex;flex-direction:column;gap:7px}'
+      +'#pf-conn>.bd{padding-top:2px}'
+      +'.pf-card.min>.bd{display:none}'
+      +'.pf-card label{font-size:11px;color:#8a8a93;margin-top:2px}'
+      +'.pf-card input{width:100%;padding:8px;border:1px solid #ddd8cf;border-radius:8px;font:inherit;color:#26262b;background:#fff}'
+      +'.pf-card button{padding:10px;border:0;border-radius:8px;background:#4f5bd5;color:#fff;font-weight:700;font:inherit;cursor:pointer}'
+      +'.pf-card button:disabled{opacity:.5;cursor:default}'
+      +'.dot{font-size:11px;font-weight:600;white-space:nowrap}'
+      +'.dot.ok{color:#1c9c5b}.dot.warn{color:#c88a1e}.dot.off{color:#9a9aa2}.dot.wait{color:#8a8a93}'
+      +'.pf-card .st{font-size:12px;color:#7a7a82;min-height:15px}'
+      +'.pf-card .ref{font-size:11px;color:#6e6e77;line-height:1.7}'
+      +'.pf-card .ref b{color:#3a3a42;font-weight:600}'
+      +'.pf-card .est{margin-top:4px;font-size:11.5px;color:#9a7a1e;background:#fbf5e3;border-radius:8px;padding:7px 9px}'
+      +'.pf-card .est b{color:#7a5e10}';
     if(!document.getElementById('pf-sc-style')){var st=document.createElement('style');st.id='pf-sc-style';st.textContent=css;(document.head||document.documentElement).appendChild(st);}
-    var box=document.createElement('div');box.id='pf-sc';
-    box.innerHTML='<div class=hd id=pf-hd><span>📈 현재가 재평가</span><span id=pf-tg>▾</span></div>'
+    var wrap=document.createElement('div');wrap.id='pf-wrap';
+    wrap.innerHTML=
+      '<div class="pf-card" id=pf-conn>'
+      +'<div class=hd><span>🔗 에이전트 연결</span><span class="dot off" id=pf-stat>○ 미설정</span></div>'
+      +'<div class=bd><label>에이전트 URL (터널) — 추출·재평가 공통</label>'
+      +'<input id=pf-url placeholder="https://xxxx.trycloudflare.com"></div></div>'
+      +'<div class="pf-card" id=pf-sc>'
+      +'<div class="hd clk" id=pf-hd><span>📈 현재가 재평가</span><span id=pf-tg>▾</span></div>'
       +'<div class=bd>'
-      +'<label>에이전트 URL (터널) — 추출·재평가 모두 이 서버로</label><input id=pf-url placeholder="https://xxxx.trycloudflare.com">'
       +'<label>수량 추정 기준 시점 (비우면 스크린샷 EXIF 자동)</label><input id=pf-cap type=datetime-local>'
       +'<button id=pf-go>현재가로 재평가</button>'
-      +'<div class=st id=pf-msg></div><div id=pf-est></div></div>';
-    document.body.appendChild(box);
+      +'<div class=st id=pf-msg></div><div id=pf-est></div></div></div>';
+    document.body.appendChild(wrap);
     var $=function(i){return document.getElementById(i);};
-    var url=$('pf-url'),cap=$('pf-cap'),go=$('pf-go'),msg=$('pf-msg'),estBox=$('pf-est');
+    var url=$('pf-url'),cap=$('pf-cap'),go=$('pf-go'),msg=$('pf-msg'),estBox=$('pf-est'),sc=$('pf-sc');
     url.value=localStorage.getItem(URLK)||'';
-    $('pf-hd').onclick=function(){box.classList.toggle('min');$('pf-tg').textContent=box.classList.contains('min')?'▸':'▾';};
-    url.onchange=function(){localStorage.setItem(URLK,norm(url.value));syncKey();};
+    $('pf-hd').onclick=function(){sc.classList.toggle('min');$('pf-tg').textContent=sc.classList.contains('min')?'▸':'▾';};
+    url.onchange=function(){localStorage.setItem(URLK,norm(url.value));syncKey();pingHealth();};
     function renderSummary(){
       var s;try{s=JSON.parse(localStorage.getItem(SUMK)||'null');}catch(e){}
       if(!s){estBox.innerHTML='';return;}
@@ -262,6 +288,7 @@ document.addEventListener('DOMContentLoaded', async function() {
       estBox.innerHTML=h;
     }
     renderSummary();
+    pingHealth();
     go.onclick=async function(){
       var base=norm(url.value);
       if(!base){msg.textContent='에이전트 URL을 입력하세요';return;}
@@ -293,6 +320,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
     build();
     setInterval(build, 1000);
+    setInterval(pingHealth, 30000);   // 터널 끊김 주기 감지
     if(document.readyState!=='complete') window.addEventListener('load', build);
   })();
   </script>
