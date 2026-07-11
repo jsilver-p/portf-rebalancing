@@ -201,6 +201,11 @@ document.addEventListener('DOMContentLoaded', async function() {
     var LS='pf_rebalancer_v1', URLK='pf_agent_url', SUMK='pf_reprice_summary';
     function norm(u){return (u||'').trim().replace(/\/+$/,'');}
     function agent(){return norm(localStorage.getItem(URLK)||'');}
+    // 에이전트 URL이 있으면 앱의 API키 가드(fetch 이전 window.prompt)를 통과시키기 위해 더미 키를 심는다.
+    // 실제 요청은 아래 fetch 인터셉트가 터널 /complete 로 보내므로 키 값은 무시된다. URL을 지우면 더미 키 회수.
+    var KEYK='pf_anthropic_key', DUMMY='via-agent-tunnel';
+    function syncKey(){try{var k=localStorage.getItem(KEYK)||'';if(agent()){if(!k)localStorage.setItem(KEYK,DUMMY);}else if(k===DUMMY){localStorage.removeItem(KEYK);}}catch(e){}}
+    syncKey();
     // ① fetch 인터셉트: 앱의 api.anthropic.com 추출/분류 호출을 서버 /complete 로 (에이전트 URL 설정 시)
     var _fetch=window.fetch.bind(window);
     window.fetch=function(input,init){
@@ -215,6 +220,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     };
     var fmtDT=function(s){if(!s)return '—';var d=new Date(s);return isNaN(d)?s:d.toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});};
     function build(){
+    syncKey();   // 매 틱마다 URL↔더미키 동기화 (setInterval로 재실행)
     if(document.getElementById('pf-sc')||!document.body) return;   // 이미 있으면 skip
     var css='#pf-sc{position:fixed;left:16px;bottom:16px;z-index:99999;width:290px;'
       +'font:13px/1.45 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",sans-serif;'
@@ -245,7 +251,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     var url=$('pf-url'),cap=$('pf-cap'),go=$('pf-go'),msg=$('pf-msg'),estBox=$('pf-est');
     url.value=localStorage.getItem(URLK)||'';
     $('pf-hd').onclick=function(){box.classList.toggle('min');$('pf-tg').textContent=box.classList.contains('min')?'▸':'▾';};
-    url.onchange=function(){localStorage.setItem(URLK,norm(url.value));};
+    url.onchange=function(){localStorage.setItem(URLK,norm(url.value));syncKey();};
     function renderSummary(){
       var s;try{s=JSON.parse(localStorage.getItem(SUMK)||'null');}catch(e){}
       if(!s){estBox.innerHTML='';return;}
