@@ -208,12 +208,39 @@ document.addEventListener('DOMContentLoaded', async function() {
     syncKey();
     // ① fetch 인터셉트: 앱의 api.anthropic.com 추출/분류 호출을 서버 /complete 로 (에이전트 URL 설정 시)
     var _fetch=window.fetch.bind(window);
+    // 추출은 CPU 모델이라 수 분 걸림 → 단일 요청이면 퀵터널(약 100초)에서 끊겨 "Failed to fetch".
+    // 제출(즉시 id) 후 짧은 폴링으로 결과 수신. 폴링 실패는 재시도 → 터널 순간 끊김도 회복.
+    function completeViaAgent(base, body){
+      return _fetch(base+'/complete/submit',{method:'POST',headers:{'content-type':'application/json'},body:body})
+        .then(function(r){return r.json();})
+        .then(function(j){
+          if(!j||!j.id) throw new Error((j&&j.error)||'제출 실패');
+          var id=j.id, tries=0, fails=0;
+          return new Promise(function(resolve,reject){
+            function done(arr){resolve(new Response(JSON.stringify({content:arr}),{status:200,headers:{'content-type':'application/json'}}));}
+            function poll(){
+              _fetch(base+'/complete/result?id='+encodeURIComponent(id)).then(function(r){return r.json();}).then(function(res){
+                fails=0;
+                if(res.status==='done') return done(res.content);
+                if(res.status==='error') return reject(new Error(res.error||'추출 오류'));
+                if(res.status==='unknown') return reject(new Error('작업을 찾을 수 없음 — 서버가 재시작된 것 같아요. 다시 시도하세요'));
+                if(++tries>900) return reject(new Error('추출 시간 초과'));   // 900*2s = 30분 상한
+                setTimeout(poll,2000);
+              }).catch(function(e){
+                if(++fails>20) return reject(new Error('연결 불안정 — '+(e&&e.message||e)));
+                setTimeout(poll,2000);   // 터널 순간 끊김: 재시도(서버 잡은 계속 진행 중)
+              });
+            }
+            poll();
+          });
+        });
+    }
     window.fetch=function(input,init){
       try{
         var u=typeof input==='string'?input:(input&&input.url)||'';
         if(u.indexOf('api.anthropic.com')>=0){
           var b=agent();
-          if(b) return _fetch(b+'/complete',{method:'POST',headers:{'content-type':'application/json'},body:(init&&init.body)||'{}'});
+          if(b) return completeViaAgent(b,(init&&init.body)||'{}');
         }
       }catch(e){}
       return _fetch(input,init);
