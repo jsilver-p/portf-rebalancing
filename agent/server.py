@@ -8,7 +8,7 @@
 외부접속: 별도로  cloudflared tunnel --url http://localhost:8899  (public https URL)
 주의: 이 맥은 CPU라 이미지당 수 분 소요(정상). Orin GPU에선 초 단위.
 """
-import base64, json, os, re, sys, threading, time, urllib.request
+import base64, json, os, re, sys, threading, time, urllib.request, urllib.parse
 from datetime import datetime, timezone, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -207,6 +207,47 @@ def complete(body):
     return {"content": [{"type": "text", "text": out.get("response", "")}]}
 
 
+# 비동기 잡: CPU 모델 추출은 수 분 걸려 100초 제한 퀵터널에서 단일 요청이 끊긴다.
+# submit(즉시 id 반환) → 백그라운드 워커 → 짧은 result 폴링으로 쪼갠다. 폴링은 터널이
+# 잠깐 끊겨도 재시도로 회복된다(서버 잡은 계속 진행).
+_JOBS = {}                        # id -> {status:pending|done|error, content|error, ts}
+_JOBS_LOCK = threading.Lock()
+
+def _job_gc():
+    now = time.time()
+    with _JOBS_LOCK:
+        for k in [k for k, v in _JOBS.items() if now - v.get("ts", now) > 1800]:
+            _JOBS.pop(k, None)
+
+def _job_run(jid, body):
+    try:
+        res = complete(body)
+        with _JOBS_LOCK:
+            _JOBS[jid] = {"status": "done", "content": res["content"], "ts": time.time()}
+    except Exception as e:
+        with _JOBS_LOCK:
+            _JOBS[jid] = {"status": "error", "error": str(e), "ts": time.time()}
+
+def submit_complete(body):
+    jid = os.urandom(8).hex()
+    with _JOBS_LOCK:
+        _JOBS[jid] = {"status": "pending", "ts": time.time()}
+    threading.Thread(target=_job_run, args=(jid, body), daemon=True).start()
+    _job_gc()
+    return {"id": jid}
+
+def job_result(jid):
+    with _JOBS_LOCK:
+        j = _JOBS.get(jid)
+    if not j:
+        return {"status": "unknown"}         # 서버 재시작 등으로 잡 소실
+    if j["status"] == "done":
+        return {"status": "done", "content": j["content"]}
+    if j["status"] == "error":
+        return {"status": "error", "error": j.get("error", "오류")}
+    return {"status": "pending"}
+
+
 # T4 노이즈 전파 게이트: 수량 오차 = 주식수 × δ(기준가 상대오차). 반올림이 노이즈에도
 # 안 뒤집혀야 채택 →  잔차 + 주식수×δ < GATE.  주식수 적은(고가) 종목은 δ 커도 안전, 많은
 # 종목은 작은 δ에도 위험 → 자동으로 KRW·소수주식은 채택, USD·다수주식은 거부.
@@ -399,6 +440,12 @@ class H(BaseHTTPRequestHandler):
             self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b)
         elif self.path == "/health":
             self.send_response(200); self._cors(); self.end_headers(); self.wfile.write(b'{"ok":true}')
+        elif self.path.split("?")[0] == "/complete/result":
+            qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            b = json.dumps(job_result((qs.get("id") or [""])[0]), ensure_ascii=False).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8"); self._cors()
+            self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b)
         elif self.path.split("?")[0] == "/prices":
             # 서버가 저장한 시세 파일을 그대로 서빙(정적). 에이전트(LLM) 무관.
             if os.path.exists(PRICES_PATH):
@@ -421,12 +468,14 @@ class H(BaseHTTPRequestHandler):
             self.send_response(404); self._cors(); self.end_headers()
     def do_POST(self):
         path = self.path.split("?")[0]
-        if path not in ("/extract", "/reprice", "/complete"):
+        if path not in ("/extract", "/reprice", "/complete", "/complete/submit"):
             self.send_response(404); self._cors(); self.end_headers(); return
         try:
             n = int(self.headers.get("Content-Length", 0))
             data = json.loads(self.rfile.read(n))
-            if path == "/complete":                 # 앱의 Anthropic 호출 대체(키 불필요)
+            if path == "/complete/submit":          # 비동기: 즉시 잡 id 반환(터널 친화)
+                result = submit_complete(data)
+            elif path == "/complete":               # 동기(하위호환): 앱의 Anthropic 호출 대체
                 result = complete(data)
             elif path == "/reprice":
                 result = reprice(data.get("holdings", []), parse_capture(data))
