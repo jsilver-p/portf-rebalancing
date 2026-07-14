@@ -16,6 +16,8 @@ set -euo pipefail
 
 MODEL="${MODEL:-qwen2.5vl:7b}"
 REPO_URL="${REPO_URL:-https://github.com/jsilver-p/portf-rebalancing.git}"
+# agent 백엔드는 개발 중이라 eval/local-agent 브랜치에 있다(기능 완료 후 main 머지 예정).
+REPO_BRANCH="${REPO_BRANCH:-eval/local-agent}"
 REPO_DIR="${REPO_DIR:-$HOME/portf-rebalancing}"
 DATA_DIR="${DATA_DIR:-$HOME/portf-agent/data}"
 CF_BIN=/usr/local/bin/cloudflared
@@ -80,12 +82,14 @@ fi
 # 6) 데이터 디렉터리(시세·캐시 — 레포 밖) -----------------------------------
 mkdir -p "$DATA_DIR"; echo "· DATA_DIR=$DATA_DIR"
 
-# 7) 레포 ------------------------------------------------------------------
-log "레포 준비: $REPO_DIR"
+# 7) 레포 (agent 브랜치) ----------------------------------------------------
+log "레포 준비: $REPO_DIR ($REPO_BRANCH)"
 if [ -d "$REPO_DIR/.git" ]; then
+  git -C "$REPO_DIR" fetch origin "$REPO_BRANCH" -q || true
+  git -C "$REPO_DIR" checkout "$REPO_BRANCH" -q 2>/dev/null || true
   git -C "$REPO_DIR" pull --ff-only || echo "⚠ git pull 실패(로컬 변경?) — 수동 확인"
 else
-  git clone "$REPO_URL" "$REPO_DIR"
+  git clone -b "$REPO_BRANCH" --single-branch "$REPO_URL" "$REPO_DIR"
 fi
 
 # 8) GPU 자기점검(선택, 비치명적) -------------------------------------------
