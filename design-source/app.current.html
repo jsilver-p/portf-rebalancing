@@ -1811,7 +1811,7 @@ class Component extends DCLogic {
     for (let i = 0; i < 900 && !res; i++) {                 // 장당 수십 초 — 넉넉히 폴링
       await new Promise(r => setTimeout(r, 2000));
       const j = await fetch(base + '/extract/batch/result?id=' + sub.id).then(r => r.json()).catch(() => null);
-      if (j && j.status === 'done') res = j.result;
+      if (j && j.status === 'done') res = j.result || j;   // 서버는 결과를 최상위에 펼쳐 준다
       else if (j && j.status === 'error') throw new Error(j.error || '추출 실패');
       if (i % 5 === 0) this.setState({ extractStatus: '화면 ' + files.length + '장 종합 분석 중… (' + (i * 2) + '초)' });
     }

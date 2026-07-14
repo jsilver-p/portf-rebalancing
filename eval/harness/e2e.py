@@ -95,12 +95,21 @@ def verify(holdings):
     sys.path.insert(0, os.path.join(ROOT, "eval", "harness"))
     from parity import norm                      # 동일 정규화 규칙 재사용
     fx = gt["fx_usd_krw"]
-    gmap = {norm(g["name"]): g for g in gt["holdings"]}
+    # 같은 종목이 여러 계좌에 있다(ACE KRX금현물 = 메리츠·ISA·IRP) → 이름만으로 매칭하면 안 된다.
+    # 보유자산의 정체는 (증권사·계좌·종목)이고, 이름 표기가 달라도 (계좌·금액)이면 같은 자산이다.
+    gleft = list(gt["holdings"])
     ok, bad = 0, []
     for h in holdings:
-        g = gmap.get(norm(h.get("name")))
+        key = (h.get("broker"), h.get("accountType"))
+        g = next((x for x in gleft if (x["broker"], x["accountType"]) == key
+                  and norm(x["name"]) == norm(h.get("name"))), None)
+        if not g:                                   # 이름 표기 차이 → 계좌+금액으로 식별
+            v0 = (h.get("value") or 0) * (fx if h.get("currency") == "USD" else 1)
+            g = next((x for x in gleft if (x["broker"], x["accountType"]) == key and x["value"]
+                      and abs(v0 - x["value"]) / x["value"] < 0.01), None)
         if not g:
-            bad.append(f"GT에 없는 종목: {h.get('name')}"); continue
+            bad.append(f"GT에 없는 종목: {h.get('name')} ({key})"); continue
+        gleft.remove(g)
         # 앱은 USD 행을 fx로 환산해 보여준다 → 원화 실질로 비교(환율 이중적용 검출)
         conv = fx if h.get("currency") == "USD" else 1
         v = (h.get("value") or 0) * conv
