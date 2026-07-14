@@ -44,29 +44,39 @@ def us_ticker(name, allow_leading=False):
     return None
 
 
+def _norm(s):
+    return re.sub(r"[\s·\-_.,()]", "", str(s or "")).lower()
+
+
 def naver_resolve(name):
-    """국내 이름 → (symbol, market_name). 실패 시 (None, None).
-    질의 폴백: 원문 → 괄호 제거 → 첫 토큰. 각 응답에서 이름 정확 일치를 우선 선택."""
+    """이름 → (symbol, market). 실패 시 (None, None).
+    **국내·미국 모두** 자동완성으로 해석한다(한국 앱은 미국주식도 한글명으로 표기한다:
+    '엔비디아'→NVDA, '팔란티어 테크'→PLTR). 통화 힌트는 믿지 않는다 — 비전 모델이 해외주식을
+    KRW로 표기하는 일이 흔하다(화면의 평가금액이 원화라서).
+    질의 폴백: 원문 → 괄호 제거 → 첫 토큰. 이름 정확·접두 일치를 우선(오매칭 방지)."""
     base = re.sub(r"\(.*?\)", "", name).strip()
-    tok = name.split("(")[0].split()
+    tok = base.split()
     tok = tok[0] if tok else ""
     queries, seen = [], set()
     for q in (name, base, tok):
         if q and q not in seen:
             seen.add(q); queries.append(q)
+    want = {_norm(name), _norm(base)}
     for q in queries:
         try:
             d = _get("https://ac.stock.naver.com/ac?" +
                      urllib.parse.urlencode({"q": q, "target": "stock"}))
         except Exception:
             continue
-        items = [it for it in d.get("items", []) if it.get("nationCode") == "KOR"]
+        items = [it for it in d.get("items", []) if it.get("code")]
         if not items:
             continue
-        exact = [it for it in items if it.get("name") in (name, base)]
-        it = (exact or items)[0]
-        suffix = ".KS" if "KOSPI" in it.get("typeCode", "") else ".KQ"
-        return it["code"] + suffix, it.get("typeName")
+        exact = [it for it in items if _norm(it.get("name")) in want]
+        pref = [it for it in items if _norm(it.get("name")).startswith(tuple(w for w in want if w))]
+        it = (exact or pref or items)[0]
+        if it.get("nationCode") == "KOR":
+            return it["code"] + (".KS" if "KOSPI" in it.get("typeCode", "") else ".KQ"), "KOSPI"
+        return it["code"], "US"          # 미국: code가 곧 티커(NVDA·PLTR·META…)
     return None, None
 
 
@@ -79,15 +89,15 @@ def resolve(name, currency=None, cache=None):
     if cache is not None and name in cache:
         return cache[name]
     rec = None
-    # 미국: 통화가 USD면 선두 티커 토큰까지 허용, 아니면 괄호/단독 티커만
-    t = us_ticker(name, allow_leading=(currency == "USD"))
-    if t and (currency == "USD" or currency is None):
-        rec = {"symbol": t, "market": "US", "source": "ticker"}
-    if rec is None and currency != "USD":
+    m = re.search(r"\(([A-Z][A-Z0-9.]{0,5})\)", name)   # 괄호 티커 '알파벳 A (GOOGL)' — 명시적 근거
+    if m:
+        rec = {"symbol": m.group(1), "market": "US", "source": "ticker"}
+    if rec is None:      # 이름 검색(국내·미국) — 티커 추측보다 앞: 'NC'는 미국 티커가 아니라 엔씨소프트다
         sym, mkt = naver_resolve(name)
         if sym:
             rec = {"symbol": sym, "market": mkt, "source": "naver"}
-    if rec is None and t:  # USD 힌트 없이도 티커 폴백
+    t = us_ticker(name, allow_leading=(currency == "USD"))
+    if rec is None and t:  # 검색이 실패했을 때만 티커 형태로 폴백
         rec = {"symbol": t, "market": "US", "source": "ticker"}
     if cache is not None and rec is not None:
         cache[name] = rec
