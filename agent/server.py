@@ -460,6 +460,12 @@ def enrich(rows, capture_dt):
                 if h.get(k) is not None:
                     h[k] = round(h[k] / fx, 2)
             h["fx_applied"] = fx
+        elif (_is_cash(h) and h.get("currency") == "USD" and fx and h.get("qty")
+              and h.get("value") and abs(h["value"] / h["qty"] - fx) / fx < 0.02):
+            # 외화 현금도 같은 규칙: 평가금액을 달러로(원화 금액을 USD로 표시하면 자기모순이고,
+            # 앱이 fx를 다시 곱하면 값이 튄다). 화면의 원화 금액 = 달러잔액 × 환율임을 확인한 뒤 환산.
+            h["value"] = round(h["value"] / fx, 2)
+            h["fx_applied"] = fx
 
     for h in rows:
         if not h.get("qty") and not h.get("confidence"):
