@@ -16,6 +16,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)                     # 형제 모듈 import
 import fetch_prices                          # noqa: E402
 import resolve                               # noqa: E402
+import finalize as finalize_mod              # noqa: E402  종합(게이트·broker 정규화)
 
 ROOT = os.path.dirname(HERE)
 MODEL = os.environ.get("MODEL", "qwen2.5vl:7b")
@@ -385,6 +386,69 @@ def extract(b64, capture_dt):
     return {"holdings": rows, "seconds": round(time.time() - t0, 1), "warnings": warnings,
             "model": MODEL, "raw": raw, "captureDateTime": capture_dt.isoformat()}
 
+
+def _vision(b64):
+    """이미지 1장 → 비전 원문 텍스트(prompt2). 배치·단건 공용."""
+    body = json.dumps({"model": MODEL, "prompt": PROMPT, "images": [b64],
+                       "stream": False, "options": {"temperature": 0, "num_ctx": 8192}}).encode()
+    req = urllib.request.Request(OLLAMA, data=body, headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=1800) as r:
+        return json.loads(r.read()).get("response", "")
+
+
+def extract_batch(images, capture_dt):
+    """여러 화면을 한 번에: 화면별 비전추출 → finalize(계좌합계 대조 게이트 + broker 정규화)
+    → 결정적 enrich(심볼·수량·현재가). 앱이 스크린샷 여러 장을 종합해 정확한 결과를 얻는 경로."""
+    t0 = time.time()
+    screens = []
+    for i, b64 in enumerate(images):
+        dt = exif_capture_dt(b64)
+        if dt:
+            store_capture(dt); capture_dt = dt
+        screens.append({"file": f"img{i + 1}", "raw": _vision(b64)})
+    fin = finalize_mod.finalize(screens)          # holdings(정규화) + gate(대조 리포트)
+    rows = fin["holdings"]
+    for h in rows:
+        h.pop("_file", None)
+    rows = enrich(rows, capture_dt)               # 심볼 해석 + T4 수량 + 가격
+    update_watchlist(rows)
+    return {"holdings": rows, "gate": fin["gate"], "screens": fin["screens"],
+            "seconds": round(time.time() - t0, 1), "model": MODEL,
+            "captureDateTime": capture_dt.isoformat()}
+
+
+def _batch_run(jid, images, capture_dt):
+    try:
+        res = extract_batch(images, capture_dt)
+        with _JOBS_LOCK:
+            _JOBS[jid] = {"status": "done", "result": res, "ts": time.time()}
+    except Exception as e:
+        with _JOBS_LOCK:
+            _JOBS[jid] = {"status": "error", "error": str(e), "ts": time.time()}
+
+
+def submit_batch(body):
+    images = body.get("images") or []
+    capture_dt = parse_capture(body)
+    jid = os.urandom(8).hex()
+    with _JOBS_LOCK:
+        _JOBS[jid] = {"status": "pending", "ts": time.time()}
+    threading.Thread(target=_batch_run, args=(jid, images, capture_dt), daemon=True).start()
+    _job_gc()
+    return {"id": jid}
+
+
+def batch_result(jid):
+    with _JOBS_LOCK:
+        j = _JOBS.get(jid)
+    if not j:
+        return {"status": "unknown"}
+    if j["status"] == "done":
+        return {"status": "done", **j["result"]}
+    if j["status"] == "error":
+        return {"status": "error", "error": j.get("error", "오류")}
+    return {"status": "pending"}
+
 # ── 시세 페치 (결정론적, LLM 무관) ─────────────────────────────
 def refresh_prices():
     """watchlist.json → Yahoo → prices.json. 실패해도 서버는 계속 돈다."""
@@ -440,9 +504,12 @@ class H(BaseHTTPRequestHandler):
             self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b)
         elif self.path == "/health":
             self.send_response(200); self._cors(); self.end_headers(); self.wfile.write(b'{"ok":true}')
-        elif self.path.split("?")[0] == "/complete/result":
+        elif self.path.split("?")[0] in ("/complete/result", "/extract/batch/result"):
             qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
-            b = json.dumps(job_result((qs.get("id") or [""])[0]), ensure_ascii=False).encode()
+            jid = (qs.get("id") or [""])[0]
+            res = (batch_result if self.path.split("?")[0] == "/extract/batch/result"
+                   else job_result)(jid)
+            b = json.dumps(res, ensure_ascii=False).encode()
             self.send_response(200)
             self.send_header("Content-Type", "application/json; charset=utf-8"); self._cors()
             self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b)
@@ -468,12 +535,15 @@ class H(BaseHTTPRequestHandler):
             self.send_response(404); self._cors(); self.end_headers()
     def do_POST(self):
         path = self.path.split("?")[0]
-        if path not in ("/extract", "/reprice", "/complete", "/complete/submit"):
+        if path not in ("/extract", "/reprice", "/complete",
+                        "/complete/submit", "/extract/batch/submit"):
             self.send_response(404); self._cors(); self.end_headers(); return
         try:
             n = int(self.headers.get("Content-Length", 0))
             data = json.loads(self.rfile.read(n))
-            if path == "/complete/submit":          # 비동기: 즉시 잡 id 반환(터널 친화)
+            if path == "/extract/batch/submit":     # 비동기: 여러 장 종합 추출 잡
+                result = submit_batch(data)
+            elif path == "/complete/submit":        # 비동기: 즉시 잡 id 반환(터널 친화)
                 result = submit_complete(data)
             elif path == "/complete":               # 동기(하위호환): 앱의 Anthropic 호출 대체
                 result = complete(data)
