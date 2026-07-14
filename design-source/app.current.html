@@ -1786,9 +1786,69 @@ class Component extends DCLogic {
   }
 
   // ---------- extraction ----------
+  agentUrl() {
+    try { return (localStorage.getItem('pf_agent_url') || '').trim().replace(/\/+$/, ''); } catch (e) { return ''; }
+  }
+
+  // 로컬 에이전트 경로: 화면을 **한 번에** 보내 서버가 종합한다(화면 간 교차검증이 필요하기 때문).
+  // 서버가 계좌합계 대조 게이트 · 증권사 정규화 · 수량 사다리(화면→계좌간→캡처일 종가)까지 마친
+  // 결과를 그대로 받는다. 브라우저가 다시 파싱하면 그 근거가 전부 버려진다.
+  async extractViaAgent(files, base) {
+    this.setState({ extracting: true, extractError: null, extractInfo: null,
+      extractStatus: '화면 ' + files.length + '장 종합 분석 중… (로컬 에이전트)' });
+    const images = await Promise.all(files.map(f => new Promise((res, rej) => {
+      const r = new FileReader();
+      r.onload = () => res(String(r.result).replace(/^data:.*?;base64,/, ''));
+      r.onerror = rej;
+      r.readAsDataURL(f);
+    })));
+    const sub = await fetch(base + '/extract/batch/submit', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ images })
+    }).then(r => r.json());
+    if (!sub || !sub.id) throw new Error((sub && sub.error) || '제출 실패');
+    let res = null;
+    for (let i = 0; i < 900 && !res; i++) {                 // 장당 수십 초 — 넉넉히 폴링
+      await new Promise(r => setTimeout(r, 2000));
+      const j = await fetch(base + '/extract/batch/result?id=' + sub.id).then(r => r.json()).catch(() => null);
+      if (j && j.status === 'done') res = j.result;
+      else if (j && j.status === 'error') throw new Error(j.error || '추출 실패');
+      if (i % 5 === 0) this.setState({ extractStatus: '화면 ' + files.length + '장 종합 분석 중… (' + (i * 2) + '초)' });
+    }
+    if (!res) throw new Error('시간 초과');
+    const clsMap = { '성장주': 'growth', '배당주': 'dividend', '채권': 'bond', '금·원자재': 'gold', '현금': 'cash', '부동산': 'realestate' };
+    const confNum = { exact: 1, high: 0.9, estimated: 0.8, 'estimated-low': 0.75, unreproducible: 0.6 };
+    const pending = (res.holdings || []).map((h, j) => ({
+      id: 'p' + Date.now() + '_' + j,
+      broker: h.broker || '미상',
+      accountType: this.ACCTS.includes(h.accountType) ? h.accountType : '일반',
+      name: h.name || '', cls: clsMap[h.assetClass] || (String(h.assetClass || '').indexOf('혼합') >= 0 ? 'mixed' : 'growth'),
+      currency: h.currency === 'USD' ? 'USD' : 'KRW',
+      qty: h.qty != null ? Number(h.qty) : null,
+      price: h.price != null ? Number(h.price) : null,
+      value: h.value != null ? Number(h.value) : null,
+      cost: h.cost != null ? Number(h.cost) : null,
+      qty_src: h.qty_src || '', price_src: h.price_src || '', value_src: h.value_src || '',
+      confidence: typeof h.confidence === 'number' ? h.confidence : (confNum[h.confidence] || 0.9),
+      checkFail: false
+    }));
+    if (!pending.length) throw new Error('표를 찾지 못함');
+    const warns = (res.gate && res.gate.warnings) || [];
+    this.applySnapshot(pending, warns.length ? ' · ⚠ 게이트 경고 ' + warns.length + '건(' + warns[0].slice(0, 60) + '…)' : '');
+  }
+
   async extractFiles(fileList) {
     const files = Array.from(fileList || []).filter(f => f.type.startsWith('image/'));
     if (!files.length) return;
+    const base = this.agentUrl();
+    if (base) {
+      try { return await this.extractViaAgent(files, base); }
+      catch (e) {
+        this.setState({ extracting: false, extractStatus: '',
+          extractError: '에이전트 추출 실패 — ' + (e.message || e) });
+        return;
+      }
+    }
     this.setState({ extracting: true, extractError: null, extractInfo: null, extractStatus: '이미지 분석 중… (0/' + files.length + ')' });
     const newPending = [];
     try {
@@ -1837,8 +1897,16 @@ class Component extends DCLogic {
         });
       }
       if (!newPending.length) throw new Error('표를 찾지 못함');
-      // 스냅샷 처리: 스크린샷에 나타난 (증권사·계좌) 범위는 그 시점의 전체 잔고로 간주
-      // → 매칭 종목 갱신 · 새 종목 추가 · 스크린샷에 없는 종목은 제거 (다른 계좌·직접입력 자산은 건드리지 않음)
+      this.applySnapshot(newPending, '');
+    } catch (e) {
+      this.setState({ extracting: false, extractStatus: '', extractError: '추출에 실패했어요 — 표가 선명하게 보이는 스크린샷으로 다시 시도해 주세요. (' + (e.message || e) + ')' });
+    }
+  }
+
+  // 스냅샷 처리: 스크린샷에 나타난 (증권사·계좌) 범위는 그 시점의 전체 잔고로 간주
+  // → 매칭 종목 갱신 · 새 종목 추가 · 스크린샷에 없는 종목은 제거 (다른 계좌·직접입력 자산은 건드리지 않음)
+  applySnapshot(newPending, extraNote) {
+    {
       const norm = s => String(s || '').replace(/[\s()\-·.,]/g, '').toLowerCase();
       const scopeOf = x => norm(x.broker) + '|' + x.accountType;
       const scopes = new Set(newPending.map(scopeOf));
@@ -1852,6 +1920,8 @@ class Component extends DCLogic {
           if (p.price != null) h.price = p.price;
           if (p.value != null) h.value = p.value;
           if (p.cost != null) h.cost = p.cost;
+          // 출처(추정인지 화면값인지)는 값과 함께 움직여야 한다 — 값만 갱신하면 칩이 거짓말을 한다
+          h.qty_src = p.qty_src || ''; h.price_src = p.price_src || ''; h.value_src = p.value_src || '';
           h.updatedAt = Date.now();
           h._seen = true;
           updated++;
@@ -1860,6 +1930,7 @@ class Component extends DCLogic {
             id: 'h' + Date.now() + Math.random().toString(36).slice(2, 6),
             broker: p.broker, accountType: p.accountType, name: p.name, cls: p.cls,
             currency: p.currency, qty: p.qty, price: p.price, value: p.value, cost: p.cost,
+            qty_src: p.qty_src || '', price_src: p.price_src || '', value_src: p.value_src || '',
             updatedAt: Date.now(), _seen: true
           });
           added++;
@@ -1873,10 +1944,8 @@ class Component extends DCLogic {
       this.setState({
         extracting: false, extractStatus: '',
         extractInfo: '스냅샷 반영 완료 — 갱신 ' + updated + ' · 신규 ' + added + (removed ? ' · 제거 ' + removed : '') +
-          (lowConf ? ' · ⚠ 확신 낮은 항목 ' + lowConf + '건은 표에서 값을 확인하세요' : '')
+          (lowConf ? ' · ⚠ 확신 낮은 항목 ' + lowConf + '건은 표에서 값을 확인하세요' : '') + (extraNote || '')
       });
-    } catch (e) {
-      this.setState({ extracting: false, extractStatus: '', extractError: '추출에 실패했어요 — 표가 선명하게 보이는 스크린샷으로 다시 시도해 주세요. (' + (e.message || e) + ')' });
     }
   }
 
@@ -1971,7 +2040,18 @@ class Component extends DCLogic {
     // --- holdings rows ---
     const acctColors = { '일반': '#6e6e6e', '연금저축': '#1fa1ff', 'IRP': '#8134af', '퇴직연금': '#004c8b', 'ISA': '#dd2a7b' };
     // 출처 태그 → 짧은 라벨(칩). 없으면 칩 미표시.
-    const srcLabel = { screen: 'screen', computed: 'calc', derived: 'derived', research: 'search', cross: 'cross' };
+    // 에이전트는 근거를 자세히 적어 보낸다('derived:cross-account(27,400)') — 칩엔 종류만 접두어로 표시.
+    const srcChip = s => {
+      s = String(s || '');
+      if (!s) return '';
+      if (s.indexOf('cross-account') >= 0) return 'cross';
+      if (s.indexOf('capture-close') >= 0) return 'est';
+      if (s.startsWith('screen')) return 'screen';
+      if (s.startsWith('computed')) return 'calc';
+      if (s.startsWith('reprice')) return 'live';
+      if (s === 'cash') return 'cash';
+      return s.slice(0, 10);
+    };
     const mkRow = h => {
       const v = this.krw(h);
       const c = this.costKrw(h);
@@ -1985,13 +2065,13 @@ class Component extends DCLogic {
         acctColor: acctColors[h.accountType] || '#6e6e6e',
         name: h.name, cls: h.cls, clsColor: (cmap[h.cls] || cmap.growth).color,
         qty: h.qty == null ? '' : this.fmtNum(h.qty),
-        qtySrc: srcLabel[h.qty_src] || h.qty_src || '', hasQtySrc: !!h.qty_src,
+        qtySrc: srcChip(h.qty_src), hasQtySrc: !!h.qty_src,
         price: h.price == null ? '' : this.fmtNum(h.price),
         cur: h.currency === 'USD' ? '$' : '₩',
         hasQP, noQP: !hasQP,
         valueStr: this.fmtW(v),
         valueInput: h.value == null ? '' : this.fmtNum(h.value),
-        valueSrc: srcLabel[vSrc] || vSrc || '', hasValueSrc: !!vSrc,
+        valueSrc: srcChip(vSrc), hasValueSrc: !!vSrc,
         weightStr: total > 0 ? (v / total * 100).toFixed(1) + '%' : '—',
         plStr: pl == null ? '—' : (pl >= 0 ? '+' : '') + pl.toFixed(1) + '%',
         plColor: pl == null ? '#999' : pl >= 0 ? '#ed4956' : '#3897f0',
