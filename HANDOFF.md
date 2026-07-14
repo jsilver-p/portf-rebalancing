@@ -1,50 +1,62 @@
-# 핸드오프 — 포트폴리오 리밸런서 + 로컬 에이전트 + 시세 추적 (2026-07)
+# 핸드오프 — 포트폴리오 리밸런서 로컬 에이전트 (2026-07)
 
-다른 에이전트가 이어받기 위한 현황. 상세: 모델 결정 [`eval/DECISION.md`], 시세 설계 [`docs/price-tracking.md`].
+증권사 스크린샷 → 로컬 비전 LLM 추출 → 계좌합계 게이트·broker 정규화 → 리밸런싱. 무료·프라이빗.
+서버는 **Jetson AGX Orin 32GB**(GPU/CUDA)에서 구동. 코드 브랜치 `eval/local-agent`(푸시됨).
 
-## 목표
-증권사 앱 스크린샷 → AI로 보유자산 추출 → 현재가로 재평가 → 리밸런싱. **무료·프라이빗**을 위해
-클라우드 API 대신 **로컬 비전 모델 + 로컬 서버**. 최종 서버는 **Jetson AGX Orin 32GB**(나중). 지금은 이 맥에서 MVP.
+## 지금 할 일 — 전자 트랙: 추출 파리티 (ORIN에서)
 
-## 지금 동작하는 것
-- **프론트(배포 앱)**: `main` → GitHub Pages `https://jsilver-p.github.io/portf-rebalancing/`. 불투명 번들이라
-  **사이드카**(`index.html` 말미 `<script>`, 번들 독립·자가치유)로 확장. localStorage 계약 `pf_rebalancer_v1`만 사용.
-- **로컬 서버**(`agent/server.py` :8899) — 두 역할:
-  - **추출 에이전트**(LLM): `POST /complete`(앱의 Anthropic 호출을 대체 — 키 불필요, 이미지는 prompt2로 정확 추출),
-    `POST /extract`(단건 추출+엔리치). 이미지 EXIF 캡처시각을 저장(`GET /capture`).
-  - **시세**(결정론적, LLM 무관): `GET /prices`(스케줄 갱신본), `POST /reprice`(보유자산→현재가 재평가+T4 수량 역산).
-- **시세 페처**(`agent/fetch_prices.py`): 심볼→Yahoo chart→`prices.json`. **이름→심볼**은 `agent/resolve.py`
-  (국내=Naver autocomplete, 미국=티커. 하드코딩 없음). 마감 후 UTC 06:45/21:30 자동 갱신.
-- **외부 접속**: `cloudflared` 퀵터널 → 공개 https URL(폰).
+목표: 정답표와 동일 정보(31종목·정규 broker·계좌합계·출처)를 배치 추출이 안정 산출.
+`/extract/batch`를 8장 실추출했을 때 드러난 **회귀 2건**을 잡는다.
 
-## 기동 / 종료
+1. **해외주식 상세(10종목·128M) 통째 누락.** 증상: 그 화면이 `screens`에 `detail`인데 holdings 0.
+   원인 추정: 라이브 7B가 그 화면(USD 10행, 최밀) JSON 파싱 실패 → `finalize.parse_rows`가 `[]` →
+   `classify([])`가 기본 `detail` 반환(빈 상세). **진단엔 per-screen raw 필요.**
+   → **먼저** `server.extract_batch`가 결과에 `screens[i].raw`(또는 디버그 플래그)를 실어 반환하게 하고,
+   ORIN에서 8장 1회 재추출해 img3(해외주식) raw를 직접 본다. 파싱 문제면 `parse_rows` 견고화 or 프롬프트,
+   빈 결과면 `classify`가 빈 배열을 detail로 삼지 않게(빈 화면=경고) 수정.
+2. **삼성 ISA broker → 한국투자증권 오정규화.** IRP는 삼성증권으로 맞음. 원인 후보:
+   ① `resolve_broker`/검색이 틀린 값 반환 ② `canonical_in(screen_text)`가 펀드 법정명 "…증권투자신탁"의
+   `증권`을 broker로 오매치 ③ `summary_broker` 상속 오류. img6(계좌요약)·img7(ISA상세) raw로 판별 후 수정.
+
+파리티 확인되면(31종목·정규 broker):
+3. 배치 import 경로가 `qty_src`/`price_src`를 `pf_rebalancer_v1`에 저장하게 → 앱 출처칩 자동 점등(후자 완료).
+4. **배포**: `eval/local-agent` → `main` 머지 + GitHub Pages(후자 UI까지 함께 공개). 배포는 승인 게이트.
+
+검증은 앱 밖에서: `test-fixtures/screenshots`(8장) + `ground-truth.json`(31) 대조. `python3 agent/finalize.py`.
+
+## ORIN 서버 기동 / 재기동
 ```bash
-bash agent/start.sh    # Ollama+서버+터널 기동 후 공개 URL 출력 (URL은 기동마다 바뀜)
-# 종료: pkill -f 'ollama serve'; pkill -f agent/server.py; pkill cloudflared
+cd <repo> && git checkout eval/local-agent && git pull
+bash agent/setup-orin.sh          # 최초 1회(ollama CUDA·모델·cloudflared arm64·Pillow). 재실행 안전.
+bash agent/run-agent.sh           # ollama+서버(:8899)+터널 기동, 공개 URL 출력. Ctrl-C 정리.
+# 재기동: Ctrl-C 후 run-agent.sh 다시. 퀵터널이라 URL이 매번 새로 발급됨.
 ```
-바이너리는 `~/portf-agent/bin`, 시세·watchlist·심볼캐시는 `~/portf-agent/data`(서버 전용, 레포 밖).
+새 URL은 로컬 `agent/env`(gitignore)에 두거나 사용자에게 전달 → 앱 좌하단 '에이전트 연결'에 입력.
+데이터(시세·watchlist·broker 캐시)는 `~/portf-agent/data`(레포 밖).
 
-## 사용법 (사용자)
-1. `bash agent/start.sh` → 출력된 터널 URL 복사.
-2. 배포 앱 좌하단 **📈 현재가 재평가** 패널에 URL 입력.
-3. **추출**: 앱 STEP1에 스크린샷(여러 장 가능) 업로드 → Anthropic 대신 이 서버로 감(키 불필요). EXIF로 캡처시각 자동.
-4. **재평가**: 패널 **재평가** 클릭 → 수량×현재가. 화면에 수량 없던 종목은 **캡처 시점 종가로 역산한 추정 수량(≈)**.
-   패널에 **수량 기준(스크린샷 시점)·평가 기준(현재)** 두 시각 표시.
+## 서버 엔드포인트 (`agent/server.py` :8899)
+- `GET /health` · `GET /capture`
+- `POST /complete/submit`+`/complete/result` — 앱 Anthropic 호출 대체(비동기, 키 불필요).
+- `POST /extract` — 단건 추출+엔리치.
+- `POST /extract/batch/submit`+`/extract/batch/result` — **다중화면 종합**: 비전추출→`finalize`(게이트+정규화)→엔리치.
+- `POST /reprice` · `GET /prices` — 결정론적 시세 재평가(LLM 무관, 초 단위).
+- MODEL=`qwen2.5vl:7b`, 프롬프트 `eval/harness/prompt2.txt`. ORIN GPU ~38초/장(측정).
 
-## 완료됨
-- 모델 선정 실측 → 7B+헤더프롬프트(정확도 100%).
-- **시세 추적**: 실보유 26/26 커버리지 확인, 서버 페치·서빙(공개 누출 없음), `prices.json` 계약 스키마.
-- **T4 수량 역산 엔리치**: **캡처 시점(EXIF) 종가**로 역산. 게이트는 **노이즈 전파식**(잔차+주식수×δ<0.33, δ KRW≈0/USD≈0.015) —
-  주식수 적은 종목은 δ 커도 안전. 실측 KRW 전량+USD 소수주식(GOOGL·VOO·META·ARKF·PLTR) 복원, **오채택 0**, 다수주식 USD 거부.
-- **캡처 시각**: 이미지 EXIF DateTimeOriginal 자동 사용(`price_asof`가 시장 마감 전/후로 기준 세션 선택 — KRW 당일·US 직전 세션).
-- **앱 연동**: 사이드카가 ① Anthropic 호출 인터셉트→`/complete`(키 불필요, 다중사진) ② `/reprice` 재평가(네이티브 통화, 앱이 ×fx)
-  ③ 수량/평가 두 기준시각 표시. 헤드리스 10/10 통과. **배포 완료**.
+## 파이프라인 핵심 (완료·유지)
+- **게이트**(`finalize.py`): 화면 유형 분류(product_summary/account_summary/detail) → 상세홀딩합 ↔ 요약총액
+  매칭으로 스코프·재현율·환각 점검. 요약행은 홀딩서 제외. 하드드롭 아님(경고). 8장 스코프 5/5 매칭 확인.
+- **broker 정규화**(`resolve_broker.py`): 하드코딩 없음. 정규명 직채택 / 브랜드(Super365)→네이버검색+LLM-RAG /
+  계좌번호·별칭→요약화면 정규명 상속. 캐시 `~/portf-agent/data/broker_cache.json`.
+- **엔리치**(`server.enrich`): 주가=평가금액/수량, 계좌간 동일종목 수량 역산, **T4 캡처시점(EXIF) 종가 역산**
+  (노이즈 전파 게이트, 오채택 0). 이름→심볼 `agent/resolve.py`(네이버 autocomplete/티커).
 
-## 다음 (우선순위)
-1. **Orin 이관** — 동일 스택(Ollama ARM64+CUDA, Python 서버). cloudflared는 **named tunnel**(고정 도메인)로 승격 → 사이드카 URL 재입력 불필요.
-2. **보안** — `/extract`·`/complete`·`/reprice`·`/prices` 터널에 토큰/인증(현재 URL만 알면 접근).
+## 프론트 (후자 트랙 — 완료, 미배포)
+- `index.html`은 **편집 가능**(불투명 아님): 193번 줄 임베드 문서를 `agent/repack_app.py`로 extract/embed.
+  진짜 현행 소스=`design-source/app.current.html`(구 .dc.html은 stale). 상세 → 메모리 `app-edit-workflow`.
+- STEP2 테이블을 **계좌 그룹**(증권사+유형뱃지+소계) + 출처칩으로 개편, 헤드리스 검증 통과. **main 미배포**(전자와 묶음).
 
-## 주의
-- 퀵터널 URL은 **기동마다 바뀜**(Orin named tunnel 전까지 매번 재입력).
-- 이 맥은 **CPU라 추출 이미지당 수 분**(정상). 재평가(시세)는 초 단위. Orin GPU에선 추출도 초 단위.
-- 브랜치 `eval/local-agent`(agent 코드·docs·eval, **미푸시**). `main`엔 index.html만 배포. 민감정보(스크린샷·정답표·prices·watchlist·심볼캐시)는 gitignore.
+## 주의 / 보안
+- 레포 **공개**. 민감정보(스크린샷·ground-truth·prices·watchlist·심볼캐시·`agent/env`·`~/portf-agent/data`·
+  실계좌번호·홀더명)는 전부 gitignore. **커밋 금지.**
+- 미해결: 루트 `env`가 git 추적 중(공개, stale 죽은 URL). `git rm --cached env && rm env` 필요.
+- 퀵터널 URL 매 기동 변경(향후 named tunnel로 고정 승격). 터널 인증 없음(URL만 알면 접근) — 추후 토큰.
