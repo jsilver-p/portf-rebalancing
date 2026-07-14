@@ -5,7 +5,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
-REPO_DIR="${REPO_DIR:-$HOME/portf-rebalancing}"
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"   # 이 스크립트가 든 레포
 export MODEL="${MODEL:-qwen2.5vl:7b}"
 export DATA_DIR="${DATA_DIR:-$HOME/portf-agent/data}"
 export PORT="${PORT:-8899}"
