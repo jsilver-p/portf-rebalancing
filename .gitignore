@@ -13,3 +13,4 @@ agent/__pycache__/
 data/
 prices.json
 watchlist.json
+agent/env
