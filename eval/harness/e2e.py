@@ -110,9 +110,12 @@ def verify(holdings):
         if not g:
             bad.append(f"GT에 없는 종목: {h.get('name')} ({key})"); continue
         gleft.remove(g)
-        # 앱은 USD 행을 fx로 환산해 보여준다 → 원화 실질로 비교(환율 이중적용 검출)
+        # 앱의 표시 공식 그대로 비교한다: qty×price가 value보다 우선(krw() 계약)이고 USD는 fx 환산.
+        # value만 대조하면 '저장값은 맞는데 표는 틀린' 버그(현재가 오독 등)를 놓친다 — 실제로 두 번 놓쳤다.
         conv = fx if h.get("currency") == "USD" else 1
-        v = (h.get("value") or 0) * conv
+        native = (h["qty"] * h["price"] if h.get("qty") is not None and h.get("price") is not None
+                  else (h.get("value") or 0))
+        v = native * conv
         if g["value"] and abs(v - g["value"]) / g["value"] > 0.01:
             bad.append(f"{h['name']}: 앱 {v:,.0f} vs 정답 {g['value']:,.0f}")
         else:
