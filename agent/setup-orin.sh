@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────────────────
 # ORIN(Jetson) 포트폴리오 추출 에이전트 — 원샷 셋업.
+# 레포를 먼저 클론한 뒤(agent 브랜치: eval/local-agent) 그 안에서 실행한다.
 # 한 번 실행하면: ollama(GPU/CUDA) + 비전모델 + cloudflared(arm64) + Pillow +
-#                데이터 디렉터리 + 레포를 준비한다. 재실행 안전(idempotent).
+#                데이터 디렉터리를 준비한다(클론은 안 함). 재실행 안전(idempotent).
 #
 # 대상: Jetson Orin (AGX/NX/Nano), JetPack 6 (L4T r36.x), aarch64.
-# 실행:  bash agent/setup-orin.sh
-# 조정:  MODEL, REPO_DIR, DATA_DIR 환경변수로 덮어쓰기 가능.
+# 실행:  bash agent/setup-orin.sh   (레포 안에서)
+# 조정:  MODEL, DATA_DIR 환경변수로 덮어쓰기 가능.
 #
 # 근거(2026-07): ollama 공식 install.sh는 Jetson을 감지해 CUDA로 설치(GPU 가속).
 #               cloudflared는 pkg.cloudflare.com에 arm64가 없어 GitHub 릴리스
@@ -15,8 +16,8 @@
 set -euo pipefail
 
 MODEL="${MODEL:-qwen2.5vl:7b}"
-REPO_URL="${REPO_URL:-https://github.com/jsilver-p/portf-rebalancing.git}"
-REPO_DIR="${REPO_DIR:-$HOME/portf-rebalancing}"
+# 이 스크립트가 들어있는 레포에서 그대로 동작한다(클론은 사용자가 먼저 함).
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DATA_DIR="${DATA_DIR:-$HOME/portf-agent/data}"
 CF_BIN=/usr/local/bin/cloudflared
 
@@ -80,15 +81,7 @@ fi
 # 6) 데이터 디렉터리(시세·캐시 — 레포 밖) -----------------------------------
 mkdir -p "$DATA_DIR"; echo "· DATA_DIR=$DATA_DIR"
 
-# 7) 레포 ------------------------------------------------------------------
-log "레포 준비: $REPO_DIR"
-if [ -d "$REPO_DIR/.git" ]; then
-  git -C "$REPO_DIR" pull --ff-only || echo "⚠ git pull 실패(로컬 변경?) — 수동 확인"
-else
-  git clone "$REPO_URL" "$REPO_DIR"
-fi
-
-# 8) GPU 자기점검(선택, 비치명적) -------------------------------------------
+# 7) GPU 자기점검(선택, 비치명적) -------------------------------------------
 log "GPU 자기점검"
 ollama run "$MODEL" "OK" >/dev/null 2>&1 || true
 ollama ps 2>/dev/null || true
