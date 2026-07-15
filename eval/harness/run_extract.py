@@ -10,13 +10,14 @@ PROMPT_FILE = os.environ.get("PROMPT_FILE", os.path.join(ROOT, "eval/harness/pro
 PROMPT = open(PROMPT_FILE).read().strip()
 TAG = os.environ.get("OUT_TAG", "")  # 결과 디렉토리 접미사 (프롬프트 변형 구분)
 NUM_CTX = int(os.environ.get("NUM_CTX", "8192"))   # 컨텍스트 — 조밀·긴 화면은 이미지 토큰이 크다
-OLLAMA = "http://127.0.0.1:11434/api/generate"
+OLLAMA = os.environ.get("OLLAMA", "http://127.0.0.1:11434") + "/api/generate"
+NP = int(os.environ.get("NP", "1"))                # 동시 요청 수 — ollama의 OLLAMA_NUM_PARALLEL과 일치시킬 것
 
 def call(model, img_path):
     b64 = base64.b64encode(open(img_path, "rb").read()).decode()
     body = json.dumps({
         "model": model, "prompt": PROMPT, "images": [b64],
-        "stream": False, "options": {"temperature": 0, "num_ctx": NUM_CTX},
+        "stream": False, "keep_alive": -1, "options": {"temperature": 0, "num_ctx": NUM_CTX},
     }).encode()
     t0 = time.time()
     req = urllib.request.Request(OLLAMA, data=body, headers={"Content-Type": "application/json"})
@@ -32,7 +33,9 @@ def main():
     imgs = sorted(f for f in os.listdir(SHOTS) if f.lower().endswith((".jpg", ".png")))
     if only:
         imgs = [f for f in imgs if any(o in f for o in only)]
-    for f in imgs:
+    t0 = time.time()
+
+    def one(f):
         print(f"[{model}] {f} ...", flush=True)
         try:
             resp, dt = call(model, os.path.join(SHOTS, f))
@@ -41,8 +44,16 @@ def main():
         json.dump({"image": f, "seconds": round(dt, 1), "raw": resp,
                    "num_ctx": NUM_CTX, "prompt_file": os.path.basename(PROMPT_FILE)},
                   open(os.path.join(outdir, f + ".json"), "w"), ensure_ascii=False, indent=2)
-        print(f"   {dt:.1f}s  chars={len(resp)}", flush=True)
-    print(f"DONE -> {outdir}")
+        print(f"   {f}  {dt:.1f}s  chars={len(resp)}", flush=True)
+
+    if NP > 1:
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=NP) as ex:
+            list(ex.map(one, imgs))
+    else:
+        for f in imgs:
+            one(f)
+    print(f"DONE -> {outdir}  (wall {time.time() - t0:.0f}s, NP={NP})")
 
 if __name__ == "__main__":
     main()

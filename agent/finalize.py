@@ -47,8 +47,22 @@ def _sanitize(frag):
     return frag
 
 
+# 압축(positional) 출력의 열 순서 — prompt4c와 이 상수가 같은 순서를 봐야 한다(진실의 출처는 여기 하나).
+COMPACT_COLUMNS = ["broker", "accountType", "name", "assetClass", "currency",
+                   "qty", "price", "value", "cost", "pnl", "confidence"]
+
+
+def _row_from_list(arr):
+    """positional 배열 행 → dict. 열 수가 어긋난 행은 버린다(오배정된 값을 쓰느니 비운다 —
+    유실은 합계 대조 게이트가 시끄럽게 잡지만, 한 칸 밀린 값은 조용히 틀린다)."""
+    if not isinstance(arr, list) or len(arr) != len(COMPACT_COLUMNS):
+        return None
+    return dict(zip(COMPACT_COLUMNS, arr))
+
+
 def parse_rows(raw):
     """비전 원문 텍스트 → 행 리스트(견고한 JSON 파싱). 추출 경로의 **단일 파서**(server도 이걸 쓴다).
+    행 형식은 dict(prompt4)와 positional 배열(prompt4c) 둘 다 수용 — 프롬프트 롤백 시 파서는 그대로.
 
     3단계: ①원문 ②정규화(+부호·쉼표·트레일링콤마) ③행 단위 구제(salvage).
     ③이 핵심 — 한 행이 깨져도 나머지 행은 살린다(전부 아니면 전무 = 화면 통째 유실)."""
@@ -62,17 +76,29 @@ def parse_rows(raw):
         try:
             d = json.loads(f)
             if isinstance(d, list):
-                return [r for r in d if isinstance(r, dict)]
+                dicts = [r for r in d if isinstance(r, dict)]
+                lists = [r for r in (_row_from_list(x) for x in d) if r]
+                if dicts or lists:
+                    return dicts + lists
         except Exception:
             pass
     rows = []                                    # ③ 행 단위 구제
-    for m in re.finditer(r"\{[^{}]*\}", _sanitize(frag)):
+    clean = _sanitize(frag)
+    for m in re.finditer(r"\{[^{}]*\}", clean):
         try:
             r = json.loads(m.group(0))
             if isinstance(r, dict):
                 rows.append(r)
         except Exception:
             continue
+    if not rows:                                 # positional 행 구제(중첩 없는 최심부 배열만 매치)
+        for m in re.finditer(r"\[[^\[\]]*\]", clean):
+            try:
+                r = _row_from_list(json.loads(m.group(0)))
+                if r:
+                    rows.append(r)
+            except Exception:
+                continue
     return rows
 
 

@@ -22,8 +22,9 @@ ROOT = os.path.dirname(HERE)
 MODEL = os.environ.get("MODEL", "qwen2.5vl:7b")
 PORT = int(os.environ.get("PORT", "8899"))
 OLLAMA = os.environ.get("OLLAMA", "http://127.0.0.1:11434") + "/api/generate"
-PROMPT_FILE = os.environ.get("PROMPT_FILE", os.path.join(ROOT, "eval/harness/prompt4.txt"))
-PROMPT = open(PROMPT_FILE).read().strip()      # prompt4 = 선정본(파리티 31/31·환각 0)
+NP = int(os.environ.get("NP", "1"))            # 동시 비전 요청 수 — ollama의 OLLAMA_NUM_PARALLEL과 일치시킬 것
+PROMPT_FILE = os.environ.get("PROMPT_FILE", os.path.join(ROOT, "eval/harness/prompt4c.txt"))
+PROMPT = open(PROMPT_FILE).read().strip()      # prompt4c = 선정본 prompt4의 압축출력판(생성 토큰 ~반, 지시문 동일)
 
 # 시세: 서버 전용 데이터(레포 밖). 결정론적 페치 — LLM 무관.
 DATA_DIR = os.environ.get("DATA_DIR", os.path.expanduser("~/portf-agent/data"))
@@ -196,7 +197,7 @@ def complete(body):
             store_capture(dt)
     prompt = PROMPT if images else "\n".join(texts)
     req = json.dumps({"model": MODEL, "prompt": prompt, "images": images,
-                      "stream": False, "options": {"temperature": 0, "num_ctx": 8192}}).encode()
+                      "stream": False, "keep_alive": -1, "options": {"temperature": 0, "num_ctx": 8192}}).encode()
     r = urllib.request.Request(OLLAMA, data=req, headers={"Content-Type": "application/json"})
     with urllib.request.urlopen(r, timeout=1800) as resp:
         out = json.loads(resp.read())
@@ -523,7 +524,7 @@ def reprice(holdings, capture_dt):
 
 def extract(b64, capture_dt):
     body = json.dumps({"model": MODEL, "prompt": PROMPT, "images": [b64],
-                       "stream": False, "options": {"temperature": 0, "num_ctx": 8192}}).encode()
+                       "stream": False, "keep_alive": -1, "options": {"temperature": 0, "num_ctx": 8192}}).encode()
     t0 = time.time()
     req = urllib.request.Request(OLLAMA, data=body, headers={"Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=1800) as r:
@@ -545,7 +546,7 @@ def extract(b64, capture_dt):
 def _vision(b64):
     """이미지 1장 → 비전 원문 텍스트(prompt2). 배치·단건 공용."""
     body = json.dumps({"model": MODEL, "prompt": PROMPT, "images": [b64],
-                       "stream": False, "options": {"temperature": 0, "num_ctx": 8192}}).encode()
+                       "stream": False, "keep_alive": -1, "options": {"temperature": 0, "num_ctx": 8192}}).encode()
     req = urllib.request.Request(OLLAMA, data=body, headers={"Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=1800) as r:
         return json.loads(r.read()).get("response", "")
@@ -553,14 +554,23 @@ def _vision(b64):
 
 def extract_batch(images, capture_dt):
     """여러 화면을 한 번에: 화면별 비전추출 → finalize(계좌합계 대조 게이트 + broker 정규화)
-    → 결정적 enrich(심볼·수량·현재가). 앱이 스크린샷 여러 장을 종합해 정확한 결과를 얻는 경로."""
+    → 결정적 enrich(심볼·수량·현재가). 앱이 스크린샷 여러 장을 종합해 정확한 결과를 얻는 경로.
+
+    비전 호출은 NP개 동시 발사 — ollama 슬롯(OLLAMA_NUM_PARALLEL)이 디코드 스텝을 배칭해
+    가중치 스트리밍을 공유하므로 총 처리량이 슬롯 수에 가깝게 늘어난다. 요청은 여전히 화면당
+    1개라 행→화면 귀속은 구조적으로 보존된다(NP는 ollama 슬롯 수와 일치시킬 것)."""
     t0 = time.time()
-    screens = []
-    for i, b64 in enumerate(images):
+    for b64 in images:                            # EXIF는 병렬 전에 순차로(빠름·상태 갱신 결정적)
         dt = exif_capture_dt(b64)
         if dt:
             store_capture(dt); capture_dt = dt
-        screens.append({"file": f"img{i + 1}", "raw": _vision(b64)})
+    if NP > 1 and len(images) > 1:
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=NP) as ex:
+            raws = list(ex.map(_vision, images))  # map은 입력 순서로 반환 → 귀속 불변
+    else:
+        raws = [_vision(b64) for b64 in images]
+    screens = [{"file": f"img{i + 1}", "raw": raw} for i, raw in enumerate(raws)]
     fin = finalize_mod.finalize(screens)          # holdings(정규화) + gate(대조 리포트)
     rows = enrich(fin["holdings"], capture_dt)    # 심볼 해석 + 수량 사다리 + 가격(_file은 화면단위 게이트에 필요)
     for h in rows:
