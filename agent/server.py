@@ -460,6 +460,13 @@ def enrich(rows, capture_dt):
             for k in ("value", "cost"):
                 if h.get(k) is not None:
                     h[k] = round(h[k] / fx, 2)
+            # price도 같은 불변식 — 앱은 value보다 qty×price를 우선하므로 price가 원화면 표가 깨진다.
+            # 이미 달러인 출처(capture-close·computed:…/FX)가 섞여 있어, 어느 단위인지는 출처 문자열이
+            # 아니라 측정으로 판정: 환산 후 단가(value/qty)에 더 가까워지는 가정을 택한다.
+            if h.get("price") and h.get("qty") and h.get("value"):
+                per = h["value"] / h["qty"]                     # 달러 단가(방금 환산됨)
+                if abs(h["price"] / fx - per) < abs(h["price"] - per):
+                    h["price"] = round(h["price"] / fx, 2)
             h["fx_applied"] = fx
         elif (_is_cash(h) and h.get("currency") == "USD" and fx and h.get("qty")
               and h.get("value") and abs(h["value"] / h["qty"] - fx) / fx < 0.02):
@@ -467,6 +474,19 @@ def enrich(rows, capture_dt):
             # 앱이 fx를 다시 곱하면 값이 튄다). 화면의 원화 금액 = 달러잔액 × 환율임을 확인한 뒤 환산.
             h["value"] = round(h["value"] / fx, 2)
             h["fx_applied"] = fx
+
+    # 표시 항등식 게이트 — 앱은 qty×price를 value보다 우선한다(재평가 경로가 price를 갱신하는 구조라).
+    # 화면 현재가를 오독하면(자릿수 유실 등) 추출 value가 정확해도 표가 조용히 오염된다.
+    # 평가금액이 진실(value_src=screen)이므로, qty×price가 value와 2% 넘게 어긋나면 price를 버리고
+    # value/qty로 되돌린다. 2%는 앱의 checkFail 기준과 같은 값(계약 단일화).
+    for h in rows:
+        if _is_cash(h) or not (h.get("qty") and h.get("price") and h.get("value")):
+            continue
+        if abs(h["qty"] * h["price"] - h["value"]) / h["value"] > 0.02:
+            h["price_note"] = (f"화면 현재가 {h['price']:,} 기각 — qty×price가 평가금액과 "
+                               f"불일치(오독 의심)")
+            h["price"] = round(h["value"] / h["qty"], 2)
+            h["price_src"] = "computed:value/qty"
 
     for h in rows:
         if not h.get("qty") and not h.get("confidence"):
