@@ -1,0 +1,18 @@
+
+# 로컬 검증용 더미 스크린샷 — 공개 레포에 커밋 금지
+test-fixtures/
+
+# 로컬 에이전트 검증 산출물
+eval/results/
+eval/.venv/
+eval/harness/expected.json
+
+# 서버 전용 시세/보유 데이터 — 보유 종목 구성 노출이라 공개 레포 금지
+agent/.symbol-cache.json
+agent/__pycache__/
+data/
+prices.json
+watchlist.json
+agent/env
+/env
+eval/harness/__pycache__/
