@@ -1905,8 +1905,11 @@ class Component extends DCLogic {
 
   // 스냅샷 처리: 스크린샷에 나타난 (증권사·계좌) 범위는 그 시점의 전체 잔고로 간주
   // → 매칭 종목 갱신 · 새 종목 추가 · 스크린샷에 없는 종목은 제거 (다른 계좌·직접입력 자산은 건드리지 않음)
+  // 예외: 데모 시드는 실데이터가 들어오는 순간 전부 치운다 — 시드 계좌는 실계좌와 스코프가 안 겹쳐서
+  // 스코프 규칙만으로는 살아남고, 추출 결과가 기존 표 아래에 덧붙는 것처럼 보인다.
   applySnapshot(newPending, extraNote) {
     {
+      const isDemo = h => /^s\d+$/.test(String(h.id));   // sampleData()만 쓰는 id 꼴
       const norm = s => String(s || '').replace(/[\s()\-·.,]/g, '').toLowerCase();
       const scopeOf = x => norm(x.broker) + '|' + x.accountType;
       const scopes = new Set(newPending.map(scopeOf));
@@ -1924,6 +1927,8 @@ class Component extends DCLogic {
           h.qty_src = p.qty_src || ''; h.price_src = p.price_src || ''; h.value_src = p.value_src || '';
           h.updatedAt = Date.now();
           h._seen = true;
+          // 데모 행이 실값으로 갱신되면 더는 데모가 아니다 — id를 실자산 꼴로 바꿔 다음 스냅샷의 시드 청소를 면한다
+          if (isDemo(h)) h.id = 'h' + Date.now() + Math.random().toString(36).slice(2, 6);
           updated++;
         } else {
           holdings.push({
@@ -1937,7 +1942,7 @@ class Component extends DCLogic {
         }
       });
       const before = holdings.length;
-      holdings = holdings.filter(h => !scopes.has(scopeOf(h)) || h._seen || h.broker === '직접입력');
+      holdings = holdings.filter(h => !isDemo(h) && (!scopes.has(scopeOf(h)) || h._seen || h.broker === '직접입력'));
       const removed = before - holdings.length;
       holdings.forEach(h => { delete h._seen; });
       this.set({ holdings });

@@ -8,7 +8,7 @@
 사전 조건: 서버(:8899)와 정적 서버(:8000)가 떠 있어야 한다. run_e2e.sh가 함께 띄운다.
 검증: 앱 저장 상태(pf_rebalancer_v1) ↔ 정답표(31종목) 대조 + 출처칩 표시 + 스크린샷 증거.
 """
-import json, os, sys, time
+import json, os, re, sys, time
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -38,22 +38,26 @@ def main():
         d.get(APP_URL)
         time.sleep(3)
         # 앱 좌하단 '에이전트 연결'과 동일한 계약: localStorage에 터널/로컬 URL을 넣는다.
-        # 보유자산은 **빈 상태**로 시작한다 — 지우기만 하면 앱이 데모 시드(13건)를 만들어 넣어서
-        # 추출 결과와 뒤섞인다(이걸 추출 성공으로 오인하면 E2E가 거짓 통과한다).
-        # 빈 배열로 두면 앱이 데모 시드(13건)를 채운다 → 추출 결과와 뒤섞여 거짓 통과를 만든다.
-        # '직접입력' 센티넬 1건으로 시드를 막는다(스냅샷 병합이 직접입력 자산은 보존한다).
+        # 시작 상태는 실사용 첫 방문을 흉내낸다:
+        #  · '직접입력' 센티넬 1건 — 스냅샷 병합이 보존해야 하는 사용자 자산(빈 배열로 두면
+        #    앱이 데모 시드 13건을 채워 추출 결과와 뒤섞여 거짓 통과를 만든다)
+        #  · 데모 시드 꼴 1건(id 's1') — 시드 계좌는 실계좌와 스코프가 안 겹쳐 스냅샷 규칙만으론
+        #    살아남았다(추출 결과가 기존 표 아래 덧붙는 버그). 청소되는지를 여기서 상시 검증한다.
         d.execute_script("""
           localStorage.setItem('pf_agent_url', arguments[0]);
           localStorage.setItem('pf_rebalancer_v1', JSON.stringify({
             holdings: [{id:'e2e0', broker:'직접입력', accountType:'일반', name:'__E2E__',
                         cls:'cash', currency:'KRW', qty:null, price:null, value:1, cost:null,
+                        updatedAt: Date.now()},
+                       {id:'s1', broker:'토스증권', accountType:'일반', name:'AAPL 애플',
+                        cls:'growth', currency:'USD', qty:12, price:212.5, value:null, cost:2280,
                         updatedAt: Date.now()}],
             target: null, fx: 1509.9 }));""", AGENT)
         d.get(APP_URL)
         time.sleep(3)
         n0 = len(json.loads(d.execute_script(
             "return localStorage.getItem('pf_rebalancer_v1');")).get("holdings", []))
-        print(f"· 앱 로드 완료 — 에이전트 {AGENT} · 시작 보유자산 {n0}건(센티넬만)")
+        print(f"· 앱 로드 완료 — 에이전트 {AGENT} · 시작 보유자산 {n0}건(센티넬+데모시드)")
 
         imgs = sorted(os.path.join(SHOTS, f) for f in os.listdir(SHOTS)
                       if f.lower().endswith((".jpg", ".png")))
@@ -67,7 +71,8 @@ def main():
             time.sleep(5); waited += 5
             state = d.execute_script("return localStorage.getItem('pf_rebalancer_v1');")
             rows = json.loads(state or "{}").get("holdings") or []
-            holdings = [h for h in rows if h.get("name") != "__E2E__"]   # 센티넬 제외
+            holdings = [h for h in rows if h.get("name") != "__E2E__"          # 센티넬 제외
+                        and not re.fullmatch(r"s\d+", str(h.get("id", "")))]   # 시드 제외(추출 도착 판정용)
             if holdings:
                 break
             err = d.execute_script(
@@ -80,6 +85,14 @@ def main():
                 print(f"   … {waited}s {st}")
         if not holdings:
             raise SystemExit("❌ 시간 초과 — 추출이 앱까지 도달하지 못함")
+        # 스냅샷 계약 검증: 데모 시드(id s\d+)는 청소되고, 직접입력 자산은 보존돼야 한다.
+        leftover = [h for h in rows if re.fullmatch(r"s\d+", str(h.get("id", "")))]
+        if leftover:
+            raise SystemExit(f"❌ 데모 시드가 추출 후에도 남음(표 아래 덧붙음 버그): "
+                             f"{[h['name'] for h in leftover]}")
+        if not any(h.get("name") == "__E2E__" for h in rows):
+            raise SystemExit("❌ 직접입력 자산(센티넬)이 스냅샷 병합에서 유실됨")
+        print("· 데모 시드 청소 ✅ · 직접입력 보존 ✅")
         d.save_screenshot(os.path.join(OUT, "app.png"))
         print(f"· 앱 표에 반영된 종목 {len(holdings)}개 (스크린샷 → {OUT}/app.png)")
         return holdings, d
