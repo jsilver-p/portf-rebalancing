@@ -1,0 +1,36 @@
+#!/bin/sh
+# index.html의 임베드 앱 문서 == design-source/app.current.html 불변식 게이트.
+#
+# 검사 대상은 작업트리가 아니라 '스테이징된 내용'이다. 원본만 add하고 index.html을 빠뜨리면
+# 작업트리는 일치하는데 커밋만 어긋난다 — 그 경우를 잡으려면 커밋될 blob을 그대로 봐야 한다.
+#
+# 활성화:  git config core.hooksPath .githooks
+set -e
+
+IDX=index.html
+SRC=design-source/app.current.html
+
+# 둘 중 아무것도 안 건드리는 커밋은 그냥 통과(대부분의 커밋).
+if ! git diff --cached --name-only | grep -qx -e "$IDX" -e "$SRC"; then
+  exit 0
+fi
+
+TMP=$(mktemp -d)
+trap 'rm -rf "$TMP"' EXIT
+
+for f in "$IDX" "$SRC"; do
+  if ! git cat-file -e ":$f" 2>/dev/null; then
+    echo "✗ pre-commit: $f 가 인덱스에 없습니다(삭제됐나요?) — 앱 문서 게이트를 검사할 수 없습니다." >&2
+    exit 1
+  fi
+done
+
+mkdir -p "$TMP/design-source"
+git show ":$IDX" > "$TMP/$IDX"
+git show ":$SRC" > "$TMP/$SRC"
+
+if ! python3 agent/repack_app.py check "$TMP/$SRC" "$TMP/$IDX"; then
+  echo "" >&2
+  echo "  (커밋에 담길 내용 기준입니다. 두 파일을 함께 add 했는지 확인하세요.)" >&2
+  exit 1
+fi
