@@ -1377,6 +1377,15 @@
     @keyframes pfspin{to{transform:rotate(360deg);}}
     input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
     input[type=number]{-moz-appearance:textfield;appearance:textfield;}
+    /* ── 표 레이아웃(단일 출처: 헤더·행이 같은 클래스를 공유) ── */
+    .pf-tbl-scroll{overflow-x:auto;}
+    .pf-hold-row{display:grid;grid-template-columns:minmax(150px,1fr) 118px 82px 98px 134px 56px 66px 24px;gap:8px;min-width:760px;}
+    .pf-analysis{display:grid;grid-template-columns:250px 1fr;gap:20px;}
+    .pf-num{font-variant-numeric:tabular-nums;}
+    @media (max-width:640px){
+      .pf-main{padding-left:12px;padding-right:12px;}
+      .pf-analysis{grid-template-columns:1fr;}
+    }
   </style>
 </helmet>
 
@@ -1384,7 +1393,7 @@
 
   <!-- ── Header ─────────────────────────────── -->
   <header style="position:sticky;top:0;z-index:20;background:var(--bg-surface,#fff);border-bottom:1px solid var(--border-default,#dfdfe8);">
-    <div style="max-width:1060px;margin:0 auto;padding:14px 20px;display:flex;align-items:center;gap:16px;">
+    <div style="max-width:1060px;margin:0 auto;padding:14px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;row-gap:6px;">
       <div style="display:flex;flex-direction:column;gap:2px;">
         <span style="font-size:18px;font-weight:700;line-height:1.2;">포트폴리오</span>
         <span style="font-size:11px;font-weight:500;letter-spacing:0.3px;color:var(--text-tertiary,#999);text-transform:uppercase;">Rebalancing Dashboard</span>
@@ -1409,7 +1418,7 @@
     </div>
   </header>
 
-  <main style="max-width:1060px;margin:0 auto;padding:20px 20px 60px;display:flex;flex-direction:column;gap:20px;">
+  <main class="pf-main" style="max-width:1060px;margin:0 auto;padding:20px 20px 60px;display:flex;flex-direction:column;gap:20px;">
 
     <!-- ── 1. Upload ─────────────────────────── -->
     <section style="background:var(--bg-surface,#fff);border:1px solid var(--border-default,#dfdfe8);border-radius:10px;overflow:hidden;">
@@ -1438,46 +1447,6 @@
         </sc-if>
       </div>
 
-      <!-- Review of extracted rows -->
-      <sc-if value="{{ hasPending }}" hint-placeholder-val="{{ false }}">
-        <div style="border-top:1px solid var(--border-default,#dfdfe8);background:#fffdf5;">
-          <div style="padding:12px 18px 4px;display:flex;align-items:center;gap:10px;">
-            <span style="font-size:11px;font-weight:700;letter-spacing:1px;color:#b8860b;">검수 필요</span>
-            <span style="font-size:12.5px;color:var(--text-secondary,#6e6e6e);">추출값을 확인·수정 후 확정하세요 — <b>노란 행</b>은 확신이 낮거나 검산 불일치</span>
-            <div style="flex:1;"></div>
-            <x-import component-from-global-scope="InstagramDesignSystem_a82dd2.Button" variant="primary" size="sm" dc-props="{{ confirmAllBtn }}" hint-size="90px,30px">전체 확정</x-import>
-            <x-import component-from-global-scope="InstagramDesignSystem_a82dd2.Button" variant="secondary" size="sm" dc-props="{{ discardAllBtn }}" hint-size="70px,30px">비우기</x-import>
-          </div>
-          <div style="padding:8px 18px 16px;display:flex;flex-direction:column;gap:4px;">
-            <div style="display:grid;grid-template-columns:110px 100px 1fr 128px 62px 74px 92px 92px 56px;gap:8px;padding:4px 8px;font-size:10.5px;font-weight:600;letter-spacing:0.4px;color:var(--text-tertiary,#999);text-transform:uppercase;">
-              <span>증권사</span><span>계좌</span><span>종목명</span><span>자산군</span><span style="text-align:right;">수량</span><span style="text-align:right;">현재가</span><span style="text-align:right;">평가금액</span><span style="text-align:right;">매입원금</span><span></span>
-            </div>
-            <sc-for list="{{ pendingRows }}" as="p" hint-placeholder-count="2">
-              <div style="display:grid;grid-template-columns:110px 100px 1fr 128px 62px 74px 92px 92px 56px;gap:8px;align-items:center;padding:5px 8px;border-radius:6px;background:{{ p.bg }};border:1px solid {{ p.bd }};">
-                <input value="{{ p.broker }}" onchange="{{ p.onBroker }}" style="border:none;background:transparent;font-size:12.5px;padding:3px 2px;min-width:0;color:var(--text-primary,#000);">
-                <select value="{{ p.accountType }}" onchange="{{ p.onAcct }}" style="border:none;background:transparent;font-size:12.5px;padding:3px 0;color:var(--text-primary,#000);">
-                  <sc-for list="{{ acctOpts }}" as="o" hint-placeholder-count="3"><option value="{{ o }}">{{ o }}</option></sc-for>
-                </select>
-                <input value="{{ p.name }}" onchange="{{ p.onName }}" style="border:none;background:transparent;font-size:12.5px;font-weight:600;padding:3px 2px;min-width:0;color:var(--text-primary,#000);">
-                <select value="{{ p.cls }}" onchange="{{ p.onCls }}" style="border:none;background:transparent;font-size:12.5px;padding:3px 0;color:var(--text-primary,#000);">
-                  <sc-for list="{{ classOpts }}" as="o" hint-placeholder-count="3"><option value="{{ o.key }}">{{ o.label }}</option></sc-for>
-                </select>
-                <input value="{{ p.qty }}" onchange="{{ p.onQty }}" placeholder="—" style="border:none;background:transparent;font-size:12.5px;text-align:right;padding:3px 2px;min-width:0;color:var(--text-primary,#000);">
-                <input value="{{ p.price }}" onchange="{{ p.onPrice }}" placeholder="—" style="border:none;background:transparent;font-size:12.5px;text-align:right;padding:3px 2px;min-width:0;color:var(--text-primary,#000);">
-                <input value="{{ p.value }}" onchange="{{ p.onValue }}" placeholder="—" style="border:none;background:transparent;font-size:12.5px;text-align:right;padding:3px 2px;min-width:0;color:var(--text-primary,#000);">
-                <input value="{{ p.cost }}" onchange="{{ p.onCost }}" placeholder="—" style="border:none;background:transparent;font-size:12.5px;text-align:right;padding:3px 2px;min-width:0;color:var(--text-primary,#000);">
-                <div style="display:flex;gap:4px;justify-content:flex-end;">
-                  <button onclick="{{ p.onConfirm }}" title="확정" style="border:none;background:var(--ig-blue,#1fa1ff);color:#fff;width:24px;height:24px;border-radius:5px;cursor:pointer;font-size:12px;line-height:1;">✓</button>
-                  <button onclick="{{ p.onDiscard }}" title="삭제" style="border:none;background:var(--bg-secondary,#efefef);color:var(--text-secondary,#6e6e6e);width:24px;height:24px;border-radius:5px;cursor:pointer;font-size:12px;line-height:1;">×</button>
-                </div>
-              </div>
-              <sc-if value="{{ p.warn }}" hint-placeholder-val="{{ false }}">
-                <div style="padding:0 8px 4px;font-size:11px;color:#b8860b;">{{ p.warnText }}</div>
-              </sc-if>
-            </sc-for>
-          </div>
-        </div>
-      </sc-if>
     </section>
 
     <!-- ── 2. Holdings table ─────────────────── -->
@@ -1494,7 +1463,8 @@
         <button onclick="{{ onAddManual }}" style="border:1px solid var(--border-strong,#c4c4c4);background:transparent;border-radius:6px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;color:var(--text-primary,#000);" style-hover="border-color:var(--ig-blue,#1fa1ff);color:var(--ig-blue,#1fa1ff);">＋ 직접 추가 (현금·부동산 등)</button>
       </div>
       <div style="padding:0 18px 6px;">
-        <div style="display:grid;grid-template-columns:1fr 122px 66px 90px 112px 58px 76px 26px;gap:8px;padding:7px 8px;border-bottom:1px solid var(--border-default,#dfdfe8);font-size:10.5px;font-weight:600;letter-spacing:0.4px;color:var(--text-tertiary,#999);text-transform:uppercase;">
+       <div class="pf-tbl-scroll">
+        <div class="pf-hold-row" style="padding:7px 8px;border-bottom:1px solid var(--border-default,#dfdfe8);font-size:10.5px;font-weight:600;letter-spacing:0.4px;color:var(--text-tertiary,#999);text-transform:uppercase;">
           <span>종목명</span><span>자산군</span><span style="text-align:right;">수량</span><span style="text-align:right;">현재가</span><span style="text-align:right;">평가금액 ₩</span><span style="text-align:right;">비중</span><span style="text-align:right;">손익</span><span></span>
         </div>
         <sc-for list="{{ rows }}" as="r" hint-placeholder-count="6">
@@ -1508,47 +1478,83 @@
               </div>
             </sc-if>
             <sc-if value="{{ r.isHolding }}" hint-placeholder-val="{{ false }}">
-              <div style="display:grid;grid-template-columns:1fr 122px 66px 90px 112px 58px 76px 26px;gap:8px;align-items:center;padding:6px 8px;border-bottom:1px solid var(--ig-gray-05,#efefef);" style-hover="background:var(--bg-app,#fafafa);">
+              <div class="pf-hold-row" style="align-items:center;padding:6px 8px;border-bottom:1px solid var(--ig-gray-05,#efefef);" style-hover="background:var(--bg-app,#fafafa);">
                 <input value="{{ r.name }}" onchange="{{ r.onName }}" style="border:none;background:transparent;font-size:13px;font-weight:600;padding:3px 2px;min-width:0;color:var(--text-primary,#000);">
                 <select value="{{ r.cls }}" onchange="{{ r.onCls }}" style="border:none;background:transparent;font-size:12px;padding:3px 0;color:{{ r.clsColor }};font-weight:600;">
                   <sc-for list="{{ classOpts }}" as="o" hint-placeholder-count="3"><option value="{{ o.key }}">{{ o.label }}</option></sc-for>
                 </select>
                 <div style="display:flex;align-items:center;justify-content:flex-end;gap:3px;min-width:0;">
                   <sc-if value="{{ r.hasQtySrc }}" hint-placeholder-val="{{ false }}"><span title="수량 출처" style="font-size:8px;font-weight:700;color:#3897f0;background:rgba(56,151,240,0.12);padding:0.5px 3px;border-radius:3px;flex:none;letter-spacing:0.2px;">{{ r.qtySrc }}</span></sc-if>
-                  <input value="{{ r.qty }}" onchange="{{ r.onQty }}" placeholder="—" style="border:none;background:transparent;font-size:12.5px;text-align:right;padding:3px 2px;min-width:0;width:100%;color:var(--text-primary,#000);">
+                  <input value="{{ r.qty }}" onchange="{{ r.onQty }}" placeholder="—" class="pf-num" style="border:none;background:transparent;font-size:12.5px;text-align:right;padding:3px 2px;min-width:0;width:100%;color:var(--text-primary,#000);">
                 </div>
                 <div style="display:flex;align-items:center;justify-content:flex-end;gap:3px;min-width:0;">
                   <span title="{{ r.staleTitle }}" style="width:6px;height:6px;border-radius:50%;background:{{ r.staleColor }};flex:none;"></span>
-                  <input value="{{ r.price }}" onchange="{{ r.onPrice }}" placeholder="—" style="border:none;background:transparent;font-size:12.5px;text-align:right;padding:3px 0;width:100%;min-width:0;color:var(--text-primary,#000);">
+                  <input value="{{ r.price }}" onchange="{{ r.onPrice }}" placeholder="—" class="pf-num" style="border:none;background:transparent;font-size:12.5px;text-align:right;padding:3px 0;width:100%;min-width:0;color:var(--text-primary,#000);">
                   <span style="font-size:10px;color:var(--text-tertiary,#999);flex:none;">{{ r.cur }}</span>
                 </div>
                 <div style="display:flex;align-items:center;justify-content:flex-end;gap:3px;min-width:0;">
+                  <sc-if value="{{ r.mismatch }}" hint-placeholder-val="{{ false }}"><span title="{{ r.mismatchTitle }}" style="font-size:9px;font-weight:700;color:#b8860b;background:#fff3cd;border:1px solid #f0d48a;padding:0 3px;border-radius:3px;flex:none;cursor:help;">⚠</span></sc-if>
                   <sc-if value="{{ r.hasValueSrc }}" hint-placeholder-val="{{ false }}"><span title="평가금액 출처" style="font-size:8px;font-weight:700;color:#8134af;background:rgba(129,52,175,0.12);padding:0.5px 3px;border-radius:3px;flex:none;letter-spacing:0.2px;">{{ r.valueSrc }}</span></sc-if>
-                  <sc-if value="{{ r.hasQP }}" hint-placeholder-val="{{ true }}"><span style="font-size:12.5px;font-weight:600;text-align:right;">{{ r.valueStr }}</span></sc-if>
-                  <sc-if value="{{ r.noQP }}" hint-placeholder-val="{{ false }}"><input value="{{ r.valueInput }}" onchange="{{ r.onValue }}" style="border:none;background:transparent;font-size:12.5px;font-weight:600;text-align:right;padding:3px 2px;min-width:0;width:100%;color:var(--text-primary,#000);"></sc-if>
+                  <sc-if value="{{ r.hasQP }}" hint-placeholder-val="{{ true }}"><span class="pf-num" style="font-size:12.5px;font-weight:600;text-align:right;">{{ r.valueStr }}</span></sc-if>
+                  <sc-if value="{{ r.noQP }}" hint-placeholder-val="{{ false }}"><input value="{{ r.valueInput }}" onchange="{{ r.onValue }}" class="pf-num" style="border:none;background:transparent;font-size:12.5px;font-weight:600;text-align:right;padding:3px 2px;min-width:0;width:100%;color:var(--text-primary,#000);"></sc-if>
                 </div>
-                <span style="font-size:12.5px;text-align:right;color:var(--text-secondary,#6e6e6e);">{{ r.weightStr }}</span>
-                <span style="font-size:12.5px;font-weight:600;text-align:right;color:{{ r.plColor }};">{{ r.plStr }}</span>
+                <span class="pf-num" style="font-size:12.5px;text-align:right;color:var(--text-secondary,#6e6e6e);">{{ r.weightStr }}</span>
+                <span class="pf-num" style="font-size:12.5px;font-weight:600;text-align:right;color:{{ r.plColor }};">{{ r.plStr }}</span>
                 <button onclick="{{ r.onDelete }}" title="삭제" style="border:none;background:transparent;color:var(--ig-gray-40,#b4b4b4);cursor:pointer;font-size:15px;padding:0;line-height:1;" style-hover="color:var(--ig-red-heart,#ed4956);">×</button>
               </div>
             </sc-if>
           </div>
         </sc-for>
-        <div style="display:flex;justify-content:space-between;padding:10px 8px 14px;font-size:11.5px;color:var(--text-tertiary,#999);">
-          <span>● 노란 점 = 시세 24시간 이상 경과 — 잔고 스크린샷을 다시 올리면 해당 종목 시세가 자동 갱신됩니다 (직접 수정도 가능)</span>
-          <span>합계 <b style="color:var(--text-primary,#000);font-size:12.5px;">{{ totalStr }}</b></span>
+       </div>
+        <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:6px 16px;padding:10px 8px 14px;font-size:11.5px;color:var(--text-tertiary,#999);">
+          <div style="display:flex;flex-wrap:wrap;align-items:center;gap:5px 12px;flex:1;min-width:0;">
+            <span style="display:inline-flex;align-items:center;gap:4px;"><span style="font-size:8px;font-weight:700;color:#3897f0;background:rgba(56,151,240,0.12);padding:0.5px 3px;border-radius:3px;letter-spacing:0.2px;">칩</span>수량 출처</span>
+            <span style="display:inline-flex;align-items:center;gap:4px;"><span style="font-size:8px;font-weight:700;color:#8134af;background:rgba(129,52,175,0.12);padding:0.5px 3px;border-radius:3px;letter-spacing:0.2px;">칩</span>평가금액 출처</span>
+            <span>· <b style="color:var(--text-secondary,#6e6e6e);">screen</b> 화면 원본 · <b style="color:var(--text-secondary,#6e6e6e);">est</b> 추정 · <b style="color:var(--text-secondary,#6e6e6e);">cross</b> 교차산출 · <b style="color:var(--text-secondary,#6e6e6e);">calc</b> 계산 · <b style="color:var(--text-secondary,#6e6e6e);">live</b> 재평가 · <b style="color:var(--text-secondary,#6e6e6e);">kept</b> 기존값 유지 · <b style="color:var(--text-secondary,#6e6e6e);">cash</b> 현금</span>
+            <span style="display:inline-flex;align-items:center;gap:4px;"><span style="width:6px;height:6px;border-radius:50%;background:#f5a623;display:inline-block;"></span>노란 점 = 시세 24h 경과(재업로드 시 자동 갱신)</span>
+            <span style="display:inline-flex;align-items:center;gap:4px;"><span style="font-size:9px;font-weight:700;color:#b8860b;background:#fff3cd;border:1px solid #f0d48a;padding:0 3px;border-radius:3px;">⚠</span>수량×현재가와 화면 평가금액 2% 이상 불일치</span>
+          </div>
+          <span style="white-space:nowrap;">합계 <b class="pf-num" style="color:var(--text-primary,#000);font-size:12.5px;">{{ totalStr }}</b></span>
         </div>
       </div>
     </section>
 
-    <!-- ── 3. Analysis ───────────────────────── -->
+    <!-- ── 3. Target ─────────────────────────── -->
+    <section style="background:var(--bg-surface,#fff);border:1px solid var(--border-default,#dfdfe8);border-radius:10px;overflow:hidden;">
+      <div style="padding:14px 18px 10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <span style="font-size:11px;font-weight:700;letter-spacing:1px;color:var(--text-tertiary,#999);">STEP 3</span>
+        <span style="font-size:15px;font-weight:700;">목표 포트폴리오</span>
+        <span style="font-size:12px;color:var(--text-secondary,#6e6e6e);">추천안을 고른 뒤 비중을 직접 조정하세요</span>
+        <div style="flex:1;"></div>
+        <sc-for list="{{ presets }}" as="pr" hint-placeholder-count="3">
+          <button onclick="{{ pr.onApply }}" style="border:1px solid {{ pr.bd }};background:{{ pr.bg }};color:{{ pr.fg }};border-radius:999px;padding:5px 13px;font-size:12px;font-weight:600;cursor:pointer;">{{ pr.label }}</button>
+        </sc-for>
+      </div>
+      <div style="display:flex;gap:10px;padding:4px 18px 16px;flex-wrap:wrap;align-items:flex-end;">
+        <sc-for list="{{ targetRows }}" as="t" hint-placeholder-count="6">
+          <div style="display:flex;flex-direction:column;gap:5px;min-width:104px;flex:1;">
+            <span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;"><span style="width:9px;height:9px;border-radius:2px;background:{{ t.color }};"></span>{{ t.label }}</span>
+            <div style="display:flex;align-items:center;border:1px solid var(--border-default,#dfdfe8);border-radius:6px;overflow:hidden;">
+              <input type="number" value="{{ t.val }}" onchange="{{ t.onChange }}" min="0" max="100" class="pf-num" style="border:none;width:100%;padding:7px 4px 7px 10px;font-size:14px;font-weight:700;text-align:right;background:var(--bg-surface,#fff);color:var(--text-primary,#000);">
+              <span style="font-size:12px;color:var(--text-tertiary,#999);padding:0 9px 0 2px;">%</span>
+            </div>
+          </div>
+        </sc-for>
+        <div style="display:flex;flex-direction:column;gap:5px;min-width:88px;">
+          <span style="font-size:12px;font-weight:600;color:var(--text-tertiary,#999);">합계</span>
+          <span class="pf-num" style="font-size:15px;font-weight:700;padding:7px 0;color:{{ sumColor }};">{{ targetSum }}%</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── 4. Analysis ───────────────────────── -->
     <section style="background:var(--bg-surface,#fff);border:1px solid var(--border-default,#dfdfe8);border-radius:10px;overflow:hidden;">
       <div style="padding:14px 18px 6px;display:flex;align-items:baseline;gap:10px;">
-        <span style="font-size:11px;font-weight:700;letter-spacing:1px;color:var(--text-tertiary,#999);">STEP 3</span>
+        <span style="font-size:11px;font-weight:700;letter-spacing:1px;color:var(--text-tertiary,#999);">STEP 4</span>
         <span style="font-size:15px;font-weight:700;">자산배분 분석</span>
         <span style="font-size:12px;color:var(--text-secondary,#6e6e6e);">혼합형 펀드는 배당주 50% · 채권 50%로 분해해 집계</span>
       </div>
-      <div style="display:grid;grid-template-columns:250px 1fr;gap:20px;padding:12px 18px 20px;align-items:start;">
+      <div class="pf-analysis" style="padding:12px 18px 20px;align-items:start;">
         <div style="display:flex;flex-direction:column;align-items:center;gap:12px;">
           <div style="position:relative;width:190px;height:190px;">
             <svg viewBox="0 0 200 200" style="width:100%;height:100%;">
@@ -1581,39 +1587,11 @@
                 <div style="height:5px;background:var(--bg-secondary,#efefef);border-radius:3px;overflow:hidden;"><div style="height:100%;border-radius:3px;background:var(--ig-gray-30,#c4c4c4);width:{{ d.tgtW }};"></div></div>
               </div>
               <div style="display:flex;justify-content:flex-end;align-items:baseline;gap:6px;">
-                <span style="font-size:11px;color:var(--text-tertiary,#999);">{{ d.curPct }} → {{ d.tgtPct }}</span>
-                <span style="font-size:12.5px;font-weight:700;color:{{ d.diffColor }};min-width:52px;text-align:right;">{{ d.diff }}</span>
+                <span class="pf-num" style="font-size:11px;color:var(--text-tertiary,#999);">{{ d.curPct }} → {{ d.tgtPct }}</span>
+                <span class="pf-num" style="font-size:12.5px;font-weight:700;color:{{ d.diffColor }};min-width:52px;text-align:right;">{{ d.diff }}</span>
               </div>
             </div>
           </sc-for>
-        </div>
-      </div>
-    </section>
-
-    <!-- ── 4. Target ─────────────────────────── -->
-    <section style="background:var(--bg-surface,#fff);border:1px solid var(--border-default,#dfdfe8);border-radius:10px;overflow:hidden;">
-      <div style="padding:14px 18px 10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-        <span style="font-size:11px;font-weight:700;letter-spacing:1px;color:var(--text-tertiary,#999);">STEP 4</span>
-        <span style="font-size:15px;font-weight:700;">목표 포트폴리오</span>
-        <span style="font-size:12px;color:var(--text-secondary,#6e6e6e);">추천안을 고른 뒤 비중을 직접 조정하세요</span>
-        <div style="flex:1;"></div>
-        <sc-for list="{{ presets }}" as="pr" hint-placeholder-count="3">
-          <button onclick="{{ pr.onApply }}" style="border:1px solid {{ pr.bd }};background:{{ pr.bg }};color:{{ pr.fg }};border-radius:999px;padding:5px 13px;font-size:12px;font-weight:600;cursor:pointer;">{{ pr.label }}</button>
-        </sc-for>
-      </div>
-      <div style="display:flex;gap:10px;padding:4px 18px 16px;flex-wrap:wrap;align-items:flex-end;">
-        <sc-for list="{{ targetRows }}" as="t" hint-placeholder-count="6">
-          <div style="display:flex;flex-direction:column;gap:5px;min-width:104px;flex:1;">
-            <span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;"><span style="width:9px;height:9px;border-radius:2px;background:{{ t.color }};"></span>{{ t.label }}</span>
-            <div style="display:flex;align-items:center;border:1px solid var(--border-default,#dfdfe8);border-radius:6px;overflow:hidden;">
-              <input type="number" value="{{ t.val }}" onchange="{{ t.onChange }}" min="0" max="100" style="border:none;width:100%;padding:7px 4px 7px 10px;font-size:14px;font-weight:700;text-align:right;background:var(--bg-surface,#fff);color:var(--text-primary,#000);">
-              <span style="font-size:12px;color:var(--text-tertiary,#999);padding:0 9px 0 2px;">%</span>
-            </div>
-          </div>
-        </sc-for>
-        <div style="display:flex;flex-direction:column;gap:5px;min-width:88px;">
-          <span style="font-size:12px;font-weight:600;color:var(--text-tertiary,#999);">합계</span>
-          <span style="font-size:15px;font-weight:700;padding:7px 0;color:{{ sumColor }};">{{ targetSum }}%</span>
         </div>
       </div>
     </section>
@@ -1675,7 +1653,6 @@ class Component extends DCLogic {
     this.ACCTS = ['일반', '연금저축', 'IRP', '퇴직연금', 'ISA'];
     this.state = {
       holdings: [],
-      pending: [],
       target: { growth: 30, dividend: 20, bond: 25, gold: 10, cash: 10, realestate: 5 },
       fx: 1380,
       extracting: false,
@@ -1780,9 +1757,6 @@ class Component extends DCLogic {
 
   updateHolding(id, patch) {
     this.set({ holdings: this.state.holdings.map(h => h.id === id ? { ...h, ...patch } : h) });
-  }
-  updatePending(id, patch) {
-    this.setState({ pending: this.state.pending.map(p => p.id === id ? { ...p, ...patch } : p) });
   }
 
   // ---------- extraction ----------
@@ -1988,19 +1962,6 @@ class Component extends DCLogic {
       '규칙: (1) 화면에 없는 값은 null — 절대 추측 금지. (2) 숫자는 쉼표 제거한 순수 숫자. (3) 수량 없이 매입원금/평가금액만 있는 화면(연금 등)은 value·cost만 채워라. (4) 합계·헤더 행 제외. (5) assetClass는 상품명으로 판단: 나스닥/S&P/성장/테크→성장주, 고배당/배당→배당주, 채권→채권, 금현물/원자재→금·원자재, 현금성/예수금/CMA→현금, 리츠→부동산, 채권혼합→혼합(주식·채권). (6) 값이 흐릿하거나 잘렸으면 해당 행 confidence를 0.7 이하로.';
   }
 
-  confirmPending(id) {
-    const p = this.state.pending.find(x => x.id === id);
-    if (!p) return;
-    const h = {
-      id: 'h' + Date.now() + Math.random().toString(36).slice(2, 6),
-      broker: p.broker, accountType: p.accountType, name: p.name, cls: p.cls,
-      currency: p.currency, qty: p.qty, price: p.price, value: p.value, cost: p.cost,
-      updatedAt: Date.now()
-    };
-    this.set({ holdings: [...this.state.holdings, h] });
-    this.setState({ pending: this.state.pending.filter(x => x.id !== id) });
-  }
-
   // ---------- allocation math ----------
   rollup() {
     const by = { growth: 0, dividend: 0, bond: 0, gold: 0, cash: 0, realestate: 0 };
@@ -2057,11 +2018,16 @@ class Component extends DCLogic {
       if (s === 'cash') return 'cash';
       return s.slice(0, 10);
     };
+    // 검산: 수량×현재가 vs 화면 평가금액. hasQP면 표는 qty*price를 보여주고 화면값(h.value)은 안 쓰므로,
+    // 2% 넘게 어긋나면 둘 중 하나가 틀린 것 — 값과 함께 매 렌더 계산해야 사용자가 고치는 즉시 반영된다.
+    const chkGap = h => (h.qty != null && h.price != null && h.value != null && h.value > 0)
+      ? Math.abs(h.qty * h.price - h.value) / h.value : 0;
     const mkRow = h => {
       const v = this.krw(h);
       const c = this.costKrw(h);
       const pl = c != null && c > 0 ? (v - c) / c * 100 : null;
       const hasQP = h.qty != null && h.price != null;
+      const gap = chkGap(h);
       const stale = Date.now() - (h.updatedAt || 0) > 86400000;
       const vSrc = h.value_src || h.price_src || '';
       return {
@@ -2077,6 +2043,9 @@ class Component extends DCLogic {
         valueStr: this.fmtW(v),
         valueInput: h.value == null ? '' : this.fmtNum(h.value),
         valueSrc: srcChip(vSrc), hasValueSrc: !!vSrc,
+        mismatch: gap > 0.02,
+        mismatchTitle: '검산 불일치 — 수량×현재가 ' + this.fmtNum(Math.round(h.qty * h.price)) +
+          ' vs 화면 평가금액 ' + this.fmtNum(h.value) + ' (' + (gap * 100).toFixed(1) + '% 차이). 표엔 수량×현재가가 표시됩니다 — 값을 확인하세요',
         weightStr: total > 0 ? (v / total * 100).toFixed(1) + '%' : '—',
         plStr: pl == null ? '—' : (pl >= 0 ? '+' : '') + pl.toFixed(1) + '%',
         plColor: pl == null ? '#999' : pl >= 0 ? '#ed4956' : '#3897f0',
@@ -2102,32 +2071,6 @@ class Component extends DCLogic {
       rows.push({ isHeader: true, isHolding: false, broker: g.broker, atype: g.accountType,
         atypeColor: acctColors[g.accountType] || '#6e6e6e', subtotalStr: this.fmtW(g.sub) });
       g.items.forEach(h => rows.push(mkRow(h)));
-    });
-
-    // --- pending rows ---
-    const pendingRows = S.pending.map(p => {
-      const low = p.confidence < 0.8 || p.checkFail;
-      return {
-        id: p.id, broker: p.broker, accountType: p.accountType, name: p.name, cls: p.cls,
-        qty: p.qty == null ? '' : this.fmtNum(p.qty),
-        price: p.price == null ? '' : this.fmtNum(p.price),
-        value: p.value == null ? '' : this.fmtNum(p.value),
-        cost: p.cost == null ? '' : this.fmtNum(p.cost),
-        bg: low ? '#fff3cd' : '#ffffff',
-        bd: low ? '#f0d48a' : 'var(--border-default,#dfdfe8)',
-        warn: p.checkFail,
-        warnText: '⚠ 수량×현재가와 평가금액이 2% 이상 어긋납니다 — 값을 확인하세요',
-        onBroker: e => this.updatePending(p.id, { broker: e.target.value }),
-        onAcct: e => this.updatePending(p.id, { accountType: e.target.value }),
-        onName: e => this.updatePending(p.id, { name: e.target.value }),
-        onCls: e => this.updatePending(p.id, { cls: e.target.value }),
-        onQty: e => this.updatePending(p.id, { qty: this.parseNum(e.target.value) }),
-        onPrice: e => this.updatePending(p.id, { price: this.parseNum(e.target.value) }),
-        onValue: e => this.updatePending(p.id, { value: this.parseNum(e.target.value) }),
-        onCost: e => this.updatePending(p.id, { cost: this.parseNum(e.target.value) }),
-        onConfirm: () => this.confirmPending(p.id),
-        onDiscard: () => this.setState({ pending: S.pending.filter(x => x.id !== p.id) })
-      };
     });
 
     // --- donut ---
@@ -2233,12 +2176,7 @@ class Component extends DCLogic {
       onFiles: e => { this.extractFiles(e.target.files); e.target.value = ''; },
       onDrop: e => { e.preventDefault(); this.extractFiles(e.dataTransfer.files); },
       onDragOver: e => e.preventDefault(),
-      hasPending: pendingRows.length > 0,
-      pendingRows,
-      acctOpts: this.ACCTS,
       classOpts,
-      confirmAllBtn: { onClick: () => { const ids = S.pending.map(p => p.id); ids.forEach(id => this.confirmPending(id)); } },
-      discardAllBtn: { onClick: () => this.setState({ pending: [] }) },
       rows,
       onAddManual: () => this.set({
         holdings: [...S.holdings, {
