@@ -21,7 +21,7 @@ def main():
     os.makedirs(outdir, exist_ok=True)
 
     processor = AutoProcessor.from_pretrained(
-        BASE, min_pixels=256 * 28 * 28, max_pixels=700000)
+        BASE, min_pixels=256 * 28 * 28, max_pixels=760000)
     model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
         BASE, torch_dtype=torch.bfloat16, device_map="cuda")
     if adapter != "none":
