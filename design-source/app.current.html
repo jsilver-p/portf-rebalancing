@@ -1650,10 +1650,26 @@ class Component extends DCLogic {
       { key: 'realestate', label: '부동산', color: '#8134af' },
       { key: 'mixed', label: '혼합(주식·채권)', color: '#6e6e6e' }
     ];
-    this.ACCTS = ['일반', '연금저축', 'IRP', '퇴직연금', 'ISA'];
+    // 배분 대상 자산군 — 혼합은 한 종목이 두 자산군에 걸쳐 있어 목표 비중의 단위가 될 수 없다.
+    // 도넛·드리프트·목표·액션이 전부 이 구성과 순서를 쓴다.
+    this.ALLOC = this.CLASSES.filter(c => c.key !== 'mixed');
+    // 계좌 — 종류·색·연금여부를 한 곳에서. 연금여부는 액션의 세금 안내가 갈리는 기준이다.
+    this.ACCOUNTS = [
+      { key: '일반', color: '#6e6e6e' },
+      { key: '연금저축', color: '#1fa1ff', pension: true },
+      { key: 'IRP', color: '#8134af', pension: true },
+      { key: '퇴직연금', color: '#004c8b', pension: true },
+      { key: 'ISA', color: '#dd2a7b' }
+    ];
+    // 목표 프리셋 — 라벨의 숫자는 값에서 파생한다(손으로 적으면 값과 조용히 어긋난다).
+    this.PRESETS = [
+      { name: '균형형', t: { growth: 30, dividend: 20, bond: 25, gold: 10, cash: 10, realestate: 5 } },
+      { name: '성장형', t: { growth: 45, dividend: 15, bond: 20, gold: 5, cash: 10, realestate: 5 } },
+      { name: '배당·안정형', t: { growth: 15, dividend: 30, bond: 30, gold: 10, cash: 10, realestate: 5 } }
+    ];
     this.state = {
       holdings: [],
-      target: { growth: 30, dividend: 20, bond: 25, gold: 10, cash: 10, realestate: 5 },
+      target: { ...this.PRESETS[0].t },
       fx: 1380,
       extracting: false,
       extractStatus: '',
@@ -1750,6 +1766,10 @@ class Component extends DCLogic {
     return '₩' + Math.round(n / 10000).toLocaleString('ko-KR') + '만';
   }
   fmtNum(n) { return n == null ? '' : Number(n).toLocaleString('ko-KR', { maximumFractionDigits: 2 }); }
+  // key를 가진 목록(CLASSES·ACCOUNTS·ALLOC) → key로 찾는 맵.
+  byKey(list) { const m = {}; list.forEach(x => m[x.key] = x); return m; }
+  // 추출 결과의 낯선 계좌명은 '일반'으로 — 아는 계좌는 ACCOUNTS가 단일 출처.
+  normAcct(a) { return this.ACCOUNTS.some(x => x.key === a) ? a : '일반'; }
   parseNum(s) {
     const v = parseFloat(String(s).replace(/[,₩$\s]/g, ''));
     return isNaN(v) ? null : v;
@@ -1795,7 +1815,7 @@ class Component extends DCLogic {
     const pending = (res.holdings || []).map((h, j) => ({
       id: 'p' + Date.now() + '_' + j,
       broker: h.broker || '미상',
-      accountType: this.ACCTS.includes(h.accountType) ? h.accountType : '일반',
+      accountType: this.normAcct(h.accountType),
       name: h.name || '', cls: clsMap[h.assetClass] || (String(h.assetClass || '').indexOf('혼합') >= 0 ? 'mixed' : 'growth'),
       currency: h.currency === 'USD' ? 'USD' : 'KRW',
       qty: h.qty != null ? Number(h.qty) : null,
@@ -1861,7 +1881,7 @@ class Component extends DCLogic {
           }
           newPending.push({
             id: 'p' + Date.now() + '_' + idx + '_' + j,
-            broker: r.broker || '미상', accountType: this.ACCTS.includes(r.accountType) ? r.accountType : '일반',
+            broker: r.broker || '미상', accountType: this.normAcct(r.accountType),
             name: r.name || '', cls,
             currency: r.currency === 'USD' ? 'USD' : 'KRW',
             qty, price, value, cost: r.cost != null ? Number(r.cost) : null,
@@ -1988,7 +2008,9 @@ class Component extends DCLogic {
     const band = Number(this.props.driftBand ?? 5);
     const { by, total } = this.rollup();
     const classOpts = this.CLASSES.map(c => ({ key: c.key, label: c.label }));
-    const cmap = {}; this.CLASSES.forEach(c => cmap[c.key] = c);
+    const cmap = this.byKey(this.CLASSES);
+    const amap = this.byKey(this.ACCOUNTS);
+    const keys = this.ALLOC.map(c => c.key);
 
     // --- header ---
     let plSum = 0, costSum = 0;
@@ -2004,7 +2026,6 @@ class Component extends DCLogic {
     const acctChips = Object.keys(acctTot).map(k => ({ label: k, value: this.fmtShort(acctTot[k]) }));
 
     // --- holdings rows ---
-    const acctColors = { '일반': '#6e6e6e', '연금저축': '#1fa1ff', 'IRP': '#8134af', '퇴직연금': '#004c8b', 'ISA': '#dd2a7b' };
     // 출처 태그 → 짧은 라벨(칩). 없으면 칩 미표시.
     // 에이전트는 근거를 자세히 적어 보낸다('derived:cross-account(27,400)') — 칩엔 종류만 접두어로 표시.
     const srcChip = s => {
@@ -2033,7 +2054,7 @@ class Component extends DCLogic {
       return {
         isHeader: false, isHolding: true,
         id: h.id, broker: h.broker, accountType: h.accountType,
-        acctColor: acctColors[h.accountType] || '#6e6e6e',
+        acctColor: (amap[h.accountType] || amap['일반']).color,
         name: h.name, cls: h.cls, clsColor: (cmap[h.cls] || cmap.growth).color,
         qty: h.qty == null ? '' : this.fmtNum(h.qty),
         qtySrc: srcChip(h.qty_src), hasQtySrc: !!h.qty_src,
@@ -2069,7 +2090,7 @@ class Component extends DCLogic {
     const rows = [];
     _groups.forEach(g => {
       rows.push({ isHeader: true, isHolding: false, broker: g.broker, atype: g.accountType,
-        atypeColor: acctColors[g.accountType] || '#6e6e6e', subtotalStr: this.fmtW(g.sub) });
+        atypeColor: (amap[g.accountType] || amap['일반']).color, subtotalStr: this.fmtW(g.sub) });
       g.items.forEach(h => rows.push(mkRow(h)));
     });
 
@@ -2077,7 +2098,7 @@ class Component extends DCLogic {
     const donutSegs = [];
     const legendRows = [];
     let angle = -Math.PI / 2;
-    this.CLASSES.filter(c => c.key !== 'mixed').forEach(c => {
+    this.ALLOC.forEach(c => {
       const v = by[c.key];
       if (total > 0 && v > 0) {
         const frac = v / total;
@@ -2090,7 +2111,6 @@ class Component extends DCLogic {
     });
 
     // --- drift ---
-    const keys = ['growth', 'dividend', 'bond', 'gold', 'cash', 'realestate'];
     const maxPct = Math.max(1, ...keys.map(k => total > 0 ? by[k] / total * 100 : 0), ...keys.map(k => S.target[k] || 0));
     const driftRows = keys.map(k => {
       const cur = total > 0 ? by[k] / total * 100 : 0;
@@ -2112,15 +2132,10 @@ class Component extends DCLogic {
       onChange: e => this.set({ target: { ...S.target, [k]: this.parseNum(e.target.value) || 0 } })
     }));
     const targetSum = keys.reduce((s, k) => s + (S.target[k] || 0), 0);
-    const PRESETS = [
-      { label: '균형형 30·20·25·10·10·5', t: { growth: 30, dividend: 20, bond: 25, gold: 10, cash: 10, realestate: 5 } },
-      { label: '성장형 45·15·20·5·10·5', t: { growth: 45, dividend: 15, bond: 20, gold: 5, cash: 10, realestate: 5 } },
-      { label: '배당·안정형 15·30·30·10·10·5', t: { growth: 15, dividend: 30, bond: 30, gold: 10, cash: 10, realestate: 5 } }
-    ];
-    const presets = PRESETS.map(p => {
+    const presets = this.PRESETS.map(p => {
       const active = keys.every(k => S.target[k] === p.t[k]);
       return {
-        label: p.label,
+        label: p.name + ' ' + keys.map(k => p.t[k]).join('·'),
         bg: active ? '#1fa1ff' : 'transparent',
         fg: active ? '#fff' : 'var(--text-primary,#000)',
         bd: active ? '#1fa1ff' : 'var(--border-strong,#c4c4c4)',
@@ -2129,7 +2144,6 @@ class Component extends DCLogic {
     });
 
     // --- actions ---
-    const pensionAccts = ['연금저축', 'IRP', '퇴직연금'];
     const acts = keys.map(k => {
       const cur = total > 0 ? by[k] / total * 100 : 0;
       const diff = cur - (S.target[k] || 0);
@@ -2143,7 +2157,7 @@ class Component extends DCLogic {
       const cand = S.holdings
         .filter(h => h.cls === a.k || (h.cls === 'mixed' && (a.k === 'bond' || a.k === 'dividend')))
         .sort((x, y) => this.krw(y) - this.krw(x)).slice(0, 2).map(h => h.name);
-      const inPension = S.holdings.some(h => (h.cls === a.k || h.cls === 'mixed') && pensionAccts.includes(h.accountType));
+      const inPension = S.holdings.some(h => (h.cls === a.k || h.cls === 'mixed') && (amap[h.accountType] || {}).pension);
       let hint = shrink
         ? (inPension ? '연금계좌 보유분부터 줄이면 세금 없이 조정됩니다' : '일반계좌 매도 시 세금·환율 시점을 확인하세요')
         : '신규 매수 또는 월 적립금 배정으로 채우세요';
