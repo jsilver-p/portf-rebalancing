@@ -2011,8 +2011,10 @@ class Component extends DCLogic {
     const cmap = this.byKey(this.CLASSES);
     const amap = this.byKey(this.ACCOUNTS);
     const keys = this.ALLOC.map(c => c.key);
+    // 구획들이 암묵적 클로저로 공유하던 값을 한 묶음으로 드러낸다 — 각 build*가 뭘 쓰는지 인자로 보인다.
+    const ctx = { S, by, total, keys, cmap, amap, band };
 
-    // --- header ---
+    // --- header (손익 합산은 6줄뿐이라 여기 남긴다) ---
     let plSum = 0, costSum = 0;
     S.holdings.forEach(h => {
       const c = this.costKrw(h);
@@ -2020,12 +2022,55 @@ class Component extends DCLogic {
     });
     const plPct = costSum > 0 ? (plSum / costSum * 100) : 0;
 
-    // --- account chips ---
+    // --- account chips (3줄) ---
     const acctTot = {};
     S.holdings.forEach(h => { acctTot[h.accountType] = (acctTot[h.accountType] || 0) + this.krw(h); });
     const acctChips = Object.keys(acctTot).map(k => ({ label: k, value: this.fmtShort(acctTot[k]) }));
 
-    // --- holdings rows ---
+    const rows = this.buildHoldingRows(ctx);
+    const { donutSegs, legendRows } = this.buildDonut(ctx);
+    const driftRows = this.buildDrift(ctx);
+    const { targetRows, targetSum, presets } = this.buildTarget(ctx);
+    const actions = this.buildActions(ctx);
+
+    return {
+      readingAttr: this.props.comfortReading ? 'comfort' : '',
+      fx: S.fx,
+      onFxChange: e => this.set({ fx: this.parseNum(e.target.value) || S.fx }),
+      fxMeta: S.fxStatus || (S.fxUpdatedAt ? '자동 · ' + this.timeAgo(S.fxUpdatedAt) : '저장값'),
+      fxMetaColor: S.fxStatus ? '#ed4956' : 'var(--text-tertiary,#999)',
+      onFxRefresh: () => this.fetchFx(),
+      hasInfo: !!S.extractInfo, extractInfo: S.extractInfo,
+      totalStr: this.fmtW(total),
+      totalShort: this.fmtShort(total),
+      plStr: (plSum >= 0 ? '+' : '') + this.fmtW(plSum).replace('₩-', '-₩') + ' (' + (plPct >= 0 ? '+' : '') + plPct.toFixed(1) + '%)',
+      plColor: plSum >= 0 ? '#ed4956' : '#3897f0',
+      acctChips,
+      extracting: S.extracting, notExtracting: !S.extracting,
+      extractStatus: S.extractStatus,
+      hasError: !!S.extractError, extractError: S.extractError,
+      onFiles: e => { this.extractFiles(e.target.files); e.target.value = ''; },
+      onDrop: e => { e.preventDefault(); this.extractFiles(e.dataTransfer.files); },
+      onDragOver: e => e.preventDefault(),
+      classOpts,
+      rows,
+      onAddManual: () => this.set({
+        holdings: [...S.holdings, {
+          id: 'h' + Date.now(), broker: '직접입력', accountType: '일반', name: '새 자산 (이름 수정)',
+          cls: 'realestate', currency: 'KRW', qty: null, price: null, value: 0, cost: null, updatedAt: Date.now()
+        }]
+      }),
+      donutSegs, legendRows, driftRows,
+      targetRows, targetSum, sumColor: targetSum === 100 ? '#1fa1ff' : '#ed4956',
+      presets,
+      bandStr: String(band),
+      actions, noActions: actions.length === 0
+    };
+  }
+
+  // (증권사·계좌)별로 묶은 보유행 — 각 그룹 앞에 계좌 헤더행이 들어간다.
+  buildHoldingRows(ctx) {
+    const { S, total, cmap, amap } = ctx;
     // 출처 태그 → 짧은 라벨(칩). 없으면 칩 미표시.
     // 에이전트는 근거를 자세히 적어 보낸다('derived:cross-account(27,400)') — 칩엔 종류만 접두어로 표시.
     const srcChip = s => {
@@ -2093,8 +2138,12 @@ class Component extends DCLogic {
         atypeColor: (amap[g.accountType] || amap['일반']).color, subtotalStr: this.fmtW(g.sub) });
       g.items.forEach(h => rows.push(mkRow(h)));
     });
+    return rows;
+  }
 
-    // --- donut ---
+  // 자산배분 도넛의 호(arc)와 범례.
+  buildDonut(ctx) {
+    const { by, total } = ctx;
     const donutSegs = [];
     const legendRows = [];
     let angle = -Math.PI / 2;
@@ -2109,10 +2158,14 @@ class Component extends DCLogic {
         angle = a1;
       }
     });
+    return { donutSegs, legendRows };
+  }
 
-    // --- drift ---
+  // 현재 vs 목표 이탈 막대.
+  buildDrift(ctx) {
+    const { S, by, total, keys, cmap, band } = ctx;
     const maxPct = Math.max(1, ...keys.map(k => total > 0 ? by[k] / total * 100 : 0), ...keys.map(k => S.target[k] || 0));
-    const driftRows = keys.map(k => {
+    return keys.map(k => {
       const cur = total > 0 ? by[k] / total * 100 : 0;
       const tgt = S.target[k] || 0;
       const diff = cur - tgt;
@@ -2125,8 +2178,11 @@ class Component extends DCLogic {
         diffColor: Math.abs(diff) >= band ? (diff > 0 ? '#ed4956' : '#1fa1ff') : '#999999'
       };
     });
+  }
 
-    // --- target rows & presets ---
+  // 목표 입력 행 · 합계 · 프리셋 버튼.
+  buildTarget(ctx) {
+    const { S, keys, cmap } = ctx;
     const targetRows = keys.map(k => ({
       key: k, label: cmap[k].label, color: cmap[k].color, val: S.target[k],
       onChange: e => this.set({ target: { ...S.target, [k]: this.parseNum(e.target.value) || 0 } })
@@ -2142,15 +2198,19 @@ class Component extends DCLogic {
         onApply: () => this.set({ target: { ...p.t } })
       };
     });
+    return { targetRows, targetSum, presets };
+  }
 
-    // --- actions ---
+  // 이탈이 밴드를 넘는 자산군에 대한 리밸런싱 액션(큰 순).
+  buildActions(ctx) {
+    const { S, by, total, keys, cmap, amap, band } = ctx;
     const acts = keys.map(k => {
       const cur = total > 0 ? by[k] / total * 100 : 0;
       const diff = cur - (S.target[k] || 0);
       return { k, cur, diff };
     }).filter(a => Math.abs(a.diff) >= band).sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
 
-    const actions = acts.map((a, i) => {
+    return acts.map((a, i) => {
       const c = cmap[a.k];
       const shrink = a.diff > 0;
       const amount = Math.abs(a.diff) / 100 * total;
@@ -2170,40 +2230,6 @@ class Component extends DCLogic {
         sub: (cand.length ? '대상 후보: ' + cand.join(' · ') + ' — ' : '') + hint
       };
     });
-
-    return {
-      readingAttr: this.props.comfortReading ? 'comfort' : '',
-      fx: S.fx,
-      onFxChange: e => this.set({ fx: this.parseNum(e.target.value) || S.fx }),
-      fxMeta: S.fxStatus || (S.fxUpdatedAt ? '자동 · ' + this.timeAgo(S.fxUpdatedAt) : '저장값'),
-      fxMetaColor: S.fxStatus ? '#ed4956' : 'var(--text-tertiary,#999)',
-      onFxRefresh: () => this.fetchFx(),
-      hasInfo: !!S.extractInfo, extractInfo: S.extractInfo,
-      totalStr: this.fmtW(total),
-      totalShort: this.fmtShort(total),
-      plStr: (plSum >= 0 ? '+' : '') + this.fmtW(plSum).replace('₩-', '-₩') + ' (' + (plPct >= 0 ? '+' : '') + plPct.toFixed(1) + '%)',
-      plColor: plSum >= 0 ? '#ed4956' : '#3897f0',
-      acctChips,
-      extracting: S.extracting, notExtracting: !S.extracting,
-      extractStatus: S.extractStatus,
-      hasError: !!S.extractError, extractError: S.extractError,
-      onFiles: e => { this.extractFiles(e.target.files); e.target.value = ''; },
-      onDrop: e => { e.preventDefault(); this.extractFiles(e.dataTransfer.files); },
-      onDragOver: e => e.preventDefault(),
-      classOpts,
-      rows,
-      onAddManual: () => this.set({
-        holdings: [...S.holdings, {
-          id: 'h' + Date.now(), broker: '직접입력', accountType: '일반', name: '새 자산 (이름 수정)',
-          cls: 'realestate', currency: 'KRW', qty: null, price: null, value: 0, cost: null, updatedAt: Date.now()
-        }]
-      }),
-      donutSegs, legendRows, driftRows,
-      targetRows, targetSum, sumColor: targetSum === 100 ? '#1fa1ff' : '#ed4956',
-      presets,
-      bandStr: String(band),
-      actions, noActions: actions.length === 0
-    };
   }
 }
 </script>
