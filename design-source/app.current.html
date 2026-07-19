@@ -1382,6 +1382,11 @@
     .pf-hold-row{display:grid;grid-template-columns:minmax(150px,1fr) 118px 82px 98px 134px 56px 66px 24px;gap:8px;min-width:760px;}
     .pf-analysis{display:grid;grid-template-columns:250px 1fr;gap:20px;}
     .pf-num{font-variant-numeric:tabular-nums;}
+    /* ── STEP 섹션 뼈대(카드·라벨·제목·설명이 5개 섹션에 반복) ── */
+    .pf-card{background:var(--bg-surface,#fff);border:1px solid var(--border-default,#dfdfe8);border-radius:10px;overflow:hidden;}
+    .pf-step{font-size:11px;font-weight:700;letter-spacing:1px;color:var(--text-tertiary,#999);}
+    .pf-step-title{font-size:15px;font-weight:700;}
+    .pf-step-desc{font-size:12px;color:var(--text-secondary,#6e6e6e);}
     @media (max-width:640px){
       .pf-main{padding-left:12px;padding-right:12px;}
       .pf-analysis{grid-template-columns:1fr;}
@@ -1421,11 +1426,11 @@
   <main class="pf-main" style="max-width:1060px;margin:0 auto;padding:20px 20px 60px;display:flex;flex-direction:column;gap:20px;">
 
     <!-- ── 1. Upload ─────────────────────────── -->
-    <section style="background:var(--bg-surface,#fff);border:1px solid var(--border-default,#dfdfe8);border-radius:10px;overflow:hidden;">
+    <section class="pf-card">
       <div style="padding:14px 18px 0;display:flex;align-items:baseline;gap:10px;">
-        <span style="font-size:11px;font-weight:700;letter-spacing:1px;color:var(--text-tertiary,#999);">STEP 1</span>
-        <span style="font-size:15px;font-weight:700;">스크린샷 업로드</span>
-        <span style="font-size:12px;color:var(--text-secondary,#6e6e6e);">스크린샷 = 그 계좌의 현재 스냅샷 — 갱신·추가는 물론, 화면에 없는 종목은 자동 제거됩니다</span>
+        <span class="pf-step">STEP 1</span>
+        <span class="pf-step-title">스크린샷 업로드</span>
+        <span class="pf-step-desc">스크린샷 = 그 계좌의 현재 스냅샷 — 갱신·추가는 물론, 화면에 없는 종목은 자동 제거됩니다</span>
       </div>
       <div style="padding:14px 18px 18px;">
         <label ondrop="{{ onDrop }}" ondragover="{{ onDragOver }}" style="display:flex;align-items:center;justify-content:center;gap:12px;border:1.5px dashed var(--border-strong,#c4c4c4);border-radius:8px;padding:26px 16px;cursor:pointer;background:var(--bg-app,#fafafa);" style-hover="border-color:var(--ig-blue,#1fa1ff);background:#f4faff;">
@@ -1450,10 +1455,10 @@
     </section>
 
     <!-- ── 2. Holdings table ─────────────────── -->
-    <section style="background:var(--bg-surface,#fff);border:1px solid var(--border-default,#dfdfe8);border-radius:10px;overflow:hidden;">
+    <section class="pf-card">
       <div style="padding:14px 18px 10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-        <span style="font-size:11px;font-weight:700;letter-spacing:1px;color:var(--text-tertiary,#999);">STEP 2</span>
-        <span style="font-size:15px;font-weight:700;">통합 보유 현황</span>
+        <span class="pf-step">STEP 2</span>
+        <span class="pf-step-title">통합 보유 현황</span>
         <sc-for list="{{ acctChips }}" as="c" hint-placeholder-count="2">
           <span style="display:inline-flex;align-items:baseline;gap:5px;background:var(--bg-secondary,#efefef);border-radius:999px;padding:4px 10px;font-size:11.5px;">
             <b>{{ c.label }}</b><span style="color:var(--text-secondary,#6e6e6e);">{{ c.value }}</span>
@@ -1520,11 +1525,11 @@
     </section>
 
     <!-- ── 3. Target ─────────────────────────── -->
-    <section style="background:var(--bg-surface,#fff);border:1px solid var(--border-default,#dfdfe8);border-radius:10px;overflow:hidden;">
+    <section class="pf-card">
       <div style="padding:14px 18px 10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-        <span style="font-size:11px;font-weight:700;letter-spacing:1px;color:var(--text-tertiary,#999);">STEP 3</span>
-        <span style="font-size:15px;font-weight:700;">목표 포트폴리오</span>
-        <span style="font-size:12px;color:var(--text-secondary,#6e6e6e);">추천안을 고른 뒤 비중을 직접 조정하세요</span>
+        <span class="pf-step">STEP 3</span>
+        <span class="pf-step-title">목표 포트폴리오</span>
+        <span class="pf-step-desc">추천안을 고른 뒤 비중을 직접 조정하세요</span>
         <div style="flex:1;"></div>
         <sc-for list="{{ presets }}" as="pr" hint-placeholder-count="3">
           <button onclick="{{ pr.onApply }}" style="border:1px solid {{ pr.bd }};background:{{ pr.bg }};color:{{ pr.fg }};border-radius:999px;padding:5px 13px;font-size:12px;font-weight:600;cursor:pointer;">{{ pr.label }}</button>
@@ -1548,11 +1553,11 @@
     </section>
 
     <!-- ── 4. Analysis ───────────────────────── -->
-    <section style="background:var(--bg-surface,#fff);border:1px solid var(--border-default,#dfdfe8);border-radius:10px;overflow:hidden;">
+    <section class="pf-card">
       <div style="padding:14px 18px 6px;display:flex;align-items:baseline;gap:10px;">
-        <span style="font-size:11px;font-weight:700;letter-spacing:1px;color:var(--text-tertiary,#999);">STEP 4</span>
-        <span style="font-size:15px;font-weight:700;">자산배분 분석</span>
-        <span style="font-size:12px;color:var(--text-secondary,#6e6e6e);">혼합형 펀드는 배당주 50% · 채권 50%로 분해해 집계</span>
+        <span class="pf-step">STEP 4</span>
+        <span class="pf-step-title">자산배분 분석</span>
+        <span class="pf-step-desc">혼합형 펀드는 배당주 50% · 채권 50%로 분해해 집계</span>
       </div>
       <div class="pf-analysis" style="padding:12px 18px 20px;align-items:start;">
         <div style="display:flex;flex-direction:column;align-items:center;gap:12px;">
@@ -1564,7 +1569,7 @@
             </svg>
             <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;pointer-events:none;">
               <span style="font-size:10.5px;font-weight:600;letter-spacing:0.5px;color:var(--text-tertiary,#999);">현재 배분</span>
-              <span style="font-size:15px;font-weight:700;">{{ totalShort }}</span>
+              <span class="pf-step-title">{{ totalShort }}</span>
             </div>
           </div>
           <div style="display:flex;flex-wrap:wrap;gap:6px 12px;justify-content:center;">
@@ -1597,11 +1602,11 @@
     </section>
 
     <!-- ── 5. Actions ────────────────────────── -->
-    <section style="background:var(--bg-surface,#fff);border:1px solid var(--border-default,#dfdfe8);border-radius:10px;overflow:hidden;">
+    <section class="pf-card">
       <div style="padding:14px 18px 8px;display:flex;align-items:baseline;gap:10px;">
-        <span style="font-size:11px;font-weight:700;letter-spacing:1px;color:var(--text-tertiary,#999);">STEP 5</span>
-        <span style="font-size:15px;font-weight:700;">리밸런싱 액션</span>
-        <span style="font-size:12px;color:var(--text-secondary,#6e6e6e);">이탈 ±{{ bandStr }}%p 이상만 · 이탈 큰 순</span>
+        <span class="pf-step">STEP 5</span>
+        <span class="pf-step-title">리밸런싱 액션</span>
+        <span class="pf-step-desc">이탈 ±{{ bandStr }}%p 이상만 · 이탈 큰 순</span>
       </div>
       <div style="padding:4px 18px 14px;display:flex;flex-direction:column;gap:8px;">
         <sc-if value="{{ noActions }}" hint-placeholder-val="{{ false }}">
