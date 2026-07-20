@@ -1690,8 +1690,11 @@ class Component extends DCLogic {
   componentDidMount() {
     let saved = null;
     try { saved = JSON.parse(localStorage.getItem('pf_rebalancer_v1') || 'null'); } catch (e) {}
-    if (saved && Array.isArray(saved.holdings) && saved.holdings.length) {
-      this.setState({ holdings: saved.holdings, target: saved.target || this.state.target, fx: saved.fx || 1380, loaded: true });
+    // 시드(데모·옛 실계좌 id 's\d+')는 복원하지 않는다 — 실제 사용자 데이터(id 'h…')만 남긴다.
+    // 이 게이트가 예전 방문 브라우저의 옛 실계좌도 화면에서 걷어낸다.
+    const holdings = (saved && Array.isArray(saved.holdings) ? saved.holdings : []).filter(h => !this.isSeed(h));
+    if (holdings.length) {
+      this.setState({ holdings, target: saved.target || this.state.target, fx: saved.fx || 1380, loaded: true });
     } else {
       // 빈 시작 — 첫 방문자에게 아무것도 자동 노출하지 않는다. 데모는 '예시 데이터로 둘러보기' 버튼으로만.
       this.setState({ loaded: true });
@@ -1746,13 +1749,18 @@ class Component extends DCLogic {
 
   persist() {
     try {
+      // 시드(데모·옛 실계좌)는 디스크에 남기지 않는다 — 새로고침·재방문 시 되살아나지 않게.
+      const holdings = this.state.holdings.filter(h => !this.isSeed(h));
       localStorage.setItem('pf_rebalancer_v1', JSON.stringify({
-        holdings: this.state.holdings, target: this.state.target, fx: this.state.fx
+        holdings, target: this.state.target, fx: this.state.fx
       }));
     } catch (e) {}
   }
 
   set(patch) { this.setState(patch, () => this.persist()); }
+
+  // 데모·옛 시드 행(id 's\d+') — 저장·복원에서 제외한다. applySnapshot의 isDemo와 같은 규약.
+  isSeed(h) { return /^s\d+$/.test(String(h.id)); }
 
   // ---------- helpers ----------
   krw(h) {
