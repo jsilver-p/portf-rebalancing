@@ -1444,6 +1444,7 @@
             <span style="font-size:13px;color:var(--text-secondary,#6e6e6e);"><b style="color:var(--ig-blue-link,#3897f0);">클릭해서 선택</b>하거나 이미지를 끌어다 놓으세요 · JPG / PNG · 여러 장 가능</span>
           </sc-if>
         </label>
+        <button onclick="{{ onLoadDemo }}" style="margin-top:10px;border:1px solid var(--border-default,#dfdfe8);background:var(--bg-surface,#fff);border-radius:999px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;color:var(--text-secondary,#6e6e6e);" style-hover="border-color:var(--ig-blue,#1fa1ff);color:var(--ig-blue,#1fa1ff);">예시 데이터로 둘러보기</button>
         <sc-if value="{{ hasError }}" hint-placeholder-val="{{ false }}">
           <div style="margin-top:10px;font-size:12.5px;color:var(--ig-red-heart,#ed4956);font-weight:600;">{{ extractError }}</div>
         </sc-if>
@@ -1692,7 +1693,8 @@ class Component extends DCLogic {
     if (saved && Array.isArray(saved.holdings) && saved.holdings.length) {
       this.setState({ holdings: saved.holdings, target: saved.target || this.state.target, fx: saved.fx || 1380, loaded: true });
     } else {
-      this.setState({ holdings: this.sampleData(), loaded: true }, () => this.persist());
+      // 빈 시작 — 첫 방문자에게 아무것도 자동 노출하지 않는다. 데모는 '예시 데이터로 둘러보기' 버튼으로만.
+      this.setState({ loaded: true });
     }
     this.fetchFx();
   }
@@ -1726,20 +1728,19 @@ class Component extends DCLogic {
     let i = 0;
     const mk = (broker, accountType, name, cls, currency, qty, price, value, cost, t) =>
       ({ id: 's' + (++i), broker, accountType, name, cls, currency, qty, price, value, cost, updatedAt: t });
+    // 예시 데이터 — 전부 허구다(실 계좌·종목·금액 아님). 자산군 7종·계좌 4종·USD/KRW를
+    // 고루 담아 데모가 도넛·그룹·검산 경로를 다 태우게 한다. 버튼으로만 로드된다.
     return [
-      mk('삼성증권', '퇴직연금', 'TIME 미국나스닥100채권혼합50액티브', 'mixed', 'KRW', null, null, 3181095, 3029455, old),
-      mk('삼성증권', '퇴직연금', 'TIGER 차이나AI소프트웨어', 'growth', 'KRW', null, null, 1799165, 2008300, old),
-      mk('삼성증권', '퇴직연금', 'TIGER 미국나스닥100', 'growth', 'KRW', null, null, 5976450, 4890000, old),
-      mk('삼성증권', '퇴직연금', 'PLUS 고배당주', 'dividend', 'KRW', null, null, 1993290, 1977690, old),
-      mk('삼성증권', '퇴직연금', 'PLUS 고배당주채권혼합', 'mixed', 'KRW', null, null, 5797000, 6040100, old),
-      mk('삼성증권', '퇴직연금', 'KODEX 미국S&P500', 'growth', 'KRW', null, null, 8115120, 6998160, old),
-      mk('삼성증권', '퇴직연금', 'ACE KRX금현물', 'gold', 'KRW', null, null, 5703840, 6421430, old),
-      mk('삼성증권', '퇴직연금', 'ACE 엔비디아밸류체인액티브', 'growth', 'KRW', null, null, 3180600, 1986450, old),
-      mk('삼성증권', '퇴직연금', '현금성자산', 'cash', 'KRW', null, null, 3065687, null, old),
-      mk('토스증권', '일반', 'AAPL 애플', 'growth', 'USD', 12, 212.5, null, 2280, now - 86400000 * 2),
-      mk('토스증권', '일반', 'SCHD 슈와브 배당ETF', 'dividend', 'USD', 40, 27.4, null, 1032, now - 86400000 * 2),
-      mk('키움증권', '연금저축', 'TIGER 미국배당다우존스', 'dividend', 'KRW', 350, 12050, null, 3900000, old),
-      mk('키움증권', '연금저축', '예수금', 'cash', 'KRW', null, null, 1240000, null, old)
+      mk('예시증권', 'IRP', 'KODEX 미국S&P500', 'growth', 'KRW', null, null, 5000000, 4500000, old),
+      mk('예시증권', 'IRP', 'TIGER 미국나스닥100', 'growth', 'KRW', null, null, 3000000, 2600000, old),
+      mk('예시증권', 'IRP', 'ACE KRX금현물', 'gold', 'KRW', null, null, 2000000, 1800000, old),
+      mk('예시증권', 'IRP', 'KODEX 국고채30년', 'bond', 'KRW', null, null, 2500000, 2550000, old),
+      mk('예시증권', 'IRP', 'TIGER 미국S&P500채권혼합', 'mixed', 'KRW', null, null, 2000000, 1950000, old),
+      mk('예시증권', '연금저축', 'SOL 미국배당다우존스', 'dividend', 'KRW', null, null, 3000000, 2800000, old),
+      mk('예시증권', '연금저축', '예수금', 'cash', 'KRW', null, null, 1000000, null, old),
+      mk('예시증권', 'ISA', 'TIGER 리츠부동산인프라', 'realestate', 'KRW', 200, 5000, null, 900000, old),
+      mk('해외예시', '일반', 'VOO 뱅가드 S&P500', 'growth', 'USD', 5, 500, null, 2000, now - 86400000 * 2),
+      mk('해외예시', '일반', 'SCHD 배당ETF', 'dividend', 'USD', 30, 28, null, 750, now - 86400000 * 2)
     ];
   }
 
@@ -2057,6 +2058,7 @@ class Component extends DCLogic {
       onFiles: e => { this.extractFiles(e.target.files); e.target.value = ''; },
       onDrop: e => { e.preventDefault(); this.extractFiles(e.dataTransfer.files); },
       onDragOver: e => e.preventDefault(),
+      onLoadDemo: () => this.set({ holdings: this.sampleData() }),
       classOpts,
       rows,
       onAddManual: () => this.set({
