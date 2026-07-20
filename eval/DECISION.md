@@ -1,3 +1,44 @@
+# 로컬 추출 모델 선정 — 결정 v2.6 (2026-07-21)
+
+**결정: 모바일급 3B(실측 3.8B)도 같은 합성 LoRA-FT 방식으로 극복된다 — base 3B의 완전 붕괴
+(0/31)를 서빙 경로 parity 전판 PASS로 되살렸다. 단 서빙 정밀도 하한이 7B보다 높다: f16·q8 PASS,
+q4는 마진이 얇아 FAIL. 모바일 채택 스윗스폿 = `qwen2.5vl:3b-ft-q8`(LLM 3.28GB, 10.6s/장).**
+
+## v2.6 — 3B 모바일 스파이크 (2026-07-21): FT가 소형 모델 붕괴를 구제, 단 q4는 칼날 마진
+
+### 배경·질문
+"4B급 모바일 가능 모델도 이 방식으로 극복되는가?" base 3B는 E5에서 출력 붕괴(재현율 0/31,
+50~175tok)했다. 툴체인(LLaMA-Factory v0.9.3 = qwen2_vl 템플릿만) 제약상 진짜 4B(Qwen3-VL-4B)는
+불가·계열 열세 → 파이프라인이 지원하는 모바일 rung **Qwen2.5-VL-3B-Instruct**(실측 3.8B)로 검증.
+
+### 방법 (7B 파이프라인 1:1 이식, 새 데이터 생성 없음)
+- 3B 베이스에 기존 합성 `data_full`(2,400장) 그대로 LoRA(rank16, all, qwen2_vl) 300step(230분,
+  loss 0.33→0.014 수렴). 레시피 `eval/ft/lora_full_3b.yaml`·`export_merge_3b.yaml`·
+  `Modelfile.3bft-q4`. 병합→`convert_hf_to_gguf`(LLM+`--mmproj`)→`llama-quantize`.
+
+### 결과 (배포경로 parity, held-out 8장)
+| 서빙 정밀도 | 판정 | 비고 |
+|---|---|---|
+| **q8_0 (3.28GB)** | **PASS** | 재현율 31/31·환각0·value/qty/price/cost 31/31·게이트 침묵·컨트롤 정상. soft=7B와 동일('미국 달러', price_src). **10.6s/장**(신선: 언로드→워밍업→8장, prefill 687 t/s) |
+| f16 (6.18GB) | PASS | 동일 프로파일(비모바일이라 참고용) |
+| q4_K_M (1.93GB) | FAIL | 한화오션(qty·price 놓침·'한화오선' 오독)·ACE금현물(price 1.00). f16/q8은 정상 → **양자화 마진**이 원인(3B 능력 한계 아님) |
+
+- **핵심: FT는 붕괴(0/31)를 완치했고, 남은 건 서빙 정밀도 하한**. 7B는 q4에서 마진 여유가 있어
+  통과했지만 3B는 q4 마진이 칼날이라 한 행이 뒤집힌다([[parity-is-knife-edge]]의 소형모델판).
+- **계속학습(1회)은 실패**: detail 편중 증강셋(`data_cont3b` 1,020장) 100step → q4에서 ACE금현물은
+  고쳤으나 FX/USD 화면을 깨뜨림(실패가 이동만). **첫 full 어댑터가 최선** — 매몰비용 방지로 중단.
+  (`lora_cont_3b.yaml`·`3b-ft2-*` 산출물은 남겨두되 미채택.)
+
+### 결론·함의
+- **답: 그렇다(구조적으로 완전 극복) — 모바일 실배포는 q8에서.** q8 3B는 ~4.6GB(LLM+mmproj)로
+  고사양폰 사정권. q4(1.93GB)까지 원하면 마진 부족 → 더 큰 용량(7B)이나 q8 유지가 필요.
+- 속도 10.6s/장은 7B-q4(13.9)보다 1.3배 빠름(디코드 대역폭 지배 — q8이라 q4만큼은 아님). 프로덕션
+  (7b-ft2-q4) 교체 아님 — 이건 모바일 실현성 검증 스파이크. 실기기 포팅(llama.cpp/MLC)은 별도.
+- 산출물: 가중치 `ft-spike/out/3b-ft-q8.gguf`+`mmproj-3b-ft.gguf`, Modelfile
+  `eval/ft/Modelfile.3bft-q8`, ollama 태그 `qwen2.5vl:3b-ft-q8`. 레시피는 `eval/ft/*_3b*`.
+
+---
+
 # 로컬 추출 모델 선정 — 결정 v2.5 (2026-07-17)
 
 **결정: 7B-FT(합성 전 클래스 학습, q4_K_M) ollama 서빙이 신선 프로토콜에서 parity 전판 PASS,
