@@ -1,0 +1,14 @@
+{
+  "synth_holdings": {
+    "file_name": "data_train/synth.json",
+    "formatting": "sharegpt",
+    "columns": {"messages": "messages", "images": "images"},
+    "tags": {"role_tag": "role", "content_tag": "content", "user_tag": "user", "assistant_tag": "assistant"}
+  },
+  "synth_holdings_val": {
+    "file_name": "data_val/synth.json",
+    "formatting": "sharegpt",
+    "columns": {"messages": "messages", "images": "images"},
+    "tags": {"role_tag": "role", "content_tag": "content", "user_tag": "user", "assistant_tag": "assistant"}
+  }
+}
