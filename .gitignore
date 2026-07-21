@@ -16,3 +16,6 @@ watchlist.json
 agent/env
 /env
 eval/harness/__pycache__/
+
+# 속도 3차 실험 스크래치(시트는 실계좌 파생물 — 커밋 금지)
+eval/speed3/
