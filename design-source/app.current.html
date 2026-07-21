@@ -1473,15 +1473,36 @@
                 <span style="width:13px;height:13px;border:2px solid var(--ig-blue,#1fa1ff);border-top-color:transparent;border-radius:50%;animation:pfspin 0.8s linear infinite;flex:none;"></span>
               </sc-if>
             </div>
-            <div style="max-height:280px;overflow:auto;">
-              <sc-for list="{{ streamRows }}" as="sr" hint-placeholder-count="3">
-                <div class="pf-stream-row" style="display:flex;align-items:center;gap:8px;padding:6px 12px;border-bottom:1px solid var(--ig-gray-05,#efefef);font-size:12px;">
-                  <span style="width:8px;height:8px;border-radius:2px;background:{{ sr.clsColor }};flex:none;"></span>
-                  <span style="font-weight:600;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ sr.name }}</span>
-                  <span style="color:var(--text-tertiary,#999);font-size:11px;white-space:nowrap;">{{ sr.acct }}</span>
-                  <span class="pf-num" style="width:52px;text-align:right;color:var(--text-secondary,#6e6e6e);">{{ sr.qtyStr }}</span>
-                  <span class="pf-num" style="width:88px;text-align:right;font-weight:600;">{{ sr.cur }}{{ sr.valueStr }}</span>
-                  <sc-if value="{{ sr.corrected }}" hint-placeholder-val="{{ false }}"><span title="{{ sr.correctedTitle }}" style="font-size:9px;font-weight:700;color:#b8860b;background:#fff3cd;border:1px solid #f0d48a;padding:0 4px;border-radius:3px;flex:none;">보정</span></sc-if>
+            <div class="pf-tbl-scroll" style="max-height:320px;overflow:auto;padding:0 12px;">
+              <div class="pf-hold-row" style="padding:7px 8px;border-bottom:1px solid var(--border-default,#dfdfe8);font-size:10.5px;font-weight:600;letter-spacing:0.4px;color:var(--text-tertiary,#999);text-transform:uppercase;">
+                <span>종목명</span><span>자산군</span><span style="text-align:right;">수량</span><span style="text-align:right;">현재가</span><span style="text-align:right;">평균가</span><span style="text-align:right;">평가금액 ₩</span><span style="text-align:right;">비중</span><span style="text-align:right;">손익</span><span></span>
+              </div>
+              <sc-for list="{{ streamTableRows }}" as="sr" hint-placeholder-count="4">
+                <div>
+                  <sc-if value="{{ sr.isHeader }}" hint-placeholder-val="{{ true }}">
+                    <div style="display:flex;align-items:center;gap:8px;padding:11px 8px 5px;border-bottom:2px solid var(--border-strong,#c4c4c4);margin-top:5px;">
+                      <span style="font-size:13px;font-weight:700;color:var(--text-primary,#000);white-space:nowrap;">{{ sr.broker }}</span>
+                      <span style="font-size:10px;font-weight:700;color:#fff;background:{{ sr.atypeColor }};padding:1.5px 8px;border-radius:999px;letter-spacing:0.3px;white-space:nowrap;">{{ sr.atype }}</span>
+                      <div style="flex:1;"></div>
+                      <span style="font-size:11.5px;color:var(--text-tertiary,#999);white-space:nowrap;">합계 <b style="color:var(--text-primary,#000);font-size:12.5px;">{{ sr.subtotalStr }}</b></span>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ sr.isHolding }}" hint-placeholder-val="{{ false }}">
+                    <div class="pf-hold-row pf-stream-row" style="align-items:center;padding:6px 8px;border-bottom:1px solid var(--ig-gray-05,#efefef);">
+                      <span style="font-size:13px;font-weight:600;color:var(--text-primary,#000);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ sr.name }}</span>
+                      <span style="font-size:12px;font-weight:600;color:{{ sr.clsColor }};white-space:nowrap;">{{ sr.clsLabel }}</span>
+                      <span class="pf-num" style="font-size:12.5px;text-align:right;color:var(--text-primary,#000);">{{ sr.qtyStr }}</span>
+                      <span class="pf-num" style="font-size:12.5px;text-align:right;color:var(--text-primary,#000);">{{ sr.priceStr }}</span>
+                      <span class="pf-num" style="font-size:12.5px;text-align:right;color:var(--text-primary,#000);">{{ sr.avgStr }}</span>
+                      <div style="display:flex;align-items:center;justify-content:flex-end;gap:4px;min-width:0;">
+                        <sc-if value="{{ sr.corrected }}" hint-placeholder-val="{{ false }}"><span title="{{ sr.correctedTitle }}" style="font-size:9px;font-weight:700;color:#b8860b;background:#fff3cd;border:1px solid #f0d48a;padding:0 3px;border-radius:3px;flex:none;">보정</span></sc-if>
+                        <span class="pf-num" style="font-size:12.5px;font-weight:600;text-align:right;">{{ sr.valueStr }}</span>
+                      </div>
+                      <span class="pf-num" style="font-size:12.5px;text-align:right;color:var(--text-secondary,#6e6e6e);">{{ sr.weightStr }}</span>
+                      <span class="pf-num" style="font-size:12.5px;font-weight:600;text-align:right;color:{{ sr.plColor }};">{{ sr.plStr }}</span>
+                      <span></span>
+                    </div>
+                  </sc-if>
                 </div>
               </sc-for>
             </div>
@@ -1972,21 +1993,56 @@ class Component extends DCLogic {
 
   // ---------- 라이브 추출 프리뷰(STEP1) ----------
   // 한 행(원시 dict 또는 최종 보정본)을 프리뷰 표시용으로. 중간·최종이 같은 매핑을 탄다(단일 출처).
-  streamDisplay(h) {
+  // 라이브 프리뷰 행 — STEP2 보유표와 **같은 형태**(증권사·계좌 그룹헤더 + 소계, 동일 컬럼·수치 파생)로
+  // 읽기전용 렌더한다. 값 파생은 STEP2와 같은 메서드(krw·costBasisKrw·avgKrw)를 공유해 단일 출처를 지킨다.
+  // 입력은 원시(assetClass) 또는 최종(cls) dict 둘 다 받는다. 확인 전 편집은 없다(재업로드로 대체).
+  buildStreamRows(list) {
+    const cmap = this.byKey(this.CLASSES), amap = this.byKey(this.ACCOUNTS);
     const clsMap = { '성장주': 'growth', '배당주': 'dividend', '채권': 'bond', '금·원자재': 'gold', '현금': 'cash', '부동산': 'realestate' };
-    const cls = h.cls || clsMap[h.assetClass] || (String(h.assetClass || '').indexOf('혼합') >= 0 ? 'mixed' : 'growth');
-    const cmap = this.byKey(this.CLASSES);
-    const qty = this.parseNum(h.qty), value = this.parseNum(h.value);
-    const corrected = String(h.value_src || '').indexOf('보정') >= 0;
-    return {
-      name: h.name || '(이름 없음)',
-      acct: (h.broker || '미상') + ' · ' + this.normAcct(h.accountType),
-      clsColor: (cmap[cls] || cmap.growth).color,
-      qtyStr: qty == null ? '—' : this.fmtNum(qty),
-      valueStr: value == null ? '—' : this.fmtNum(value),
-      cur: h.currency === 'USD' ? '$' : '₩',
-      corrected, correctedTitle: corrected ? '게이트가 계좌합계 대조로 자릿수 보정한 행' : ''
+    const norm = h => {
+      const cls = h.cls || clsMap[h.assetClass] || (String(h.assetClass || '').indexOf('혼합') >= 0 ? 'mixed' : 'growth');
+      const cost = h.cost != null ? Number(h.cost) : null;
+      const qty = h.qty != null ? Number(h.qty) : null;
+      return {
+        broker: h.broker || '미상', accountType: this.normAcct(h.accountType),
+        name: h.name || '(이름 없음)', cls, currency: h.currency === 'USD' ? 'USD' : 'KRW',
+        qty, price: h.price != null ? Number(h.price) : null,
+        value: h.value != null ? Number(h.value) : null, cost,
+        avgCost: (cost != null && qty) ? cost / qty : null,
+        value_src: h.value_src || ''
+      };
     };
+    const items = (list || []).map(norm);
+    const total = items.reduce((s, h) => s + this.krw(h), 0);
+    const groups = new Map();
+    items.forEach(h => {
+      const key = h.broker + '|' + h.accountType;
+      if (!groups.has(key)) groups.set(key, { broker: h.broker, accountType: h.accountType, items: [], sub: 0 });
+      const g = groups.get(key); g.items.push(h); g.sub += this.krw(h);
+    });
+    const rows = [];
+    groups.forEach(g => {
+      rows.push({ isHeader: true, isHolding: false, broker: g.broker, atype: g.accountType,
+        atypeColor: (amap[g.accountType] || amap['일반']).color, subtotalStr: this.fmtW(g.sub) });
+      g.items.forEach(h => {
+        const v = this.krw(h), c = this.costBasisKrw(h);
+        const pl = c != null && c > 0 ? (v - c) / c * 100 : null;
+        const corrected = String(h.value_src || '').indexOf('보정') >= 0;
+        rows.push({
+          isHeader: false, isHolding: true,
+          name: h.name, clsColor: (cmap[h.cls] || cmap.growth).color, clsLabel: (cmap[h.cls] || cmap.growth).label,
+          qtyStr: h.qty == null ? '—' : this.fmtNum(h.qty),
+          priceStr: h.price == null ? '—' : this.fmtNum(h.price),
+          avgStr: h.avgCost == null ? '—' : this.fmtNum(h.avgCost),
+          valueStr: this.fmtW(v),
+          weightStr: total > 0 ? (v / total * 100).toFixed(1) + '%' : '—',
+          plStr: pl == null ? '—' : (pl >= 0 ? '+' : '') + pl.toFixed(1) + '%',
+          plColor: pl == null ? '#999' : pl >= 0 ? '#ed4956' : '#3897f0',
+          corrected, correctedTitle: corrected ? '게이트가 계좌합계 대조로 자릿수 보정한 행' : ''
+        });
+      });
+    });
+    return rows;
   }
 
   // 중간 원시 행을 한 행씩 프리뷰에 흘려보낸다(써지듯). done 되면 pump가 멈춘다.
@@ -2378,7 +2434,7 @@ class Component extends DCLogic {
       repriceMsg: S.repriceMsg, hasRepriceMsg: !!S.repriceMsg,
       repriceSummaryText: this.repriceSummaryText(), hasRepriceSummary: !!S.repriceSummary,
       // 라이브 추출 프리뷰(STEP1)
-      streamRows: (S.streamRows || []).map(h => this.streamDisplay(h)),
+      streamTableRows: this.buildStreamRows(S.streamRows || []),
       streamHasRows: (S.streamRows || []).length > 0,
       streamLive: S.streamStage === 'live',
       streamReview: S.streamStage === 'review',
