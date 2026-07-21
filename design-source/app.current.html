@@ -1740,16 +1740,21 @@ class Component extends DCLogic {
   sampleData() {
     const now = Date.now(), old = now - 3 * 86400000;
     let i = 0;
+    // 매수평균가는 원가·수량이 함께 있으면 도출(추출 경로와 동일 규약) — 데모가 평균가·주당 손익을 보여준다.
     const mk = (broker, accountType, name, cls, currency, qty, price, value, cost, t) =>
-      ({ id: 's' + (++i), broker, accountType, name, cls, currency, qty, price, value, cost, updatedAt: t });
-    // 예시 데이터 — 전부 허구다(실 계좌·종목·금액 아님). 자산군 7종·계좌 4종·USD/KRW를
-    // 고루 담아 데모가 도넛·그룹·검산 경로를 다 태우게 한다. 버튼으로만 로드된다.
+      ({ id: 's' + (++i), broker, accountType, name, cls, currency, qty, price, value, cost,
+         avgCost: (cost != null && qty) ? cost / qty : null,
+         avgCost_src: (cost != null && qty) ? 'computed:cost/qty' : '',
+         updatedAt: t });
+    // 예시 데이터 — 전부 허구다(실 계좌·종목·금액 아님). 자산군 7종·계좌 4종·USD/KRW를 고루 담아
+    // 데모가 도넛·그룹·평균가·손익 경로를 다 태운다. 수량 있는 행은 평균가가 뜨고, 연금(SOL)·현금(예수금)
+    // 행은 수량 없이 총원가 폴백/‘—’을 보여준다. qty×price는 각 행 평가금액을 보존(집계 불변). 버튼으로만 로드.
     return [
-      mk('예시증권', 'IRP', 'KODEX 미국S&P500', 'growth', 'KRW', null, null, 5000000, 4500000, old),
-      mk('예시증권', 'IRP', 'TIGER 미국나스닥100', 'growth', 'KRW', null, null, 3000000, 2600000, old),
-      mk('예시증권', 'IRP', 'ACE KRX금현물', 'gold', 'KRW', null, null, 2000000, 1800000, old),
-      mk('예시증권', 'IRP', 'KODEX 국고채30년', 'bond', 'KRW', null, null, 2500000, 2550000, old),
-      mk('예시증권', 'IRP', 'TIGER 미국S&P500채권혼합', 'mixed', 'KRW', null, null, 2000000, 1950000, old),
+      mk('예시증권', 'IRP', 'KODEX 미국S&P500', 'growth', 'KRW', 100, 50000, null, 4500000, old),
+      mk('예시증권', 'IRP', 'TIGER 미국나스닥100', 'growth', 'KRW', 50, 60000, null, 2600000, old),
+      mk('예시증권', 'IRP', 'ACE KRX금현물', 'gold', 'KRW', 200, 10000, null, 1800000, old),
+      mk('예시증권', 'IRP', 'KODEX 국고채30년', 'bond', 'KRW', 25, 100000, null, 2550000, old),
+      mk('예시증권', 'IRP', 'TIGER 미국S&P500채권혼합', 'mixed', 'KRW', 40, 50000, null, 1950000, old),
       mk('예시증권', '연금저축', 'SOL 미국배당다우존스', 'dividend', 'KRW', null, null, 3000000, 2800000, old),
       mk('예시증권', '연금저축', '예수금', 'cash', 'KRW', null, null, 1000000, null, old),
       mk('예시증권', 'ISA', 'TIGER 리츠부동산인프라', 'realestate', 'KRW', 200, 5000, null, 900000, old),
