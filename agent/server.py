@@ -19,7 +19,7 @@ import resolve                               # noqa: E402
 import finalize as finalize_mod              # noqa: E402  종합(게이트·broker 정규화)
 
 ROOT = os.path.dirname(HERE)
-MODEL = os.environ.get("MODEL", "qwen2.5vl:7b-ft2-q4")
+MODEL = os.environ.get("MODEL", "qwen2.5vl:3b-ft-q8")
 PORT = int(os.environ.get("PORT", "8899"))
 OLLAMA = os.environ.get("OLLAMA", "http://127.0.0.1:11434") + "/api/generate"
 NP = int(os.environ.get("NP", "2"))            # 동시 비전 요청 수 — ollama의 OLLAMA_NUM_PARALLEL과 일치시킬 것

@@ -32,8 +32,15 @@ q4는 마진이 얇아 FAIL. 모바일 채택 스윗스폿 = `qwen2.5vl:3b-ft-q8
 ### 결론·함의
 - **답: 그렇다(구조적으로 완전 극복) — 모바일 실배포는 q8에서.** q8 3B는 ~4.6GB(LLM+mmproj)로
   고사양폰 사정권. q4(1.93GB)까지 원하면 마진 부족 → 더 큰 용량(7B)이나 q8 유지가 필요.
-- 속도 10.6s/장은 7B-q4(13.9)보다 1.3배 빠름(디코드 대역폭 지배 — q8이라 q4만큼은 아님). 프로덕션
-  (7b-ft2-q4) 교체 아님 — 이건 모바일 실현성 검증 스파이크. 실기기 포팅(llama.cpp/MLC)은 별도.
+- 속도 10.6s/장은 7B-q4(13.9)보다 1.3배 빠름(디코드 대역폭 지배 — q8이라 q4만큼은 아님).
+  실기기 포팅(llama.cpp/MLC)은 별도.
+
+### 프로덕션 전환 (2026-07-21, 사용자 결정)
+- 서버 기본 모델을 `qwen2.5vl:7b-ft2-q4` → **`qwen2.5vl:3b-ft-q8`**로 교체(`agent/server.py`·
+  `agent/run-agent.sh`). 리샘플(×0.5 LANCZOS)·prompt4e·NP=2는 그대로(3B도 동일 분포 학습).
+  기본값 端到端(extract_batch, 실화면 8장) parity 전판 PASS 재확인. ollama 상주 모델도 q8로 전환.
+- 트레이드오프: 7B 대비 더 작고 빠르고(모바일 사정권) 동일 parity 통과이나, 마진은 더 얇다
+  (q4는 FAIL, f16 한 런에서 NVDA cost 흔들림 관측). held-out 8장 기준으론 동급 PASS.
 - 산출물: 가중치 `ft-spike/out/3b-ft-q8.gguf`+`mmproj-3b-ft.gguf`, Modelfile
   `eval/ft/Modelfile.3bft-q8`, ollama 태그 `qwen2.5vl:3b-ft-q8`. 레시피는 `eval/ft/*_3b*`.
 
