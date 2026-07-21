@@ -19,12 +19,12 @@ import resolve                               # noqa: E402
 import finalize as finalize_mod              # noqa: E402  종합(게이트·broker 정규화)
 
 ROOT = os.path.dirname(HERE)
-MODEL = os.environ.get("MODEL", "qwen2.5vl:7b")
+MODEL = os.environ.get("MODEL", "qwen2.5vl:3b-ft-q8")
 PORT = int(os.environ.get("PORT", "8899"))
 OLLAMA = os.environ.get("OLLAMA", "http://127.0.0.1:11434") + "/api/generate"
-NP = int(os.environ.get("NP", "1"))            # 동시 비전 요청 수 — ollama의 OLLAMA_NUM_PARALLEL과 일치시킬 것
-PROMPT_FILE = os.environ.get("PROMPT_FILE", os.path.join(ROOT, "eval/harness/prompt4c.txt"))
-PROMPT = open(PROMPT_FILE).read().strip()      # prompt4c = 선정본 prompt4의 압축출력판(생성 토큰 ~반, 지시문 동일)
+NP = int(os.environ.get("NP", "2"))            # 동시 비전 요청 수 — ollama의 OLLAMA_NUM_PARALLEL과 일치시킬 것
+PROMPT_FILE = os.environ.get("PROMPT_FILE", os.path.join(ROOT, "eval/harness/prompt4e.txt"))
+PROMPT = open(PROMPT_FILE).read().strip()      # prompt4e = prompt4c + 외화예수금 규칙(8) — DECISION v2.3/v2.5 검증본
 
 # 시세: 서버 전용 데이터(레포 밖). 결정론적 페치 — LLM 무관.
 DATA_DIR = os.environ.get("DATA_DIR", os.path.expanduser("~/portf-agent/data"))
@@ -112,6 +112,23 @@ def parse_json(raw):
     """비전 원문 → 행 리스트. 파서는 finalize 하나만 쓴다(단일 출처) — 단건·배치가 같은 견고성을 갖도록."""
     return finalize_mod.parse_rows(raw) or None
 
+def resample_half_b64(b64):
+    """×0.5 LANCZOS + 28px 스냅 리샘플 — DECISION v2.5 채택 구성(모델이 이 분포로 학습됨).
+    이미지 토큰 ~1/4. PNG 무손실 재인코딩(검증 픽스처와 동일 조건). EXIF는 원본 b64에서
+    따로 읽으므로(호출부 보장) 여기서 소실돼도 무관. 실패 시 원본 그대로 반환."""
+    try:
+        import io
+        from PIL import Image
+        im = Image.open(io.BytesIO(base64.b64decode(b64))).convert("RGB")
+        w = max(28, round(im.width * 0.5 / 28) * 28)
+        h = max(28, round(im.height * 0.5 / 28) * 28)
+        buf = io.BytesIO()
+        im.resize((w, h), Image.LANCZOS).save(buf, "PNG")
+        return base64.b64encode(buf.getvalue()).decode()
+    except Exception:
+        return b64
+
+
 def exif_capture_dt(b64):
     """base64 이미지의 EXIF DateTimeOriginal → tz-aware datetime(CAPTURE_TZ) 또는 None.
     스크린샷(안드로이드 등)은 대개 이 태그를 남긴다 — 기기 로컬 시각이라 CAPTURE_TZ로 간주."""
@@ -196,6 +213,7 @@ def complete(body):
         if dt:
             store_capture(dt)
     prompt = PROMPT if images else "\n".join(texts)
+    images = [resample_half_b64(b) for b in images]
     req = json.dumps({"model": MODEL, "prompt": prompt, "images": images,
                       "stream": False, "keep_alive": -1, "options": {"temperature": 0, "num_ctx": 8192}}).encode()
     r = urllib.request.Request(OLLAMA, data=req, headers={"Content-Type": "application/json"})
@@ -543,7 +561,7 @@ def reprice(holdings, capture_dt):
 
 
 def extract(b64, capture_dt):
-    body = json.dumps({"model": MODEL, "prompt": PROMPT, "images": [b64],
+    body = json.dumps({"model": MODEL, "prompt": PROMPT, "images": [resample_half_b64(b64)],
                        "stream": False, "keep_alive": -1, "options": {"temperature": 0, "num_ctx": 8192}}).encode()
     t0 = time.time()
     req = urllib.request.Request(OLLAMA, data=body, headers={"Content-Type": "application/json"})
@@ -564,8 +582,8 @@ def extract(b64, capture_dt):
 
 
 def _vision(b64):
-    """이미지 1장 → 비전 원문 텍스트(prompt2). 배치·단건 공용."""
-    body = json.dumps({"model": MODEL, "prompt": PROMPT, "images": [b64],
+    """이미지 1장 → 비전 원문 텍스트. 배치·단건 공용."""
+    body = json.dumps({"model": MODEL, "prompt": PROMPT, "images": [resample_half_b64(b64)],
                        "stream": False, "keep_alive": -1, "options": {"temperature": 0, "num_ctx": 8192}}).encode()
     req = urllib.request.Request(OLLAMA, data=body, headers={"Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=1800) as r:
