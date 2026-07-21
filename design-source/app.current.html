@@ -1379,7 +1379,7 @@
     input[type=number]{-moz-appearance:textfield;appearance:textfield;}
     /* ── 표 레이아웃(단일 출처: 헤더·행이 같은 클래스를 공유) ── */
     .pf-tbl-scroll{overflow-x:auto;}
-    .pf-hold-row{display:grid;grid-template-columns:minmax(150px,1fr) 118px 82px 98px 134px 56px 66px 24px;gap:8px;min-width:760px;}
+    .pf-hold-row{display:grid;grid-template-columns:minmax(150px,1fr) 118px 82px 98px 98px 134px 56px 66px 24px;gap:8px;min-width:858px;}
     .pf-analysis{display:grid;grid-template-columns:250px 1fr;gap:20px;}
     .pf-num{font-variant-numeric:tabular-nums;}
     /* ── STEP 섹션 뼈대(카드·라벨·제목·설명이 5개 섹션에 반복) ── */
@@ -1471,7 +1471,7 @@
       <div style="padding:0 18px 6px;">
        <div class="pf-tbl-scroll">
         <div class="pf-hold-row" style="padding:7px 8px;border-bottom:1px solid var(--border-default,#dfdfe8);font-size:10.5px;font-weight:600;letter-spacing:0.4px;color:var(--text-tertiary,#999);text-transform:uppercase;">
-          <span>종목명</span><span>자산군</span><span style="text-align:right;">수량</span><span style="text-align:right;">현재가</span><span style="text-align:right;">평가금액 ₩</span><span style="text-align:right;">비중</span><span style="text-align:right;">손익</span><span></span>
+          <span>종목명</span><span>자산군</span><span style="text-align:right;">수량</span><span style="text-align:right;">현재가</span><span style="text-align:right;">평균가</span><span style="text-align:right;">평가금액 ₩</span><span style="text-align:right;">비중</span><span style="text-align:right;">손익</span><span></span>
         </div>
         <sc-for list="{{ rows }}" as="r" hint-placeholder-count="6">
           <div>
@@ -1499,6 +1499,11 @@
                   <span style="font-size:10px;color:var(--text-tertiary,#999);flex:none;">{{ r.cur }}</span>
                 </div>
                 <div style="display:flex;align-items:center;justify-content:flex-end;gap:3px;min-width:0;">
+                  <sc-if value="{{ r.hasAvgSrc }}" hint-placeholder-val="{{ false }}"><span title="매수평균가 출처" style="font-size:8px;font-weight:700;color:#e1306c;background:rgba(225,48,108,0.12);padding:0.5px 3px;border-radius:3px;flex:none;letter-spacing:0.2px;">{{ r.avgSrc }}</span></sc-if>
+                  <input value="{{ r.avgInput }}" onchange="{{ r.onAvg }}" placeholder="—" class="pf-num" style="border:none;background:transparent;font-size:12.5px;text-align:right;padding:3px 0;width:100%;min-width:0;color:var(--text-primary,#000);">
+                  <span style="font-size:10px;color:var(--text-tertiary,#999);flex:none;">{{ r.cur }}</span>
+                </div>
+                <div style="display:flex;align-items:center;justify-content:flex-end;gap:3px;min-width:0;">
                   <sc-if value="{{ r.mismatch }}" hint-placeholder-val="{{ false }}"><span title="{{ r.mismatchTitle }}" style="font-size:9px;font-weight:700;color:#b8860b;background:#fff3cd;border:1px solid #f0d48a;padding:0 3px;border-radius:3px;flex:none;cursor:help;">⚠</span></sc-if>
                   <sc-if value="{{ r.hasValueSrc }}" hint-placeholder-val="{{ false }}"><span title="평가금액 출처" style="font-size:8px;font-weight:700;color:#8134af;background:rgba(129,52,175,0.12);padding:0.5px 3px;border-radius:3px;flex:none;letter-spacing:0.2px;">{{ r.valueSrc }}</span></sc-if>
                   <sc-if value="{{ r.hasQP }}" hint-placeholder-val="{{ true }}"><span class="pf-num" style="font-size:12.5px;font-weight:600;text-align:right;">{{ r.valueStr }}</span></sc-if>
@@ -1516,7 +1521,7 @@
           <div style="display:flex;flex-wrap:wrap;align-items:center;gap:5px 12px;flex:1;min-width:0;">
             <span style="display:inline-flex;align-items:center;gap:4px;"><span style="font-size:8px;font-weight:700;color:#3897f0;background:rgba(56,151,240,0.12);padding:0.5px 3px;border-radius:3px;letter-spacing:0.2px;">칩</span>수량 출처</span>
             <span style="display:inline-flex;align-items:center;gap:4px;"><span style="font-size:8px;font-weight:700;color:#8134af;background:rgba(129,52,175,0.12);padding:0.5px 3px;border-radius:3px;letter-spacing:0.2px;">칩</span>평가금액 출처</span>
-            <span>· <b style="color:var(--text-secondary,#6e6e6e);">screen</b> 화면 원본 · <b style="color:var(--text-secondary,#6e6e6e);">est</b> 추정 · <b style="color:var(--text-secondary,#6e6e6e);">cross</b> 교차산출 · <b style="color:var(--text-secondary,#6e6e6e);">calc</b> 계산 · <b style="color:var(--text-secondary,#6e6e6e);">live</b> 재평가 · <b style="color:var(--text-secondary,#6e6e6e);">kept</b> 기존값 유지 · <b style="color:var(--text-secondary,#6e6e6e);">cash</b> 현금</span>
+            <span>· <b style="color:var(--text-secondary,#6e6e6e);">screen</b> 화면 원본 · <b style="color:var(--text-secondary,#6e6e6e);">est</b> 추정 · <b style="color:var(--text-secondary,#6e6e6e);">cross</b> 교차산출 · <b style="color:var(--text-secondary,#6e6e6e);">calc</b> 계산 · <b style="color:var(--text-secondary,#6e6e6e);">live</b> 재평가 · <b style="color:var(--text-secondary,#6e6e6e);">kept</b> 기존값 유지 · <b style="color:var(--text-secondary,#6e6e6e);">cash</b> 현금 · <b style="color:#e1306c;">manual</b> 직접입력</span>
             <span style="display:inline-flex;align-items:center;gap:4px;"><span style="width:6px;height:6px;border-radius:50%;background:#f5a623;display:inline-block;"></span>노란 점 = 시세 24h 경과(재업로드 시 자동 갱신)</span>
             <span style="display:inline-flex;align-items:center;gap:4px;"><span style="font-size:9px;font-weight:700;color:#b8860b;background:#fff3cd;border:1px solid #f0d48a;padding:0 3px;border-radius:3px;">⚠</span>수량×현재가와 화면 평가금액 2% 이상 불일치</span>
           </div>
@@ -1693,6 +1698,12 @@ class Component extends DCLogic {
     // 시드(데모·옛 실계좌 id 's\d+')는 복원하지 않는다 — 실제 사용자 데이터(id 'h…')만 남긴다.
     // 이 게이트가 예전 방문 브라우저의 옛 실계좌도 화면에서 걷어낸다.
     const holdings = (saved && Array.isArray(saved.holdings) ? saved.holdings : []).filter(h => !this.isSeed(h));
+    // 레거시 마이그레이션: avgCost 없던 기존 데이터는 원가·수량으로 매수평균가를 백필해 새 손익 기준에 태운다.
+    holdings.forEach(h => {
+      if (h.avgCost == null && h.cost != null && h.qty != null && h.qty > 0) {
+        h.avgCost = h.cost / h.qty; h.avgCost_src = 'computed:cost/qty';
+      }
+    });
     if (holdings.length) {
       this.setState({ holdings, target: saved.target || this.state.target, fx: saved.fx || 1380, loaded: true });
     } else {
@@ -1729,16 +1740,21 @@ class Component extends DCLogic {
   sampleData() {
     const now = Date.now(), old = now - 3 * 86400000;
     let i = 0;
+    // 매수평균가는 원가·수량이 함께 있으면 도출(추출 경로와 동일 규약) — 데모가 평균가·주당 손익을 보여준다.
     const mk = (broker, accountType, name, cls, currency, qty, price, value, cost, t) =>
-      ({ id: 's' + (++i), broker, accountType, name, cls, currency, qty, price, value, cost, updatedAt: t });
-    // 예시 데이터 — 전부 허구다(실 계좌·종목·금액 아님). 자산군 7종·계좌 4종·USD/KRW를
-    // 고루 담아 데모가 도넛·그룹·검산 경로를 다 태우게 한다. 버튼으로만 로드된다.
+      ({ id: 's' + (++i), broker, accountType, name, cls, currency, qty, price, value, cost,
+         avgCost: (cost != null && qty) ? cost / qty : null,
+         avgCost_src: (cost != null && qty) ? 'computed:cost/qty' : '',
+         updatedAt: t });
+    // 예시 데이터 — 전부 허구다(실 계좌·종목·금액 아님). 자산군 7종·계좌 4종·USD/KRW를 고루 담아
+    // 데모가 도넛·그룹·평균가·손익 경로를 다 태운다. 수량 있는 행은 평균가가 뜨고, 연금(SOL)·현금(예수금)
+    // 행은 수량 없이 총원가 폴백/‘—’을 보여준다. qty×price는 각 행 평가금액을 보존(집계 불변). 버튼으로만 로드.
     return [
-      mk('예시증권', 'IRP', 'KODEX 미국S&P500', 'growth', 'KRW', null, null, 5000000, 4500000, old),
-      mk('예시증권', 'IRP', 'TIGER 미국나스닥100', 'growth', 'KRW', null, null, 3000000, 2600000, old),
-      mk('예시증권', 'IRP', 'ACE KRX금현물', 'gold', 'KRW', null, null, 2000000, 1800000, old),
-      mk('예시증권', 'IRP', 'KODEX 국고채30년', 'bond', 'KRW', null, null, 2500000, 2550000, old),
-      mk('예시증권', 'IRP', 'TIGER 미국S&P500채권혼합', 'mixed', 'KRW', null, null, 2000000, 1950000, old),
+      mk('예시증권', 'IRP', 'KODEX 미국S&P500', 'growth', 'KRW', 100, 50000, null, 4500000, old),
+      mk('예시증권', 'IRP', 'TIGER 미국나스닥100', 'growth', 'KRW', 50, 60000, null, 2600000, old),
+      mk('예시증권', 'IRP', 'ACE KRX금현물', 'gold', 'KRW', 200, 10000, null, 1800000, old),
+      mk('예시증권', 'IRP', 'KODEX 국고채30년', 'bond', 'KRW', 25, 100000, null, 2550000, old),
+      mk('예시증권', 'IRP', 'TIGER 미국S&P500채권혼합', 'mixed', 'KRW', 40, 50000, null, 1950000, old),
       mk('예시증권', '연금저축', 'SOL 미국배당다우존스', 'dividend', 'KRW', null, null, 3000000, 2800000, old),
       mk('예시증권', '연금저축', '예수금', 'cash', 'KRW', null, null, 1000000, null, old),
       mk('예시증권', 'ISA', 'TIGER 리츠부동산인프라', 'realestate', 'KRW', 200, 5000, null, 900000, old),
@@ -1770,6 +1786,18 @@ class Component extends DCLogic {
   costKrw(h) {
     if (h.cost == null) return null;
     return h.currency === 'USD' ? h.cost * this.state.fx : h.cost;
+  }
+  // 매수평균가(주당)를 KRW로. avgCost는 추출 시 cost/qty로 동결 저장되거나 사용자가 직접 입력한다.
+  avgKrw(h) {
+    if (h.avgCost == null) return null;
+    return h.currency === 'USD' ? h.avgCost * this.state.fx : h.avgCost;
+  }
+  // 손익 기준 = 현재 수량에 대한 원가. 주당 평균가가 있으면 avg×현재수량(수량 편집에 정합),
+  // 없으면 총 매입금액(수량 null인 연금 화면 등)으로 폴백. 둘 다 없으면 null → 손익 '—'.
+  costBasisKrw(h) {
+    const a = this.avgKrw(h);
+    if (a != null && h.qty != null) return a * h.qty;
+    return this.costKrw(h);
   }
   fmtW(n) {
     if (n == null || isNaN(n)) return '—';
@@ -1930,7 +1958,12 @@ class Component extends DCLogic {
           if (p.qty != null) h.qty = p.qty;
           if (p.price != null) h.price = p.price;
           if (p.value != null) h.value = p.value;
-          if (p.cost != null) h.cost = p.cost;
+          // 원가가 새로 들어올 때만 매수평균가를 재동결(같은 스냅샷의 cost·qty 쌍 기준) — 수량만 갱신되면 avg 유지.
+          if (p.cost != null) {
+            h.cost = p.cost;
+            h.avgCost = (h.qty != null && h.qty > 0) ? h.cost / h.qty : null;
+            h.avgCost_src = h.avgCost != null ? 'computed:cost/qty' : '';
+          }
           // 출처(추정인지 화면값인지)는 값과 함께 움직여야 한다 — 값만 갱신하면 칩이 거짓말을 한다
           h.qty_src = p.qty_src || ''; h.price_src = p.price_src || ''; h.value_src = p.value_src || '';
           h.updatedAt = Date.now();
@@ -1943,6 +1976,8 @@ class Component extends DCLogic {
             id: 'h' + Date.now() + Math.random().toString(36).slice(2, 6),
             broker: p.broker, accountType: p.accountType, name: p.name, cls: p.cls,
             currency: p.currency, qty: p.qty, price: p.price, value: p.value, cost: p.cost,
+            avgCost: (p.cost != null && p.qty != null && p.qty > 0) ? p.cost / p.qty : null,
+            avgCost_src: (p.cost != null && p.qty != null && p.qty > 0) ? 'computed:cost/qty' : '',
             qty_src: p.qty_src || '', price_src: p.price_src || '', value_src: p.value_src || '',
             updatedAt: Date.now(), _seen: true
           });
@@ -2031,10 +2066,11 @@ class Component extends DCLogic {
     // --- header (손익 합산은 6줄뿐이라 여기 남긴다) ---
     let plSum = 0, costSum = 0;
     S.holdings.forEach(h => {
-      const c = this.costKrw(h);
+      const c = this.costBasisKrw(h);
       if (c != null) { plSum += this.krw(h) - c; costSum += c; }
     });
-    const plPct = costSum > 0 ? (plSum / costSum * 100) : 0;
+    const hasBasis = costSum > 0;                              // 원가 기준이 하나도 없으면 손익은 '알 수 없음'
+    const plPct = hasBasis ? (plSum / costSum * 100) : 0;
 
     // --- account chips (3줄) ---
     const acctTot = {};
@@ -2057,8 +2093,8 @@ class Component extends DCLogic {
       hasInfo: !!S.extractInfo, extractInfo: S.extractInfo,
       totalStr: this.fmtW(total),
       totalShort: this.fmtShort(total),
-      plStr: (plSum >= 0 ? '+' : '') + this.fmtW(plSum).replace('₩-', '-₩') + ' (' + (plPct >= 0 ? '+' : '') + plPct.toFixed(1) + '%)',
-      plColor: plSum >= 0 ? '#ed4956' : '#3897f0',
+      plStr: hasBasis ? ((plSum >= 0 ? '+' : '') + this.fmtW(plSum).replace('₩-', '-₩') + ' (' + (plPct >= 0 ? '+' : '') + plPct.toFixed(1) + '%)') : '—',
+      plColor: hasBasis ? (plSum >= 0 ? '#ed4956' : '#3897f0') : '#999',
       acctChips,
       extracting: S.extracting, notExtracting: !S.extracting,
       extractStatus: S.extractStatus,
@@ -2094,20 +2130,23 @@ class Component extends DCLogic {
       if (s.indexOf('cross-account') >= 0) return 'cross';
       if (s.indexOf('capture-close') >= 0) return 'est';
       if (s.startsWith('screen')) return 'screen';
+      if (s === 'manual') return 'manual';
       if (s.startsWith('computed')) return 'calc';
       if (s.startsWith('reprice')) return 'live';
       if (s === 'cash') return 'cash';
       return s.slice(0, 10);
     };
-    // 검산: 수량×현재가 vs 화면 평가금액. hasQP면 표는 qty*price를 보여주고 화면값(h.value)은 안 쓰므로,
-    // 2% 넘게 어긋나면 둘 중 하나가 틀린 것 — 값과 함께 매 렌더 계산해야 사용자가 고치는 즉시 반영된다.
+    // 검산: 수량×현재가 vs 화면 평가금액. 이 대조는 **추출 시점의 스크린샷 값들**끼리만 의미가 있다.
+    // 사용자가 수량·현재가·평가금액을 직접 고치면(출처 manual) 그 값을 신뢰하고 검산하지 않는다 —
+    // 예: 현재가를 시장가로 갱신하면 qty×price가 스크린샷 평가금액과 벌어지는 게 정상이다.
     const chkGap = h => (h.qty != null && h.price != null && h.value != null && h.value > 0)
       ? Math.abs(h.qty * h.price - h.value) / h.value : 0;
     const mkRow = h => {
       const v = this.krw(h);
-      const c = this.costKrw(h);
+      const c = this.costBasisKrw(h);
       const pl = c != null && c > 0 ? (v - c) / c * 100 : null;
       const hasQP = h.qty != null && h.price != null;
+      const anyManual = h.qty_src === 'manual' || h.price_src === 'manual' || h.value_src === 'manual';
       const gap = chkGap(h);
       const stale = Date.now() - (h.updatedAt || 0) > 86400000;
       const vSrc = h.value_src || h.price_src || '';
@@ -2120,11 +2159,13 @@ class Component extends DCLogic {
         qtySrc: srcChip(h.qty_src), hasQtySrc: !!h.qty_src,
         price: h.price == null ? '' : this.fmtNum(h.price),
         cur: h.currency === 'USD' ? '$' : '₩',
+        avgInput: h.avgCost == null ? '' : this.fmtNum(h.avgCost),
+        avgSrc: srcChip(h.avgCost_src), hasAvgSrc: !!h.avgCost_src,
         hasQP, noQP: !hasQP,
         valueStr: this.fmtW(v),
         valueInput: h.value == null ? '' : this.fmtNum(h.value),
         valueSrc: srcChip(vSrc), hasValueSrc: !!vSrc,
-        mismatch: gap > 0.02,
+        mismatch: gap > 0.02 && !anyManual,
         mismatchTitle: '검산 불일치 — 수량×현재가 ' + this.fmtNum(Math.round(h.qty * h.price)) +
           ' vs 화면 평가금액 ' + this.fmtNum(h.value) + ' (' + (gap * 100).toFixed(1) + '% 차이). 표엔 수량×현재가가 표시됩니다 — 값을 확인하세요',
         weightStr: total > 0 ? (v / total * 100).toFixed(1) + '%' : '—',
@@ -2134,9 +2175,10 @@ class Component extends DCLogic {
         staleTitle: stale ? '시세가 24시간 이상 지났습니다 — 현재가를 갱신하세요' : '',
         onName: e => this.updateHolding(h.id, { name: e.target.value }),
         onCls: e => this.updateHolding(h.id, { cls: e.target.value }),
-        onQty: e => this.updateHolding(h.id, { qty: this.parseNum(e.target.value) }),
-        onPrice: e => this.updateHolding(h.id, { price: this.parseNum(e.target.value), updatedAt: Date.now() }),
-        onValue: e => this.updateHolding(h.id, { value: this.parseNum(e.target.value), updatedAt: Date.now() }),
+        onQty: e => this.updateHolding(h.id, { qty: this.parseNum(e.target.value), qty_src: 'manual' }),
+        onPrice: e => this.updateHolding(h.id, { price: this.parseNum(e.target.value), price_src: 'manual', updatedAt: Date.now() }),
+        onValue: e => this.updateHolding(h.id, { value: this.parseNum(e.target.value), value_src: 'manual', updatedAt: Date.now() }),
+        onAvg: e => this.updateHolding(h.id, { avgCost: this.parseNum(e.target.value), avgCost_src: 'manual' }),
         onDelete: () => this.set({ holdings: S.holdings.filter(x => x.id !== h.id) })
       };
     };
