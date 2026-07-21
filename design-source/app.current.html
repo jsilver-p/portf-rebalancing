@@ -2096,48 +2096,62 @@ class Component extends DCLogic {
   }
 
   // 데모용 더미 추출 — 에이전트 없이도 라이브 스트리밍 + 게이트 자릿수 보정을 눈으로 보게 한다.
-  // 실제 경로와 동일한 _pushStream(중간 원시행)→_finishStream(게이트 보정본) 파이프라인을 그대로 태운다.
-  // 응답은 전부 허구(픽션). 마지막 원시행 '예수금'은 자릿수 오독(4,500)으로 흘러가고, 계좌합계 대조
-  // 게이트가 45,000으로 보정하는 전환을 재현한다.
+  // 데이터는 STEP2 '예시 데이터로 둘러보기'와 동일한 sampleData() 포트폴리오를 그대로 쓴다.
+  // 실제 경로와 동일한 _pushStream(중간 원시행)→_finishStream(게이트 보정본) 파이프라인을 태우고,
+  // 예수금 한 행만 자릿수 오독(1,000,000→100,000)으로 흘려 계좌합계 대조 게이트가 복원하는 걸 보여준다.
   demoStream() {
     if (this.state.streamStage === 'live') return;
-    // 화면 1 (가온증권 일반) — 정상 판독
-    const raw1 = [
-      { broker: '가온증권', accountType: '일반', name: '한빛반도체', assetClass: '성장주', currency: 'KRW', qty: 10, price: 85000, value: 850000, cost: 700000, confidence: 'high' },
-      { broker: '가온증권', accountType: '일반', name: '새봄금융지주', assetClass: '배당주', currency: 'KRW', qty: 20, price: 30000, value: 600000, cost: 640000, confidence: 'high' }
-    ];
-    // 화면 2 (새롬투자 연금저축) — 예수금 평가금액이 자릿수 누락(45,000 → 4,500)으로 판독됨
-    const raw2 = [
-      { broker: '새롬투자', accountType: '연금저축', name: '국고채 24-3', assetClass: '채권', currency: 'KRW', qty: 120, price: 10000, value: 1200000, cost: 1195000, confidence: 'high' },
-      { broker: '새롬투자', accountType: '연금저축', name: '예수금', assetClass: '현금', currency: 'KRW', qty: null, price: null, value: 4500, confidence: 'high' }
-    ];
-    const repair = '새롬투자 연금저축: 예수금 평가금액 4,500 → 45,000 (계좌합계 1,245,000와 일치하도록 자릿수 보정 — 오독 교정)';
-    const gate = { warnings: [repair], repairs: [repair] };
-    // 게이트 보정 완료본 — 예수금이 45,000으로 교정되고 value_src에 '보정' 태그가 붙는다.
-    const finalRows = [
-      raw1[0], raw1[1], raw2[0],
-      { broker: '새롬투자', accountType: '연금저축', name: '예수금', assetClass: '현금', currency: 'KRW', qty: null, price: null, value: 45000, confidence: 'high', value_src: 'screen(계좌합계 대조로 자릿수 보정)' }
-    ];
-    const clsMap = { '성장주': 'growth', '배당주': 'dividend', '채권': 'bond', '금·원자재': 'gold', '현금': 'cash', '부동산': 'realestate' };
-    const pending = finalRows.map((h, j) => ({
+    const SLIP = '예수금';                            // 이 행만 자릿수 오독으로 흘리고 게이트가 보정
+    const sample = this.sampleData();                 // STEP2 예시 데이터와 동일
+    const toRaw = h => ({
+      broker: h.broker, accountType: h.accountType, name: h.name, cls: h.cls,
+      currency: h.currency, qty: h.qty, price: h.price,
+      value: h.name === SLIP ? 100000 : h.value, cost: h.cost, confidence: 'high'
+    });
+    // 최종(게이트 보정 완료) — 예수금 값 복원 + '보정' 태그. 나머지는 원시와 동일.
+    const finalRows = sample.map(h => h.name === SLIP
+      ? { ...toRaw(h), value: h.value, value_src: 'screen(계좌합계 대조로 자릿수 보정)' }
+      : toRaw(h));
+    // 커밋용 pending — 추출 pending 형태(확인 시 applySnapshot이 실자산으로 병합)
+    const pending = sample.map((h, j) => ({
       id: 'p' + Date.now() + '_' + j,
-      broker: h.broker, accountType: this.normAcct(h.accountType), name: h.name,
-      cls: clsMap[h.assetClass] || 'growth', currency: 'KRW',
+      broker: h.broker, accountType: h.accountType, name: h.name, cls: h.cls, currency: h.currency,
       qty: h.qty != null ? Number(h.qty) : null,
       price: h.price != null ? Number(h.price) : null,
       value: h.value != null ? Number(h.value) : null,
       cost: h.cost != null ? Number(h.cost) : null,
-      value_src: h.value_src || '', confidence: 0.9, checkFail: false
+      value_src: h.name === SLIP ? 'screen(계좌합계 대조로 자릿수 보정)' : '',
+      confidence: 0.9, checkFail: false
     }));
+    // 게이트 로그 — 예수금이 속한 계좌의 합계로 자릿수 복원
+    const acct = sample.filter(h => h.broker === '예시증권' && h.accountType === '연금저축');
+    const acctTotal = acct.reduce((s, h) => s + (h.value != null ? h.value : (h.qty || 0) * (h.price || 0)), 0);
+    const repair = '예시증권 연금저축: 예수금 평가금액 100,000 → 1,000,000 (계좌합계 ' +
+      acctTotal.toLocaleString('ko-KR') + '와 일치하도록 자릿수 보정 — 오독 교정)';
+    const gate = { warnings: [repair], repairs: [repair] };
+    // 화면(=증권사·계좌) 단위로 나눠 흘려보낸다
+    const waves = [];
+    sample.forEach(h => {
+      const key = h.broker + '|' + h.accountType;
+      let w = waves.find(x => x.key === key);
+      if (!w) { w = { key, rows: [] }; waves.push(w); }
+      w.rows.push(toRaw(h));
+    });
+    const N = waves.length;
     this._revealQ = []; this._pumping = false;
     this.setState({ extracting: true, extractError: null, extractInfo: null,
       streamStage: 'live', streamRows: [], gateReport: null, streamPending: null, streamNote: '',
-      extractStatus: '예시 · 화면 2장 분석 중… (1/2)' });
-    this._pushStream(raw1);
-    setTimeout(() => { if (this.state.streamStage === 'live') {
-      this.setState({ extractStatus: '예시 · 화면 2장 분석 중… (2/2)' }); this._pushStream(raw2);
-    } }, 1100);
-    setTimeout(() => { if (this.state.streamStage === 'live') this._finishStream(finalRows, gate, pending, ''); }, 2400);
+      extractStatus: '예시 · 화면 ' + N + '장 분석 중… (1/' + N + ')' });
+    this._pushStream(waves[0].rows);
+    let t = 0;
+    for (let i = 1; i < N; i++) {
+      t += 800;
+      ((idx, delay) => setTimeout(() => { if (this.state.streamStage === 'live') {
+        this.setState({ extractStatus: '예시 · 화면 ' + N + '장 분석 중… (' + (idx + 1) + '/' + N + ')' });
+        this._pushStream(waves[idx].rows);
+      } }, delay))(i, t);
+    }
+    setTimeout(() => { if (this.state.streamStage === 'live') this._finishStream(finalRows, gate, pending, ''); }, t + 1000);
   }
 
   // 로컬 에이전트 경로: 화면을 **한 번에** 보내 서버가 종합한다(화면 간 교차검증이 필요하기 때문).
