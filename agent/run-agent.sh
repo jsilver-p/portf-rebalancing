@@ -31,6 +31,15 @@ curl -s http://127.0.0.1:11434/api/generate \
   -d "{\"model\":\"$MODEL\",\"prompt\":\"1\",\"stream\":false,\"keep_alive\":-1,\"options\":{\"num_ctx\":8192}}" \
   >/dev/null && echo "· 모델 적재 완료(상시 유지)" || echo "⚠ 워밍업 실패 — 첫 추출이 느릴 수 있음"
 
+# 0.7) 포트 선점 정리 — 이전 실행 잔여 프로세스가 $PORT를 물고 있으면 죽인다 ------
+# (Ctrl-C 못 받고 죽거나 터널만 살아 서버 좀비가 남은 경우 "address already in use" 방지)
+if fuser "$PORT/tcp" >/dev/null 2>&1; then
+  echo "· 포트 $PORT 선점 프로세스 정리…"
+  fuser -k "$PORT/tcp" 2>/dev/null || true
+  for _ in $(seq 1 10); do fuser "$PORT/tcp" >/dev/null 2>&1 || break; sleep 0.5; done
+  fuser "$PORT/tcp" >/dev/null 2>&1 && { echo "❌ 포트 $PORT 여전히 점유 중 — 수동 확인 필요"; exit 1; }
+fi
+
 # 1) 에이전트 서버 -----------------------------------------------------------
 python3 "$REPO_DIR/agent/server.py" >/tmp/agent-server.log 2>&1 &
 SRV=$!
