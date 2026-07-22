@@ -1473,7 +1473,7 @@
                 <span style="width:13px;height:13px;border:2px solid var(--ig-blue,#1fa1ff);border-top-color:transparent;border-radius:50%;animation:pfspin 0.8s linear infinite;flex:none;"></span>
               </sc-if>
             </div>
-            <div class="pf-tbl-scroll" style="max-height:320px;overflow:auto;padding:0 12px;">
+            <div class="pf-tbl-scroll" style="padding:0 12px;">
               <div class="pf-hold-row" style="padding:7px 8px;border-bottom:1px solid var(--border-default,#dfdfe8);font-size:10.5px;font-weight:600;letter-spacing:0.4px;color:var(--text-tertiary,#999);text-transform:uppercase;">
                 <span>종목명</span><span>자산군</span><span style="text-align:right;">수량</span><span style="text-align:right;">현재가</span><span style="text-align:right;">평균가</span><span style="text-align:right;">평가금액 ₩</span><span style="text-align:right;">비중</span><span style="text-align:right;">손익</span><span></span>
               </div>
@@ -1489,9 +1489,16 @@
                   </sc-if>
                   <sc-if value="{{ sr.isHolding }}" hint-placeholder-val="{{ false }}">
                     <div class="pf-hold-row pf-stream-row" style="align-items:center;padding:6px 8px;border-bottom:1px solid var(--ig-gray-05,#efefef);">
-                      <span style="font-size:13px;font-weight:600;color:var(--text-primary,#000);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ sr.name }}</span>
+                      <div style="display:flex;align-items:center;gap:4px;min-width:0;">
+                        <sc-if value="{{ sr.hasImg }}" hint-placeholder-val="{{ false }}"><span title="이미지 {{ sr.imgTag }}에서 추출" style="font-size:8px;font-weight:700;color:var(--text-tertiary,#999);background:var(--bg-secondary,#efefef);padding:0.5px 4px;border-radius:3px;flex:none;">{{ sr.imgTag }}</span></sc-if>
+                        <sc-if value="{{ sr.nameReview }}" hint-placeholder-val="{{ false }}"><span title="{{ sr.nameTitle }}" style="font-size:9px;font-weight:700;color:#b8860b;background:#fff3cd;border:1px solid #f0d48a;padding:0 3px;border-radius:3px;flex:none;cursor:help;">⚠</span></sc-if>
+                        <span style="font-size:13px;font-weight:600;color:var(--text-primary,#000);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;">{{ sr.name }}</span>
+                      </div>
                       <span style="font-size:12px;font-weight:600;color:{{ sr.clsColor }};white-space:nowrap;">{{ sr.clsLabel }}</span>
-                      <span class="pf-num" style="font-size:12.5px;text-align:right;color:var(--text-primary,#000);">{{ sr.qtyStr }}</span>
+                      <div style="display:flex;align-items:center;justify-content:flex-end;gap:3px;min-width:0;">
+                        <sc-if value="{{ sr.qtyReview }}" hint-placeholder-val="{{ false }}"><span title="{{ sr.qtyTitle }}" style="font-size:9px;font-weight:700;color:#b8860b;background:#fff3cd;border:1px solid #f0d48a;padding:0 3px;border-radius:3px;flex:none;cursor:help;">⚠</span></sc-if>
+                        <span class="pf-num" style="font-size:12.5px;text-align:right;color:var(--text-primary,#000);">{{ sr.qtyStr }}</span>
+                      </div>
                       <span class="pf-num" style="font-size:12.5px;text-align:right;color:var(--text-primary,#000);">{{ sr.priceStr }}</span>
                       <span class="pf-num" style="font-size:12.5px;text-align:right;color:var(--text-primary,#000);">{{ sr.avgStr }}</span>
                       <div style="display:flex;align-items:center;justify-content:flex-end;gap:4px;min-width:0;">
@@ -1565,12 +1572,15 @@
             </sc-if>
             <sc-if value="{{ r.isHolding }}" hint-placeholder-val="{{ false }}">
               <div class="pf-hold-row" style="align-items:center;padding:6px 8px;border-bottom:1px solid var(--ig-gray-05,#efefef);" style-hover="background:var(--bg-app,#fafafa);">
-                <input value="{{ r.name }}" onchange="{{ r.onName }}" onkeydown="{{ r.onKeyEnter }}" style="border:none;background:transparent;font-size:13px;font-weight:600;padding:3px 2px;min-width:0;color:var(--text-primary,#000);">
+                <div style="display:flex;align-items:center;gap:4px;min-width:0;">
+                  <sc-if value="{{ r.nameReview }}" hint-placeholder-val="{{ false }}"><span title="{{ r.nameTitle }}" style="font-size:9px;font-weight:700;color:#b8860b;background:#fff3cd;border:1px solid #f0d48a;padding:0 3px;border-radius:3px;flex:none;cursor:help;">⚠</span></sc-if>
+                  <input value="{{ r.name }}" onchange="{{ r.onName }}" onkeydown="{{ r.onKeyEnter }}" style="border:none;background:transparent;font-size:13px;font-weight:600;padding:3px 2px;min-width:0;width:100%;color:var(--text-primary,#000);">
+                </div>
                 <select value="{{ r.cls }}" onchange="{{ r.onCls }}" style="border:none;background:transparent;font-size:12px;padding:3px 0;color:{{ r.clsColor }};font-weight:600;">
                   <sc-for list="{{ classOpts }}" as="o" hint-placeholder-count="3"><option value="{{ o.key }}">{{ o.label }}</option></sc-for>
                 </select>
                 <div style="display:flex;align-items:center;justify-content:flex-end;gap:3px;min-width:0;">
-                  <sc-if value="{{ r.hasQtySrc }}" hint-placeholder-val="{{ false }}"><span title="수량 출처" style="font-size:8px;font-weight:700;color:#3897f0;background:rgba(56,151,240,0.12);padding:0.5px 3px;border-radius:3px;flex:none;letter-spacing:0.2px;">{{ r.qtySrc }}</span></sc-if>
+                  <sc-if value="{{ r.qtyReview }}" hint-placeholder-val="{{ false }}"><span title="{{ r.qtyTitle }}" style="font-size:9px;font-weight:700;color:#b8860b;background:#fff3cd;border:1px solid #f0d48a;padding:0 3px;border-radius:3px;flex:none;cursor:help;">⚠</span></sc-if>
                   <input value="{{ r.qty }}" onchange="{{ r.onQty }}" onkeydown="{{ r.onKeyEnter }}" placeholder="—" class="pf-num" style="border:none;background:transparent;font-size:12.5px;text-align:right;padding:3px 2px;min-width:0;width:100%;color:var(--text-primary,#000);">
                 </div>
                 <div style="display:flex;align-items:center;justify-content:flex-end;gap:3px;min-width:0;">
@@ -1579,13 +1589,11 @@
                   <span style="font-size:10px;color:var(--text-tertiary,#999);flex:none;">{{ r.cur }}</span>
                 </div>
                 <div style="display:flex;align-items:center;justify-content:flex-end;gap:3px;min-width:0;">
-                  <sc-if value="{{ r.hasAvgSrc }}" hint-placeholder-val="{{ false }}"><span title="매수평균가 출처" style="font-size:8px;font-weight:700;color:#e1306c;background:rgba(225,48,108,0.12);padding:0.5px 3px;border-radius:3px;flex:none;letter-spacing:0.2px;">{{ r.avgSrc }}</span></sc-if>
                   <input value="{{ r.avgInput }}" onchange="{{ r.onAvg }}" onkeydown="{{ r.onKeyEnter }}" placeholder="—" class="pf-num" style="border:none;background:transparent;font-size:12.5px;text-align:right;padding:3px 0;width:100%;min-width:0;color:var(--text-primary,#000);">
                   <span style="font-size:10px;color:var(--text-tertiary,#999);flex:none;">{{ r.cur }}</span>
                 </div>
                 <div style="display:flex;align-items:center;justify-content:flex-end;gap:3px;min-width:0;">
-                  <sc-if value="{{ r.mismatch }}" hint-placeholder-val="{{ false }}"><span title="{{ r.mismatchTitle }}" style="font-size:9px;font-weight:700;color:#b8860b;background:#fff3cd;border:1px solid #f0d48a;padding:0 3px;border-radius:3px;flex:none;cursor:help;">⚠</span></sc-if>
-                  <sc-if value="{{ r.hasValueSrc }}" hint-placeholder-val="{{ false }}"><span title="평가금액 출처" style="font-size:8px;font-weight:700;color:#8134af;background:rgba(129,52,175,0.12);padding:0.5px 3px;border-radius:3px;flex:none;letter-spacing:0.2px;">{{ r.valueSrc }}</span></sc-if>
+                  <sc-if value="{{ r.valueReview }}" hint-placeholder-val="{{ false }}"><span title="{{ r.valueTitle }}" style="font-size:9px;font-weight:700;color:#b8860b;background:#fff3cd;border:1px solid #f0d48a;padding:0 3px;border-radius:3px;flex:none;cursor:help;">⚠</span></sc-if>
                   <sc-if value="{{ r.hasQP }}" hint-placeholder-val="{{ true }}"><span class="pf-num" style="font-size:12.5px;font-weight:600;text-align:right;">{{ r.valueStr }}</span></sc-if>
                   <sc-if value="{{ r.noQP }}" hint-placeholder-val="{{ false }}"><input value="{{ r.valueInput }}" onchange="{{ r.onValue }}" onkeydown="{{ r.onKeyEnter }}" class="pf-num" style="border:none;background:transparent;font-size:12.5px;font-weight:600;text-align:right;padding:3px 2px;min-width:0;width:100%;color:var(--text-primary,#000);"></sc-if>
                 </div>
@@ -1599,11 +1607,8 @@
        </div>
         <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:6px 16px;padding:10px 8px 14px;font-size:11.5px;color:var(--text-tertiary,#999);">
           <div style="display:flex;flex-wrap:wrap;align-items:center;gap:5px 12px;flex:1;min-width:0;">
-            <span style="display:inline-flex;align-items:center;gap:4px;"><span style="font-size:8px;font-weight:700;color:#3897f0;background:rgba(56,151,240,0.12);padding:0.5px 3px;border-radius:3px;letter-spacing:0.2px;">칩</span>수량 출처</span>
-            <span style="display:inline-flex;align-items:center;gap:4px;"><span style="font-size:8px;font-weight:700;color:#8134af;background:rgba(129,52,175,0.12);padding:0.5px 3px;border-radius:3px;letter-spacing:0.2px;">칩</span>평가금액 출처</span>
-            <span>· <b style="color:var(--text-secondary,#6e6e6e);">screen</b> 화면 원본 · <b style="color:var(--text-secondary,#6e6e6e);">est</b> 추정 · <b style="color:var(--text-secondary,#6e6e6e);">cross</b> 교차산출 · <b style="color:var(--text-secondary,#6e6e6e);">calc</b> 계산 · <b style="color:var(--text-secondary,#6e6e6e);">live</b> 재평가 · <b style="color:var(--text-secondary,#6e6e6e);">kept</b> 기존값 유지 · <b style="color:var(--text-secondary,#6e6e6e);">cash</b> 현금 · <b style="color:#e1306c;">manual</b> 직접입력</span>
+            <span style="display:inline-flex;align-items:center;gap:4px;"><span style="font-size:9px;font-weight:700;color:#b8860b;background:#fff3cd;border:1px solid #f0d48a;padding:0 3px;border-radius:3px;">⚠</span><b style="color:var(--text-secondary,#6e6e6e);">확인 필요</b> — 종목·수량이 추정/불확실하거나 재평가 미갱신인 행. 값을 확인하세요(마커에 마우스 올리면 사유)</span>
             <span style="display:inline-flex;align-items:center;gap:4px;"><span style="width:6px;height:6px;border-radius:50%;background:#f5a623;display:inline-block;"></span>노란 점 = 시세 24h 경과(재업로드 시 자동 갱신)</span>
-            <span style="display:inline-flex;align-items:center;gap:4px;"><span style="font-size:9px;font-weight:700;color:#b8860b;background:#fff3cd;border:1px solid #f0d48a;padding:0 3px;border-radius:3px;">⚠</span>수량×현재가와 화면 평가금액 2% 이상 불일치</span>
           </div>
           <span style="white-space:nowrap;">합계 <b class="pf-num" style="color:var(--text-primary,#000);font-size:12.5px;">{{ totalStr }}</b></span>
         </div>
@@ -1775,6 +1780,7 @@ class Component extends DCLogic {
       gateReport: null,           // {lines:[{kind,text}]} — 게이트 대조/보정 로그
       streamPending: null,        // 확인 시 applySnapshot에 넘길 pending
       streamNote: '',
+      streamCapture: '',          // 촬영 시점 라벨(EXIF/기준일) — 라이브 헤더에 표시
       // 에이전트 연결(헤더)
       agentUrlInput: '',
       connStatus: '○ 미설정',
@@ -1968,16 +1974,22 @@ class Component extends DCLogic {
       if (j.error) throw new Error(j.error);
       const byId = {}; (j.holdings || []).forEach(h => { if (h.id != null) byId[h.id] = h; });
       const now = Date.now(), est = [];
+      let repriced = 0, kept = 0;
       const merged = holdings.map(h => {
         const u = byId[h.id]; if (!u) return h;
         if (u.confidence && String(u.confidence).indexOf('estimated') === 0 && u.qty != null) est.push({ name: h.name, qty: u.qty });
-        return { ...h, qty: u.qty, price: u.price, value: u.value, currency: u.currency || h.currency, symbol: u.symbol, confidence: u.confidence, updatedAt: now };
+        if (String(u.value_src || '').startsWith('reprice')) repriced++;
+        if (u.reprice_note) kept++;
+        // value_src를 갱신해야 검산(mismatch)이 재평가 행을 건너뛴다(가짜 ⚠ 방지). reprice_note로 미갱신 표시.
+        return { ...h, qty: u.qty, price: u.price, value: u.value, currency: u.currency || h.currency, symbol: u.symbol,
+          confidence: u.confidence, value_src: u.value_src || h.value_src,
+          qty_note: u.qty_note || '', symbol_note: u.symbol_note || '', reprice_note: u.reprice_note || '', updatedAt: now };
       });
       const patch = { holdings: merged };
       if (j.fx) patch.fx = Math.round(j.fx * 10) / 10;
       this.set(patch);
-      this.setState({ repriceMsg: '재평가 완료' + (est.length ? (' · 추정 ' + est.length + '건') : ''),
-        repriceSummary: { at: now, fx: patch.fx || this.state.fx, est, capUsed: j.captureDateTime } });
+      this.setState({ repriceMsg: '재평가 완료 · ' + repriced + '건 갱신' + (kept ? (' · ' + kept + '건 확인필요(미갱신)') : ''),
+        repriceSummary: { at: now, fx: patch.fx || this.state.fx, est, capUsed: j.captureDateTime, capSrc: j.captureSource } });
     } catch (e) {
       this.setState({ repriceMsg: '실패: ' + (e && e.message || e) });
     }
@@ -1986,9 +1998,35 @@ class Component extends DCLogic {
   repriceSummaryText() {
     const s = this.state.repriceSummary; if (!s) return '';
     const fmt = t => { if (!t) return '—'; const d = new Date(t); return isNaN(d) ? String(t) : d.toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }); };
-    let out = '수량 기준 ' + fmt(s.capUsed) + ' · 평가 기준 ' + fmt(s.at) + ' (환율 ' + s.fx + ')';
+    const srcLabel = s.capSrc === 'exif' ? ' (EXIF)' : s.capSrc === 'manual' ? ' (직접지정)' : s.capSrc === 'fallback' ? ' (기준일)' : '';
+    let out = '수량 기준 ' + fmt(s.capUsed) + srcLabel + ' · 평가 기준 ' + fmt(s.at) + ' (환율 ' + s.fx + ')';
     if (s.est && s.est.length) out += ' · 추정수량 ' + s.est.length + '건';
     return out;
+  }
+
+  // 확인 필요 판정 — 단일 출처. 라이브 표(STEP1)·보유표(STEP2)가 같은 기준으로
+  // "종목·수량이 불확실해 사용자가 살펴봐야 할" 셀을 표시한다. 서버가 계산해 둔 신호를 읽기만 한다:
+  //   종목: symbol_note(심볼 오해석 의심) · 수량: qty_note·confidence·derived 출처·checkFail
+  //   평가금액: reprice_note(재평가 미갱신 — 스크린샷 값 유지)
+  reviewFlag(h) {
+    // 현금은 애초에 주식 수량이 없다 — 수량 확인 대상이 아니다(서버가 붙인 unreproducible로 오탐하지 않게).
+    const isCash = h.cls === 'cash';
+    const conf = h.confidence;
+    const lowConf = !isCash && (conf === 'estimated' || conf === 'estimated-low' || conf === 'unreproducible'
+      || (typeof conf === 'number' && conf < 0.8));
+    const qsrc = String(h.qty_src || '');
+    const derived = !isCash && (qsrc.indexOf('cross-account') >= 0 || qsrc.indexOf('capture-close') >= 0);
+    return {
+      nameReview: !!h.symbol_note,
+      nameTitle: h.symbol_note || '',
+      qtyReview: !!h.qty_note || lowConf || derived || (!isCash && !!h.checkFail),
+      qtyTitle: h.qty_note
+        || (derived ? '외부 시세로 역산한 추정 수량 — 값 확인' : '')
+        || (lowConf ? '추출 확신이 낮은 수량 — 값 확인' : '')
+        || (h.checkFail ? '수량×현재가가 화면 평가금액과 불일치 — 값 확인' : ''),
+      valueReview: !!h.reprice_note,
+      valueTitle: h.reprice_note || ''
+    };
   }
 
   // ---------- 라이브 추출 프리뷰(STEP1) ----------
@@ -2009,7 +2047,10 @@ class Component extends DCLogic {
         qty, price: h.price != null ? Number(h.price) : null,
         value: h.value != null ? Number(h.value) : null, cost,
         avgCost: (cost != null && qty) ? cost / qty : null,
-        value_src: h.value_src || ''
+        value_src: h.value_src || '',
+        // 확인필요 판정 신호(최종 보정본에만 존재) + 소스 이미지 귀속
+        confidence: h.confidence, qty_src: h.qty_src || '', qty_note: h.qty_note || '',
+        symbol_note: h.symbol_note || '', checkFail: h.checkFail, img: h._img || null
       };
     };
     const items = (list || []).map(norm);
@@ -2028,6 +2069,7 @@ class Component extends DCLogic {
         const v = this.krw(h), c = this.costBasisKrw(h);
         const pl = c != null && c > 0 ? (v - c) / c * 100 : null;
         const corrected = String(h.value_src || '').indexOf('보정') >= 0;
+        const rf = this.reviewFlag(h);
         rows.push({
           isHeader: false, isHolding: true,
           name: h.name, clsColor: (cmap[h.cls] || cmap.growth).color, clsLabel: (cmap[h.cls] || cmap.growth).label,
@@ -2038,7 +2080,10 @@ class Component extends DCLogic {
           weightStr: total > 0 ? (v / total * 100).toFixed(1) + '%' : '—',
           plStr: pl == null ? '—' : (pl >= 0 ? '+' : '') + pl.toFixed(1) + '%',
           plColor: pl == null ? '#999' : pl >= 0 ? '#ed4956' : '#3897f0',
-          corrected, correctedTitle: corrected ? '게이트가 계좌합계 대조로 자릿수 보정한 행' : ''
+          corrected, correctedTitle: corrected ? '게이트가 계좌합계 대조로 자릿수 보정한 행' : '',
+          nameReview: rf.nameReview, nameTitle: rf.nameTitle,
+          qtyReview: rf.qtyReview, qtyTitle: rf.qtyTitle,
+          hasImg: h.img != null, imgTag: h.img != null ? String(h.img) : ''
         });
       });
     });
@@ -2060,7 +2105,7 @@ class Component extends DCLogic {
   }
 
   // 최종 도착 — 남은 reveal 취소하고 게이트 보정본을 한 번에 부드럽게 표시 + 확인 대기.
-  _finishStream(finalRows, gate, pending, note) {
+  _finishStream(finalRows, gate, pending, note, capture) {
     this._revealQ = [];
     this.setState({
       extracting: false, extractStatus: '',
@@ -2068,17 +2113,28 @@ class Component extends DCLogic {
       streamRows: finalRows,
       gateReport: this.buildGateReport(gate),
       streamPending: pending,
-      streamNote: note || ''
+      streamNote: note || '',
+      streamCapture: capture || ''
     });
+  }
+
+  // 촬영 시점 라벨 — EXIF 시각이면 그대로, 아니면 기준일. 스크린샷의 시점을 사용자에게 명시.
+  captureLabel(iso, src) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    const t = isNaN(d) ? String(iso) : d.toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    const tag = src === 'exif' ? ' (EXIF)' : src === 'fallback' ? ' (기준일·EXIF 없음)' : '';
+    return '촬영 시점 ' + t + tag;
   }
 
   // 게이트 리포트 → 로그 줄. repairs(실제 보정)를 먼저, 중복 아닌 warnings를 뒤에.
   buildGateReport(gate) {
     const reps = (gate && gate.repairs) || [];
     const warns = (gate && gate.warnings) || [];
+    const humanize = t => String(t).replace(/\bimg(\d+)\b/g, '이미지 $1');   // 게이트 원인의 화면 귀속을 사람이 읽게
     const lines = [];
-    reps.forEach(t => lines.push({ kind: 'repair', text: t }));
-    warns.forEach(w => { if (reps.indexOf(w) < 0) lines.push({ kind: 'warn', text: w }); });
+    reps.forEach(t => lines.push({ kind: 'repair', text: humanize(t) }));
+    warns.forEach(w => { if (reps.indexOf(w) < 0) lines.push({ kind: 'warn', text: humanize(w) }); });
     return { lines };
   }
 
@@ -2086,13 +2142,13 @@ class Component extends DCLogic {
   commitStream() {
     const pending = this.state.streamPending || [];
     const note = this.state.streamNote || '';
-    this.setState({ streamStage: '', streamRows: [], gateReport: null, streamPending: null, streamNote: '' },
+    this.setState({ streamStage: '', streamRows: [], gateReport: null, streamPending: null, streamNote: '', streamCapture: '' },
       () => { if (pending.length) this.applySnapshot(pending, note); });
   }
 
   discardStream() {
     this._revealQ = [];
-    this.setState({ streamStage: '', streamRows: [], gateReport: null, streamPending: null, streamNote: '', extractStatus: '', extracting: false });
+    this.setState({ streamStage: '', streamRows: [], gateReport: null, streamPending: null, streamNote: '', streamCapture: '', extractStatus: '', extracting: false });
   }
 
   // 데모용 더미 추출 — 에이전트 없이도 라이브 스트리밍 + 게이트 자릿수 보정을 눈으로 보게 한다.
@@ -2184,7 +2240,10 @@ class Component extends DCLogic {
       const rows = (j.progress && j.progress.rows) || [];
       if (rows.length > seen) { this._pushStream(rows.slice(seen)); seen = rows.length; }
       const p = j.progress || {};
-      this.setState({ extractStatus: '화면 분석 중… (' + (p.done || 0) + '/' + (p.total || files.length) + ')' });
+      const st = p.stage === 'finalizing'
+        ? '종합·검증 중… (게이트·심볼·수량 산출)'
+        : '이미지 분석 중… (' + (p.done || 0) + '/' + (p.total || files.length) + ')';
+      this.setState({ extractStatus: st });
     }
     if (!res) throw new Error('시간 초과');
     const clsMap = { '성장주': 'growth', '배당주': 'dividend', '채권': 'bond', '금·원자재': 'gold', '현금': 'cash', '부동산': 'realestate' };
@@ -2202,13 +2261,16 @@ class Component extends DCLogic {
       cost: h.cost != null ? Number(h.cost) : null,
       qty_src: h.qty_src || '', price_src: h.price_src || '', value_src: h.value_src || '',
       confidence: typeof h.confidence === 'number' ? h.confidence : (confNum[h.confidence] || 0.9),
+      // 확인필요 마커 신호(서버가 게이트에서 계산) — STEP2까지 보존해 표시한다
+      qty_note: h.qty_note || '', symbol_note: h.symbol_note || '', price_note: h.price_note || '',
       checkFail: false
     }));
     if (!pending.length) throw new Error('표를 찾지 못함');
     const warns = (res.gate && res.gate.warnings) || [];
     // 최종(게이트 보정 완료) 한 번에 부드럽게 표시 + 확인 버튼 대기 (STEP2 반영은 확인 시)
     this._finishStream(finalHoldings, res.gate || {}, pending,
-      warns.length ? ' · ⚠ 게이트 경고 ' + warns.length + '건(' + warns[0].slice(0, 60) + '…)' : '');
+      warns.length ? ' · ⚠ 게이트 경고 ' + warns.length + '건(' + warns[0].slice(0, 60) + '…)' : '',
+      this.captureLabel(res.captureDateTime, res.captureSource));
   }
 
   async extractFiles(fileList) {
@@ -2311,6 +2373,9 @@ class Component extends DCLogic {
           }
           // 출처(추정인지 화면값인지)는 값과 함께 움직여야 한다 — 값만 갱신하면 칩이 거짓말을 한다
           h.qty_src = p.qty_src || ''; h.price_src = p.price_src || ''; h.value_src = p.value_src || '';
+          // 확인필요 신호도 값과 함께 이식 — STEP2 마커가 STEP1 정확도를 그대로 반영하게(버리지 않는다)
+          h.confidence = p.confidence; h.checkFail = p.checkFail;
+          h.qty_note = p.qty_note || ''; h.symbol_note = p.symbol_note || ''; h.price_note = p.price_note || '';
           h.updatedAt = Date.now();
           h._seen = true;
           // 데모 행이 실값으로 갱신되면 더는 데모가 아니다 — id를 실자산 꼴로 바꿔 다음 스냅샷의 시드 청소를 면한다
@@ -2324,6 +2389,8 @@ class Component extends DCLogic {
             avgCost: (p.cost != null && p.qty != null && p.qty > 0) ? p.cost / p.qty : null,
             avgCost_src: (p.cost != null && p.qty != null && p.qty > 0) ? 'computed:cost/qty' : '',
             qty_src: p.qty_src || '', price_src: p.price_src || '', value_src: p.value_src || '',
+            confidence: p.confidence, checkFail: p.checkFail,
+            qty_note: p.qty_note || '', symbol_note: p.symbol_note || '', price_note: p.price_note || '',
             updatedAt: Date.now(), _seen: true
           });
           added++;
@@ -2453,7 +2520,9 @@ class Component extends DCLogic {
       streamLive: S.streamStage === 'live',
       streamReview: S.streamStage === 'review',
       streamStatusText: S.streamStage === 'live' ? (S.extractStatus || '분석 중…')
-        : (S.streamStage === 'review' ? ('추출 ' + (S.streamRows || []).length + '건 · 확인 후 반영') : ''),
+        : (S.streamStage === 'review'
+            ? ('추출 ' + (S.streamRows || []).length + '건 · 확인 후 반영' + (S.streamCapture ? (' · ' + S.streamCapture) : ''))
+            : ''),
       gateLines: (S.gateReport && S.gateReport.lines) || [],
       hasGate: !!(S.gateReport && S.gateReport.lines && S.gateReport.lines.length),
       onConfirmStream: () => this.commitStream(),
@@ -2491,23 +2560,9 @@ class Component extends DCLogic {
   // (증권사·계좌)별로 묶은 보유행 — 각 그룹 앞에 계좌 헤더행이 들어간다.
   buildHoldingRows(ctx) {
     const { S, total, cmap, amap } = ctx;
-    // 출처 태그 → 짧은 라벨(칩). 없으면 칩 미표시.
-    // 에이전트는 근거를 자세히 적어 보낸다('derived:cross-account(27,400)') — 칩엔 종류만 접두어로 표시.
-    const srcChip = s => {
-      s = String(s || '');
-      if (!s) return '';
-      if (s.indexOf('cross-account') >= 0) return 'cross';
-      if (s.indexOf('capture-close') >= 0) return 'est';
-      if (s.startsWith('screen')) return 'screen';
-      if (s === 'manual') return 'manual';
-      if (s.startsWith('computed')) return 'calc';
-      if (s.startsWith('reprice')) return 'live';
-      if (s === 'cash') return 'cash';
-      return s.slice(0, 10);
-    };
     // 검산: 수량×현재가 vs 화면 평가금액. 이 대조는 **추출 시점의 스크린샷 값들**끼리만 의미가 있다.
-    // 사용자가 수량·현재가·평가금액을 직접 고치면(출처 manual) 그 값을 신뢰하고 검산하지 않는다 —
-    // 예: 현재가를 시장가로 갱신하면 qty×price가 스크린샷 평가금액과 벌어지는 게 정상이다.
+    // 사용자가 직접 고치거나(manual) 현재가로 재평가(reprice)하면 qty×price가 스크린샷 평가금액과
+    // 벌어지는 게 정상이므로 검산하지 않는다 — 재평가 행에 가짜 불일치 경고를 띄우지 않는다.
     const chkGap = h => (h.qty != null && h.price != null && h.value != null && h.value > 0)
       ? Math.abs(h.qty * h.price - h.value) / h.value : 0;
     const mkRow = h => {
@@ -2516,27 +2571,32 @@ class Component extends DCLogic {
       const pl = c != null && c > 0 ? (v - c) / c * 100 : null;
       const hasQP = h.qty != null && h.price != null;
       const anyManual = h.qty_src === 'manual' || h.price_src === 'manual' || h.value_src === 'manual';
+      const repriced = String(h.value_src || '').startsWith('reprice');
       const gap = chkGap(h);
+      const mismatch = gap > 0.02 && !anyManual && !repriced;   // 스크린샷 검산(수동·재평가 제외)
       const stale = Date.now() - (h.updatedAt || 0) > 86400000;
-      const vSrc = h.value_src || h.price_src || '';
+      // 확인필요 판정(단일 출처) — 종목/수량 마커. 검산 불일치도 수량 확인 신호로 합친다.
+      const rf = this.reviewFlag(h);
+      const qtyReview = rf.qtyReview || mismatch;
+      const qtyTitle = rf.qtyTitle || (mismatch
+        ? '검산 불일치 — 수량×현재가 ' + this.fmtNum(Math.round(h.qty * h.price)) +
+          ' vs 화면 평가금액 ' + this.fmtNum(h.value) + ' (' + (gap * 100).toFixed(1) + '% 차이) — 값 확인'
+        : '');
       return {
         isHeader: false, isHolding: true,
         id: h.id, broker: h.broker, accountType: h.accountType,
         acctColor: (amap[h.accountType] || amap['일반']).color,
         name: h.name, cls: h.cls, clsColor: (cmap[h.cls] || cmap.growth).color,
         qty: h.qty == null ? '' : this.fmtNum(h.qty),
-        qtySrc: srcChip(h.qty_src), hasQtySrc: !!h.qty_src,
         price: h.price == null ? '' : this.fmtNum(h.price),
         cur: h.currency === 'USD' ? '$' : '₩',
         avgInput: h.avgCost == null ? '' : this.fmtNum(h.avgCost),
-        avgSrc: srcChip(h.avgCost_src), hasAvgSrc: !!h.avgCost_src,
         hasQP, noQP: !hasQP,
         valueStr: this.fmtW(v),
         valueInput: h.value == null ? '' : this.fmtNum(h.value),
-        valueSrc: srcChip(vSrc), hasValueSrc: !!vSrc,
-        mismatch: gap > 0.02 && !anyManual,
-        mismatchTitle: '검산 불일치 — 수량×현재가 ' + this.fmtNum(Math.round(h.qty * h.price)) +
-          ' vs 화면 평가금액 ' + this.fmtNum(h.value) + ' (' + (gap * 100).toFixed(1) + '% 차이). 표엔 수량×현재가가 표시됩니다 — 값을 확인하세요',
+        nameReview: rf.nameReview, nameTitle: rf.nameTitle,
+        qtyReview, qtyTitle,
+        valueReview: rf.valueReview, valueTitle: rf.valueTitle,
         weightStr: total > 0 ? (v / total * 100).toFixed(1) + '%' : '—',
         plStr: pl == null ? '—' : (pl >= 0 ? '+' : '') + pl.toFixed(1) + '%',
         plColor: pl == null ? '#999' : pl >= 0 ? '#ed4956' : '#3897f0',

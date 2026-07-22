@@ -190,6 +190,18 @@ def parse_capture(data):
     return datetime.now(KST)
 
 
+def capture_source(data):
+    """이미지 없는 경로(reprice)에서 캡처 시각의 출처를 판정 → UI 표기용.
+    'manual'(사용자가 직접 지정) / 'exif'(직전 추출의 저장된 EXIF) / 'fallback'(기준일·now)."""
+    if data.get("captureDateTime"):
+        return "manual"
+    try:
+        json.load(open(LAST_CAPTURE_PATH))   # 직전 추출이 남긴 EXIF 시각
+        return "exif"
+    except Exception:
+        return "fallback"
+
+
 def complete(body):
     """Anthropic messages 형식 → 로컬 모델 → Anthropic 형식 응답으로 프록시.
     앱의 api.anthropic.com 호출을 그대로 받아 처리(키 불필요). 이미지가 있으면 prompt2(정확 추출),
@@ -294,8 +306,10 @@ def _fix_cost(h):
         h["cost"] = None
 
 
-def enrich(rows, capture_dt):
+def enrich(rows, capture_dt, mode="extract"):
     """엔리치 사다리 — **추측한 값은 반드시 출처(qty_src·confidence)로 표시**한다(사용자 오해 방지).
+    mode="extract"(기본): STEP1 추출 — 화면수량 검증 게이트 포함(품질검증·확인필요 마커 신호원).
+    mode="reprice": STEP2 재평가 — 이미 검토·확정된 수량을 신뢰한다(화면수량 기각 게이트 미실행).
       T1 화면 수량                      → screen / exact
       T2 수량·평가금액 → 주가            → computed:value/qty (USD 자산인데 화면값이 원화면 ÷FX)
       T3 계좌간 동일종목 주가로 수량 역산   → derived:cross-account / high
@@ -367,8 +381,9 @@ def enrich(rows, capture_dt):
     # 화면 수량 검증 게이트 — 모델이 수량 칸에 엉뚱한 열(평가손익 등)을 넣는 일이 잦다.
     # 캡처일 종가로 계산한 기대 수량과 크게 어긋나면 **그 수량을 채택하지 않는다**(→ T3/T4가 다시 도출).
     # 틀린 수량을 그대로 쓰면 리밸런싱 전체가 틀어진다 — 빈칸이 낫다.
+    # 단 재평가(mode=reprice)는 STEP1에서 검토·확정된 수량을 신뢰한다 — 이 게이트를 돌리지 않는다.
     for h in rows:
-        if h.get("qty") is None or not h.get("value") or not h.get("symbol") or _is_cash(h):
+        if mode == "reprice" or h.get("qty") is None or not h.get("value") or not h.get("symbol") or _is_cash(h):
             continue
         close, _ = close_of(h, h.get("currency"))
         fx = get_fx()
@@ -535,10 +550,12 @@ def update_watchlist(rows):
         print(f"· watchlist 갱신 실패: {e}")
 
 
-def reprice(holdings, capture_dt):
-    """앱의 보유자산 → 현재가로 재평가. 심볼 해석·T4(수량 복원)·현재가 합성.
-    반환: {fx, asOf, captureDateTime, holdings:[... value=수량×현재가×(환율 if USD)]}."""
-    rows = enrich(holdings, capture_dt)        # symbol + qty(T4) + confidence
+def reprice(holdings, capture_dt, capt_source="exif"):
+    """앱의 보유자산 → 현재가로 재평가. 목적: 오늘 주가로 평가금액 최신화.
+    STEP2는 검토·확정된 수량을 신뢰한다(mode=reprice → 화면수량 기각 게이트 미실행).
+    현재가를 못 붙이는 행(심볼 미해석·현재가 미취득·수량 없음)만 kept + reprice_note로 명시.
+    반환: {fx, asOf, captureDateTime, captureSource, holdings:[... value=수량×현재가]}."""
+    rows = enrich(holdings, capture_dt, mode="reprice")   # symbol + (수량 없을 때만)T4 + confidence
     update_watchlist(rows)
     syms = list({h["symbol"] for h in rows if h.get("symbol")})
     pdata = fetch_prices.build(syms) if syms else {"fx": {"USDKRW": None}, "prices": {}, "asOf": None}
@@ -554,10 +571,19 @@ def reprice(holdings, capture_dt):
             h["value"] = round(price * h["qty"], 2)   # 네이티브 — KRW 환산은 앱이 fx로 수행
             h["stale"] = pr.get("stale")
             h["value_src"] = "reprice:qty*price@current"
+            h.pop("reprice_note", None)
         else:
-            h["value_src"] = "kept"  # 현금·미해석·수량없음 → 재평가 불가(기존 값 유지)
+            h["value_src"] = "kept"  # 재평가 불가(기존 값 유지)
+            if not _is_cash(h):      # 현금은 재평가 대상이 아님(정상) — note 없음
+                if not s:
+                    h["reprice_note"] = "심볼 미해석 — 재평가 불가, 스크린샷 값 유지"
+                elif not h.get("qty"):
+                    h["reprice_note"] = "수량 없음 — 재평가 불가, 스크린샷 값 유지"
+                else:
+                    h["reprice_note"] = "현재가 미취득 — 재평가 불가, 스크린샷 값 유지"
     return {"fx": fx, "asOf": pdata.get("asOf"),
-            "captureDateTime": capture_dt.isoformat(), "holdings": rows}
+            "captureDateTime": capture_dt.isoformat(), "captureSource": capt_source,
+            "holdings": rows}
 
 
 def extract(b64, capture_dt):
@@ -590,7 +616,7 @@ def _vision(b64):
         return json.loads(r.read()).get("response", "")
 
 
-def extract_batch(images, capture_dt, on_screen=None):
+def extract_batch(images, capture_dt, on_screen=None, on_stage=None):
     """여러 화면을 한 번에: 화면별 비전추출 → finalize(계좌합계 대조 게이트 + broker 정규화)
     → 결정적 enrich(심볼·수량·현재가). 앱이 스크린샷 여러 장을 종합해 정확한 결과를 얻는 경로.
 
@@ -598,10 +624,11 @@ def extract_batch(images, capture_dt, on_screen=None):
     가중치 스트리밍을 공유하므로 총 처리량이 슬롯 수에 가깝게 늘어난다. 요청은 여전히 화면당
     1개라 행→화면 귀속은 구조적으로 보존된다(NP는 ollama 슬롯 수와 일치시킬 것)."""
     t0 = time.time()
+    exif_found = False
     for b64 in images:                            # EXIF는 병렬 전에 순차로(빠름·상태 갱신 결정적)
         dt = exif_capture_dt(b64)
         if dt:
-            store_capture(dt); capture_dt = dt
+            store_capture(dt); capture_dt = dt; exif_found = True
     n = len(images)
     raws = [None] * n                             # 입력 순서 보존(행→화면 귀속 불변) — as_completed여도 자리에 채움
     def _done(i, raw):
@@ -621,6 +648,8 @@ def extract_batch(images, capture_dt, on_screen=None):
     else:
         for i, b64 in enumerate(images):
             _done(i, _vision(b64))
+    if on_stage:                                  # 비전추출 끝 → 종합·검증 단계로(라이브 상태 전환)
+        on_stage("finalizing")
     screens = [{"file": f"img{i + 1}", "raw": raw} for i, raw in enumerate(raws)]
     fin = finalize_mod.finalize(screens)          # holdings(정규화) + gate(대조 리포트)
     rows = enrich(fin["holdings"], capture_dt)    # 심볼 해석 + 수량 사다리 + 가격(_file은 화면단위 게이트에 필요)
@@ -629,20 +658,29 @@ def extract_batch(images, capture_dt, on_screen=None):
     update_watchlist(rows)
     return {"holdings": rows, "gate": fin["gate"], "screens": fin["screens"],
             "seconds": round(time.time() - t0, 1), "model": MODEL,
-            "captureDateTime": capture_dt.isoformat()}
+            "captureDateTime": capture_dt.isoformat(),
+            "captureSource": "exif" if exif_found else "fallback"}
 
 
 def _batch_run(jid, images, capture_dt):
+    seed = lambda: {"done": 0, "total": len(images), "rows": [], "stage": "extracting"}
     def on_screen(idx, rows):                     # 화면 완료 시 진행 상황에 원시 행 누적(폴링이 읽어감)
         with _JOBS_LOCK:
             j = _JOBS.get(jid)
             if not j or j.get("status") != "pending":
                 return
-            p = j.setdefault("progress", {"done": 0, "total": len(images), "rows": []})
+            p = j.setdefault("progress", seed())
+            for r in rows:                        # 행→소스 이미지 귀속(라이브 UI가 "이미지 N"으로 표시)
+                r["_img"] = idx + 1
             p["rows"].extend(rows)
             p["done"] += 1
+    def on_stage(stage):                          # 단계 전환(extracting → finalizing) 라이브 반영
+        with _JOBS_LOCK:
+            j = _JOBS.get(jid)
+            if j and j.get("status") == "pending":
+                j.setdefault("progress", seed())["stage"] = stage
     try:
-        res = extract_batch(images, capture_dt, on_screen=on_screen)
+        res = extract_batch(images, capture_dt, on_screen=on_screen, on_stage=on_stage)
         with _JOBS_LOCK:
             _JOBS[jid] = {"status": "done", "result": res, "ts": time.time()}
     except Exception as e:
@@ -656,7 +694,7 @@ def submit_batch(body):
     jid = os.urandom(8).hex()
     with _JOBS_LOCK:
         _JOBS[jid] = {"status": "pending", "ts": time.time(),
-                      "progress": {"done": 0, "total": len(images), "rows": []}}
+                      "progress": {"done": 0, "total": len(images), "rows": [], "stage": "extracting"}}
     threading.Thread(target=_batch_run, args=(jid, images, capture_dt), daemon=True).start()
     _job_gc()
     return {"id": jid}
@@ -672,7 +710,7 @@ def batch_result(jid):
     if j["status"] == "error":
         return {"status": "error", "error": j.get("error", "오류")}
     # 진행 중: 화면별로 도착한 원시 행을 함께 준다 → 앱이 라이브로 그린다(하위호환: 필드 추가만)
-    return {"status": "pending", "progress": j.get("progress", {"done": 0, "total": 0, "rows": []})}
+    return {"status": "pending", "progress": j.get("progress", {"done": 0, "total": 0, "rows": [], "stage": "extracting"})}
 
 # ── 시세 페치 (결정론적, LLM 무관) ─────────────────────────────
 def refresh_prices():
@@ -773,7 +811,7 @@ class H(BaseHTTPRequestHandler):
             elif path == "/complete":               # 동기(하위호환): 앱의 Anthropic 호출 대체
                 result = complete(data)
             elif path == "/reprice":
-                result = reprice(data.get("holdings", []), parse_capture(data))
+                result = reprice(data.get("holdings", []), parse_capture(data), capture_source(data))
             else:
                 result = extract(data["image"], parse_capture(data))
         except Exception as e:
