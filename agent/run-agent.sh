@@ -6,7 +6,7 @@
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"   # 이 스크립트가 든 레포
-export MODEL="${MODEL:-qwen2.5vl:3b-ft-q8}"
+export MODEL="${MODEL:-qwen2.5vl:3b-ft3-q8}"
 export DATA_DIR="${DATA_DIR:-$HOME/portf-agent/data}"
 export PORT="${PORT:-8899}"
 export NP="${NP:-2}"                     # 동시 비전 요청 수 = OLLAMA_NUM_PARALLEL
