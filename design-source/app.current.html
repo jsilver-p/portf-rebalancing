@@ -1397,6 +1397,15 @@
     @media (max-width:640px){
       .pf-main{padding-left:12px;padding-right:12px;}
       .pf-analysis{grid-template-columns:1fr;}
+      /* [실험] 표 반응형 — 좁은 화면에선 부차 컬럼(자산군·현재가·평균가·비중)을 숨겨
+         화면 폭에 맞춘다(가로 스크롤 제거). 남는 5열: 종목명·수량·평가금액·손익·삭제.
+         헤더·본문·라이브표가 .pf-hold-row를 공유하므로 한 곳에서 동시 적용. */
+      .pf-hold-row{grid-template-columns:minmax(72px,1fr) 46px 96px 56px 18px;gap:6px;min-width:0;}
+      /* !important — 숨길 셀(현재가·평균가 div)이 인라인 display:flex를 가져 그걸 이겨야 한다 */
+      .pf-hold-row > :nth-child(2),
+      .pf-hold-row > :nth-child(4),
+      .pf-hold-row > :nth-child(5),
+      .pf-hold-row > :nth-child(7){display:none !important;}
     }
   </style>
 </helmet>
