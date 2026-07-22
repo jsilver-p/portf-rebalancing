@@ -1378,8 +1378,15 @@
     input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
     input[type=number]{-moz-appearance:textfield;appearance:textfield;}
     /* ── 표 레이아웃(단일 출처: 헤더·행이 같은 클래스를 공유) ── */
-    .pf-tbl-scroll{overflow-x:auto;}
+    /* 높이 상한 + 양축 스크롤 → 첫 행(헤더)·첫 열(종목명) 고정. 행 적으면 스크롤바 없이 자연 흐름 */
+    .pf-tbl-scroll{overflow:auto;max-height:70vh;}
     .pf-hold-row{display:grid;grid-template-columns:minmax(150px,1fr) 118px 82px 98px 98px 134px 56px 66px 24px;gap:8px;min-width:858px;}
+    /* 헤더 행 고정(첫 행): 헤더 .pf-hold-row는 pf-tbl-scroll 직계 자식(본문 행은 sc-for로 한 겹 감싸져 직계 아님) */
+    .pf-tbl-scroll > .pf-hold-row{position:sticky;top:0;z-index:3;background:var(--bg-surface,#fff);}
+    /* 좌상단 코너(헤더의 첫 셀 '종목명') — 세로·가로 동시 고정 */
+    .pf-tbl-scroll > .pf-hold-row > span:first-child{position:sticky;left:0;z-index:4;background:var(--bg-surface,#fff);}
+    /* 본문 행 첫 열 고정(첫 열) */
+    .pf-frz-col{position:sticky;left:0;z-index:2;background:var(--bg-surface,#fff);}
     .pf-analysis{display:grid;grid-template-columns:250px 1fr;gap:20px;}
     .pf-num{font-variant-numeric:tabular-nums;}
     /* ── STEP 섹션 뼈대(카드·라벨·제목·설명이 5개 섹션에 반복) ── */
@@ -1489,7 +1496,7 @@
                   </sc-if>
                   <sc-if value="{{ sr.isHolding }}" hint-placeholder-val="{{ false }}">
                     <div class="pf-hold-row pf-stream-row" style="align-items:center;padding:6px 8px;border-bottom:1px solid var(--ig-gray-05,#efefef);">
-                      <div style="display:flex;align-items:center;gap:4px;min-width:0;">
+                      <div class="pf-frz-col" style="display:flex;align-items:center;gap:4px;min-width:0;">
                         <sc-if value="{{ sr.hasImg }}" hint-placeholder-val="{{ false }}"><span title="이미지 {{ sr.imgTag }}에서 추출" style="font-size:8px;font-weight:700;color:var(--text-tertiary,#999);background:var(--bg-secondary,#efefef);padding:0.5px 4px;border-radius:3px;flex:none;">{{ sr.imgTag }}</span></sc-if>
                         <sc-if value="{{ sr.nameReview }}" hint-placeholder-val="{{ false }}"><span title="{{ sr.nameTitle }}" style="font-size:9px;font-weight:700;color:#b8860b;background:#fff3cd;border:1px solid #f0d48a;padding:0 3px;border-radius:3px;flex:none;cursor:help;">⚠</span></sc-if>
                         <span style="font-size:13px;font-weight:600;color:var(--text-primary,#000);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;">{{ sr.name }}</span>
@@ -1572,7 +1579,7 @@
             </sc-if>
             <sc-if value="{{ r.isHolding }}" hint-placeholder-val="{{ false }}">
               <div class="pf-hold-row" style="align-items:center;padding:6px 8px;border-bottom:1px solid var(--ig-gray-05,#efefef);" style-hover="background:var(--bg-app,#fafafa);">
-                <div style="display:flex;align-items:center;gap:4px;min-width:0;">
+                <div class="pf-frz-col" style="display:flex;align-items:center;gap:4px;min-width:0;">
                   <sc-if value="{{ r.nameReview }}" hint-placeholder-val="{{ false }}"><span title="{{ r.nameTitle }}" style="font-size:9px;font-weight:700;color:#b8860b;background:#fff3cd;border:1px solid #f0d48a;padding:0 3px;border-radius:3px;flex:none;cursor:help;">⚠</span></sc-if>
                   <input value="{{ r.name }}" onchange="{{ r.onName }}" onkeydown="{{ r.onKeyEnter }}" style="border:none;background:transparent;font-size:13px;font-weight:600;padding:3px 2px;min-width:0;width:100%;color:var(--text-primary,#000);">
                 </div>
