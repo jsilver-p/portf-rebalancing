@@ -1378,14 +1378,16 @@
     input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
     input[type=number]{-moz-appearance:textfield;appearance:textfield;}
     /* ── 표 레이아웃(단일 출처: 헤더·행이 같은 클래스를 공유) ── */
-    /* 표 내부 스크롤 없음 — 바깥(페이지) 스크롤만. 컬럼 헤더는 페이지 기준으로 sticky 고정된다 */
-    .pf-tbl-scroll{overflow:visible;}
     .pf-hold-row{display:grid;grid-template-columns:minmax(150px,1fr) 118px 82px 98px 98px 134px 56px 66px 24px;gap:8px;min-width:858px;}
-    /* 스크롤 시 컨텍스트 유지 — 위→아래 3단 스택: 상단바(top:0) → 섹션 제목 → 표 컬럼 헤더.
-       상단바 높이(--pf-bar-h)·섹션 헤더 높이(--pf-secN-h)는 componentDidMount의 ResizeObserver가 발행 */
+    /* 가로: 표가 스크롤을 소유(페이지 아님) — 본문만 overflow-x:auto 로 좌우 스크롤. 세로: 페이지 스크롤.
+       컬럼 헤더를 본문 스크롤러 안에 두면 세로 sticky 가 스크롤러에 갇히므로, 헤더는 스크롤러 밖
+       .pf-colhead-vp(세로 sticky·가로 clip)에 두고 본문 scrollLeft 를 JS 가 translateX 로 동기화한다.
+       상단바 높이(--pf-bar-h)·섹션 헤더 높이(--pf-secN-h)는 componentDidMount 의 ResizeObserver 가 발행. */
     .pf-sec-head{position:sticky;top:var(--pf-bar-h,80px);z-index:5;background:var(--bg-surface,#fff);}
-    .pf-col-head-1{position:sticky;top:calc(var(--pf-bar-h,80px) + var(--pf-sec1-h,64px));z-index:4;background:var(--bg-surface,#fff);}
-    .pf-col-head-2{position:sticky;top:calc(var(--pf-bar-h,80px) + var(--pf-sec2-h,64px));z-index:4;background:var(--bg-surface,#fff);}
+    .pf-tbl-body{overflow-x:auto;overflow-y:visible;}
+    .pf-colhead-vp{position:sticky;z-index:4;background:var(--bg-surface,#fff);overflow:hidden;}
+    .pf-colhead-1{top:calc(var(--pf-bar-h,80px) + var(--pf-sec1-h,64px));}
+    .pf-colhead-2{top:calc(var(--pf-bar-h,80px) + var(--pf-sec2-h,64px));}
     .pf-analysis{display:grid;grid-template-columns:250px 1fr;gap:20px;}
     .pf-num{font-variant-numeric:tabular-nums;}
     /* ── STEP 섹션 뼈대(카드·라벨·제목·설명이 5개 섹션에 반복) ── */
@@ -1471,8 +1473,8 @@
 
         <!-- 라이브 추출 프리뷰 — 화면별로 행이 써지듯 뜨고, 게이트 보정이 보인다. 확인 시 STEP2 반영 -->
         <sc-if value="{{ streamHasRows }}" hint-placeholder-val="{{ false }}">
-          <div style="margin-top:14px;border:1px solid var(--border-default,#dfdfe8);border-radius:8px;overflow:hidden;">
-            <div style="padding:8px 12px;background:var(--bg-app,#fafafa);border-bottom:1px solid var(--border-default,#dfdfe8);display:flex;align-items:center;gap:8px;">
+          <div style="margin-top:14px;border:1px solid var(--border-default,#dfdfe8);border-radius:8px;overflow:visible;">
+            <div style="padding:8px 12px;background:var(--bg-app,#fafafa);border-bottom:1px solid var(--border-default,#dfdfe8);border-radius:8px 8px 0 0;display:flex;align-items:center;gap:8px;">
               <span style="font-size:12px;font-weight:700;">추출 결과</span>
               <span style="font-size:11px;color:var(--text-tertiary,#999);">{{ streamStatusText }}</span>
               <div style="flex:1;"></div>
@@ -1480,10 +1482,13 @@
                 <span style="width:13px;height:13px;border:2px solid var(--ig-blue,#1fa1ff);border-top-color:transparent;border-radius:50%;animation:pfspin 0.8s linear infinite;flex:none;"></span>
               </sc-if>
             </div>
-            <div class="pf-tbl-scroll" style="padding:0 12px;">
-              <div class="pf-hold-row pf-col-head-1" style="padding:7px 8px;border-bottom:1px solid var(--border-default,#dfdfe8);font-size:10.5px;font-weight:600;letter-spacing:0.4px;color:var(--text-tertiary,#999);text-transform:uppercase;">
-                <span>종목명</span><span>자산군</span><span style="text-align:right;">수량</span><span style="text-align:right;">현재가</span><span style="text-align:right;">평균가</span><span style="text-align:right;">평가금액 ₩</span><span style="text-align:right;">비중</span><span style="text-align:right;">손익</span><span></span>
+            <div class="pf-tbl" style="padding:0 12px;">
+              <div class="pf-colhead-vp pf-colhead-1">
+                <div class="pf-hold-row pf-col-head-1" style="padding:7px 8px;border-bottom:1px solid var(--border-default,#dfdfe8);font-size:10.5px;font-weight:600;letter-spacing:0.4px;color:var(--text-tertiary,#999);text-transform:uppercase;">
+                  <span>종목명</span><span>자산군</span><span style="text-align:right;">수량</span><span style="text-align:right;">현재가</span><span style="text-align:right;">평균가</span><span style="text-align:right;">평가금액 ₩</span><span style="text-align:right;">비중</span><span style="text-align:right;">손익</span><span></span>
+                </div>
               </div>
+              <div class="pf-tbl-body pf-tbl-body-1">
               <sc-for list="{{ streamTableRows }}" as="sr" hint-placeholder-count="4">
                 <div>
                   <sc-if value="{{ sr.isHeader }}" hint-placeholder-val="{{ true }}">
@@ -1519,6 +1524,7 @@
                   </sc-if>
                 </div>
               </sc-for>
+              </div>
             </div>
             <sc-if value="{{ hasGate }}" hint-placeholder-val="{{ false }}">
               <div style="padding:8px 12px;border-top:1px solid var(--border-default,#dfdfe8);background:#fffdf5;display:flex;flex-direction:column;gap:3px;">
@@ -1563,10 +1569,13 @@
         <div style="padding:0 18px 6px;font-size:11px;color:var(--text-tertiary,#999);">{{ repriceSummaryText }}</div>
       </sc-if>
       <div style="padding:0 18px 6px;">
-       <div class="pf-tbl-scroll">
+       <div class="pf-tbl">
+        <div class="pf-colhead-vp pf-colhead-2">
         <div class="pf-hold-row pf-col-head-2" style="padding:7px 8px;border-bottom:1px solid var(--border-default,#dfdfe8);font-size:10.5px;font-weight:600;letter-spacing:0.4px;color:var(--text-tertiary,#999);text-transform:uppercase;">
           <span>종목명</span><span>자산군</span><span style="text-align:right;">수량</span><span style="text-align:right;">현재가</span><span style="text-align:right;">평균가</span><span style="text-align:right;">평가금액 ₩</span><span style="text-align:right;">비중</span><span style="text-align:right;">손익</span><span></span>
         </div>
+        </div>
+        <div class="pf-tbl-body pf-tbl-body-2">
         <sc-for list="{{ rows }}" as="r" hint-placeholder-count="6">
           <div>
             <sc-if value="{{ r.isHeader }}" hint-placeholder-val="{{ true }}">
@@ -1611,6 +1620,7 @@
             </sc-if>
           </div>
         </sc-for>
+        </div>
        </div>
         <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:6px 16px;padding:10px 8px 14px;font-size:11.5px;color:var(--text-tertiary,#999);">
           <div style="display:flex;flex-wrap:wrap;align-items:center;gap:5px 12px;flex:1;min-width:0;">
@@ -1842,12 +1852,24 @@ class Component extends DCLogic {
       Object.values(this._stickyEls).forEach(el => el && this._stickyRO.observe(el));
     }
     window.addEventListener('resize', this._setSticky);
+    // 표 가로 스크롤 동기화 — 본문(.pf-tbl-body)의 scrollLeft 를 세로 고정 헤더(.pf-colhead-vp 안)로
+    // translateX 미러링해 가로 스크롤 시에도 열이 어긋나지 않게. document 캡처 단계 위임이라
+    // STEP1 라이브표가 나중에 나타나도 재바인딩이 필요 없다(scroll 은 버블 안 하므로 capture:true).
+    this._hsync = (ev) => {
+      const body = ev.target;
+      if (!body || !body.classList || !body.classList.contains('pf-tbl-body')) return;
+      const vp = body.previousElementSibling;
+      const head = vp && vp.querySelector('.pf-hold-row');
+      if (head) head.style.transform = 'translateX(' + (-body.scrollLeft) + 'px)';
+    };
+    document.addEventListener('scroll', this._hsync, true);
   }
 
   componentWillUnmount() {
     if (this._healthTimer) clearInterval(this._healthTimer);
     if (this._stickyRO) this._stickyRO.disconnect();
     if (this._setSticky) window.removeEventListener('resize', this._setSticky);
+    if (this._hsync) document.removeEventListener('scroll', this._hsync, true);
   }
 
   async fetchFx() {
