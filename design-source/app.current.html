@@ -1389,9 +1389,10 @@
     .pf-colhead-1{top:calc(var(--pf-bar-h,80px) + var(--pf-sec1-h,64px));}
     .pf-colhead-2{top:calc(var(--pf-bar-h,80px) + var(--pf-sec2-h,64px));}
     /* 가로 스크롤 시 첫 열(종목명) 고정 — 헤더·본문 모두 각자 스크롤러(.pf-colhead-vp/.pf-tbl-body) 왼쪽에
-       sticky. 스크롤 중(.pf-hx)엔 우측 그림자로 프리즈 경계를 표시. */
+       sticky. 스크롤 중(.pf-hx)엔 셀 좌우의 투명 여백(좌 8px 인셋·우 8px 그리드 gap)을 불투명 밴드로
+       메워 뒤 내용이 새어 보이지 않게 하고, 그 바깥에 소프트 그림자로 프리즈 경계를 표시. */
     .pf-hold-row > :first-child{position:sticky;left:8px;z-index:2;background:var(--bg-surface,#fff);}
-    .pf-hx .pf-hold-row > :first-child{box-shadow:6px 0 6px -4px rgba(0,0,0,0.12);}
+    .pf-hx .pf-hold-row > :first-child{box-shadow:-8px 0 0 var(--bg-surface,#fff),8px 0 0 var(--bg-surface,#fff),11px 0 8px -6px rgba(0,0,0,0.14);}
     .pf-analysis{display:grid;grid-template-columns:250px 1fr;gap:20px;}
     .pf-num{font-variant-numeric:tabular-nums;}
     /* ── STEP 섹션 뼈대(카드·라벨·제목·설명이 5개 섹션에 반복) ── */
