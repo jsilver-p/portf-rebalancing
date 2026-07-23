@@ -1369,6 +1369,9 @@
 </style>
   <script src="fdd09da4-3f15-4417-ba35-190abeb52574"></script>
   <style>
+    /* 화면 폭에 따라 접히는 값들(단일 출처) — 좁은 화면에선 좌우 여백을 최소로 줄여 표에 폭을 준다.
+       인라인 style 안에서도 var() 로 참조하므로 미디어 쿼리 한 곳만 바꾸면 전체가 따라온다. */
+    :root{--pf-page-pad:20px;--pf-sec-pad:18px;--pf-scrim:0 6px 6px -6px rgba(0,0,0,0.22);}
     body{margin:0;background:var(--bg-app,#fafafa);}
     a{color:var(--ig-blue-link,#3897f0);text-decoration:none;}
     a:hover{color:var(--ig-blue-deep,#004c8b);}
@@ -1378,7 +1381,10 @@
     input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
     input[type=number]{-moz-appearance:textfield;appearance:textfield;}
     /* ── 표 레이아웃(단일 출처: 헤더·행이 같은 클래스를 공유) ── */
-    .pf-hold-row{display:grid;grid-template-columns:minmax(150px,1fr) 118px 82px 98px 98px 134px 56px 66px 24px;gap:8px;min-width:858px;}
+    /* 열 너비: 종목명만 가변(--pf-name-w = 최소폭), 나머지는 고정. 좁은 화면에선 종목명을 더 줄이고
+       잘린 이름은 말줄임 + 툴팁(.pf-name)으로 본다. min-width 는 '고정열 676px + gap 8×8px = 740px'
+       에 종목명 최소폭을 더한 값 — 트랙 합과 어긋나면 표가 잘리거나 빈 여백이 남으므로 같이 계산한다. */
+    .pf-hold-row{--pf-name-w:112px;display:grid;grid-template-columns:minmax(var(--pf-name-w),1fr) 118px 82px 98px 98px 134px 56px 66px 24px;gap:8px;min-width:calc(740px + var(--pf-name-w));}
     /* 가로: 표가 스크롤을 소유(페이지 아님) — 본문만 overflow-x:auto 로 좌우 스크롤. 세로: 페이지 스크롤.
        컬럼 헤더를 본문 스크롤러 안에 두면 세로 sticky 가 스크롤러에 갇히므로, 헤더는 스크롤러 밖
        .pf-colhead-vp(세로 sticky·가로 clip)에 두고 본문 scrollLeft 를 JS 가 헤더에 그대로 옮긴다.
@@ -1388,16 +1394,25 @@
     .pf-sec-head{position:sticky;top:var(--pf-bar-h,80px);z-index:6;background:var(--bg-surface,#fff);}
     .pf-res-head{position:sticky;top:calc(var(--pf-bar-h,80px) + var(--pf-sec1-h,37px));z-index:5;}
     /* 표의 좌우 인셋은 표마다 다르다(STEP1 만 12px) — 고정 밴드가 덮어야 할 폭이기도 하므로
-       패딩과 밴드 확장이 같은 값을 보게 --pf-tbl-pad 하나로 둔다(단일 출처). */
-    .pf-tbl{padding:0 var(--pf-tbl-pad,0px);}
+       패딩과 밴드 확장이 같은 값을 보게 --pf-tbl-pad 하나로 둔다(단일 출처). 인셋 값은 클래스에
+       두고(인라인 style 은 미디어 쿼리로 못 줄인다) 좁은 화면에서 절반으로 접는다. */
+    .pf-tbl{padding:0 var(--pf-tbl-pad,0px);--pf-band:calc(-1 * var(--pf-tbl-pad,0px)) 0 0 var(--bg-surface,#fff),var(--pf-tbl-pad,0px) 0 0 var(--bg-surface,#fff);}
+    .pf-tbl-1{--pf-tbl-pad:12px;}
     .pf-tbl-body{overflow-x:auto;overflow-y:visible;}
     .pf-colhead-vp{position:sticky;z-index:4;background:var(--bg-surface,#fff);overflow:hidden;}
     .pf-colhead-1{top:calc(var(--pf-bar-h,80px) + var(--pf-sec1-h,37px) + var(--pf-res-h,35px));}
     .pf-colhead-2{top:calc(var(--pf-bar-h,80px) + var(--pf-sec2-h,54px));}
-    .pf-grp-1{position:sticky;top:calc(var(--pf-bar-h,80px) + var(--pf-sec1-h,37px) + var(--pf-res-h,35px) + var(--pf-ch1-h,32px));z-index:3;}
+    /* 그룹행은 가로로 고정이지만 죽은 영역은 아니다 — 그 위에서 좌우로 밀면 표가 스크롤된다(_grpPan).
+       세로/가로 소유권은 touch-action 이 가른다: 세로 팬은 브라우저(페이지 스크롤), 가로는 핸들러. */
+    .pf-grp-1{position:sticky;top:calc(var(--pf-bar-h,80px) + var(--pf-sec1-h,37px) + var(--pf-res-h,35px) + var(--pf-ch1-h,32px));z-index:3;touch-action:pan-y;user-select:none;}
     /* 고정 밴드(컬럼 헤더·그룹행)는 표 좌우 여백(--pf-tbl-pad)까지 불투명하게 덮는다 —
        그 여백이 비어 있으면 뒤로 지나가는 내용이 밴드 옆으로 새어 보인다(첫 열 고정과 같은 이유). */
-    .pf-colhead-vp,.pf-grp-1{box-shadow:calc(-1 * var(--pf-tbl-pad,0px)) 0 0 var(--bg-surface,#fff),var(--pf-tbl-pad,0px) 0 0 var(--bg-surface,#fff);}
+    .pf-colhead-vp,.pf-grp-1{box-shadow:var(--pf-band);}
+    /* 가려진 내용 신호 — 고정 스택의 **맨 아래** 단에만 얕은 그림자를 켠다(_setScrim). 그 단이 붙어 있다는 건
+       바로 아래로 내용이 지나가고 있다는 뜻. ::after 띠가 아니라 box-shadow 인 이유: 컬럼 헤더 뷰포트는
+       overflow:hidden 이라 자식으로 그린 띠가 잘린다. 밴드는 좌우 덮개(--pf-band)를 잃지 않게 같이 쓴다. */
+    .pf-scrim{box-shadow:var(--pf-scrim);}
+    .pf-colhead-vp.pf-scrim,.pf-grp-1.pf-scrim{box-shadow:var(--pf-band),var(--pf-scrim);}
     /* 가로 스크롤 시 첫 열(종목명) 고정 — 헤더·본문 모두 각자 스크롤러(.pf-colhead-vp/.pf-tbl-body) 왼쪽에
        sticky. 스크롤 중(.pf-hx)엔 셀 좌우의 투명 여백(좌 8px 인셋·우 8px 그리드 gap)을 불투명 밴드로
        메워 뒤 내용이 새어 보이지 않게 하고, 그 바깥에 소프트 그림자로 프리즈 경계를 표시. */
@@ -1410,6 +1425,10 @@
        그래서 세로 sticky 가 페이지 기준으로 살아나고, 가로로는 애초에 움직이지 않는다. */
     .pf-tbl-body > div:has(> .pf-grp-row){position:sticky;left:0;z-index:3;background:var(--bg-surface,#fff);}
     .pf-grp-row{background:var(--bg-surface,#fff);}
+    /* 종목명은 좁아서 잘린다 — 잘린 것만 커서 올림/탭에서 풀네임을 띄운다(_tip). 표 안에 그리면
+       본문 스크롤러(overflow-x:auto → overflow-y 도 auto)가 위아래로 잘라내므로 body 에 띄운다. */
+    .pf-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
+    .pf-tip{position:fixed;z-index:100;max-width:min(76vw,420px);padding:5px 9px;border-radius:6px;background:rgba(0,0,0,0.86);color:#fff;font-size:12px;font-weight:600;line-height:1.35;pointer-events:none;box-shadow:0 4px 14px rgba(0,0,0,0.24);overflow-wrap:anywhere;}
     .pf-analysis{display:grid;grid-template-columns:250px 1fr;gap:20px;}
     .pf-num{font-variant-numeric:tabular-nums;}
     /* ── STEP 섹션 뼈대(카드·라벨·제목·설명이 5개 섹션에 반복) ── */
@@ -1418,9 +1437,13 @@
     .pf-step{font-size:11px;font-weight:700;letter-spacing:1px;color:var(--text-tertiary,#999);}
     .pf-step-title{font-size:15px;font-weight:700;}
     .pf-step-desc{font-size:12px;color:var(--text-secondary,#6e6e6e);}
+    /* 좁은 화면: 표 폭이 곧 정보량이라 바깥 여백(페이지 → 섹션 → 표 인셋)을 모두 최소로 접고
+       종목명 최소폭도 줄인다. 카드 바깥 6px 은 카드 경계가 보이게 남기는 최소치. */
     @media (max-width:640px){
-      .pf-main{padding-left:12px;padding-right:12px;}
       .pf-analysis{grid-template-columns:1fr;}
+      :root{--pf-page-pad:6px;--pf-sec-pad:8px;}
+      .pf-tbl-1{--pf-tbl-pad:6px;}
+      .pf-hold-row{--pf-name-w:84px;}
     }
   </style>
 </helmet>
@@ -1461,16 +1484,16 @@
     </div>
   </header>
 
-  <main class="pf-main" style="max-width:1060px;margin:0 auto;padding:20px 20px 60px;display:flex;flex-direction:column;gap:20px;">
+  <main class="pf-main" style="max-width:1060px;margin:0 auto;padding:20px var(--pf-page-pad,20px) 60px;display:flex;flex-direction:column;gap:20px;">
 
     <!-- ── 1. Upload ─────────────────────────── -->
     <section class="pf-card">
-      <div class="pf-sec-head" data-sechead="1" style="padding:14px 18px 0;display:flex;align-items:baseline;gap:10px;">
+      <div class="pf-sec-head" data-sechead="1" style="padding:14px var(--pf-sec-pad,18px) 0;display:flex;align-items:baseline;gap:10px;">
         <span class="pf-step">STEP 1</span>
         <span class="pf-step-title">스크린샷 업로드</span>
         <span class="pf-step-desc">스크린샷 = 그 계좌의 현재 스냅샷 — 갱신·추가는 물론, 화면에 없는 종목은 자동 제거됩니다</span>
       </div>
-      <div style="padding:14px 18px 18px;">
+      <div style="padding:14px var(--pf-sec-pad,18px) 18px;">
         <label ondrop="{{ onDrop }}" ondragover="{{ onDragOver }}" style="display:flex;align-items:center;justify-content:center;gap:12px;border:1.5px dashed var(--border-strong,#c4c4c4);border-radius:8px;padding:26px 16px;cursor:pointer;background:var(--bg-app,#fafafa);" style-hover="border-color:var(--ig-blue,#1fa1ff);background:#f4faff;">
           <input type="file" accept="image/*" multiple="" onchange="{{ onFiles }}" style="display:none;">
           <sc-if value="{{ extracting }}" hint-placeholder-val="{{ false }}">
@@ -1504,7 +1527,7 @@
                 <span style="width:13px;height:13px;border:2px solid var(--ig-blue,#1fa1ff);border-top-color:transparent;border-radius:50%;animation:pfspin 0.8s linear infinite;flex:none;"></span>
               </sc-if>
             </div>
-            <div class="pf-tbl" style="--pf-tbl-pad:12px;">
+            <div class="pf-tbl pf-tbl-1">
               <div class="pf-colhead-vp pf-colhead-1">
                 <div class="pf-hold-row pf-col-head-1" style="padding:7px 8px;border-bottom:1px solid var(--border-default,#dfdfe8);font-size:10.5px;font-weight:600;letter-spacing:0.4px;color:var(--text-tertiary,#999);text-transform:uppercase;">
                   <span>종목명</span><span>자산군</span><span style="text-align:right;">수량</span><span style="text-align:right;">현재가</span><span style="text-align:right;">평균가</span><span style="text-align:right;">평가금액 ₩</span><span style="text-align:right;">비중</span><span style="text-align:right;">손익</span><span></span>
@@ -1527,7 +1550,7 @@
                         <div style="display:flex;align-items:center;gap:4px;min-width:0;">
                           <sc-if value="{{ sr.hasImg }}" hint-placeholder-val="{{ false }}"><span title="이미지 {{ sr.imgTag }}에서 추출" style="font-size:8px;font-weight:700;color:var(--text-tertiary,#999);background:var(--bg-secondary,#efefef);padding:0.5px 4px;border-radius:3px;flex:none;">{{ sr.imgTag }}</span></sc-if>
                           <sc-if value="{{ sr.nameReview }}" hint-placeholder-val="{{ false }}"><span title="{{ sr.nameTitle }}" style="font-size:9px;font-weight:700;color:#b8860b;background:#fff3cd;border:1px solid #f0d48a;padding:0 3px;border-radius:3px;flex:none;cursor:help;">⚠</span></sc-if>
-                          <span style="font-size:13px;font-weight:600;color:var(--text-primary,#000);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;">{{ sr.name }}</span>
+                          <span class="pf-name" data-full="{{ sr.name }}" tabindex="0" style="font-size:13px;font-weight:600;color:var(--text-primary,#000);">{{ sr.name }}</span>
                         </div>
                         <span style="font-size:12px;font-weight:600;color:{{ sr.clsColor }};white-space:nowrap;">{{ sr.clsLabel }}</span>
                         <div style="display:flex;align-items:center;justify-content:flex-end;gap:3px;min-width:0;">
@@ -1573,7 +1596,7 @@
 
     <!-- ── 2. Holdings table ─────────────────── -->
     <section class="pf-card">
-      <div class="pf-sec-head" data-sechead="2" style="padding:14px 18px 10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <div class="pf-sec-head" data-sechead="2" style="padding:14px var(--pf-sec-pad,18px) 10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
         <span class="pf-step">STEP 2</span>
         <span class="pf-step-title">통합 보유 현황</span>
         <sc-for list="{{ acctChips }}" as="c" hint-placeholder-count="2">
@@ -1587,12 +1610,12 @@
         <button onclick="{{ onAddManual }}" style="border:1px solid var(--border-strong,#c4c4c4);background:transparent;border-radius:6px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;color:var(--text-primary,#000);" style-hover="border-color:var(--ig-blue,#1fa1ff);color:var(--ig-blue,#1fa1ff);">＋ 직접 추가 (현금·부동산 등)</button>
       </div>
       <sc-if value="{{ hasRepriceMsg }}" hint-placeholder-val="{{ false }}">
-        <div style="padding:0 18px 4px;font-size:11.5px;font-weight:600;color:var(--ig-blue-deep,#004c8b);">{{ repriceMsg }}</div>
+        <div style="padding:0 var(--pf-sec-pad,18px) 4px;font-size:11.5px;font-weight:600;color:var(--ig-blue-deep,#004c8b);">{{ repriceMsg }}</div>
       </sc-if>
       <sc-if value="{{ hasRepriceSummary }}" hint-placeholder-val="{{ false }}">
-        <div style="padding:0 18px 6px;font-size:11px;color:var(--text-tertiary,#999);">{{ repriceSummaryText }}</div>
+        <div style="padding:0 var(--pf-sec-pad,18px) 6px;font-size:11px;color:var(--text-tertiary,#999);">{{ repriceSummaryText }}</div>
       </sc-if>
-      <div style="padding:0 18px 6px;">
+      <div style="padding:0 var(--pf-sec-pad,18px) 6px;">
        <div class="pf-tbl">
         <div class="pf-colhead-vp pf-colhead-2">
         <div class="pf-hold-row pf-col-head-2" style="padding:7px 8px;border-bottom:1px solid var(--border-default,#dfdfe8);font-size:10.5px;font-weight:600;letter-spacing:0.4px;color:var(--text-tertiary,#999);text-transform:uppercase;">
@@ -1614,7 +1637,7 @@
               <div class="pf-hold-row" style="align-items:center;padding:6px 8px;border-bottom:1px solid var(--ig-gray-05,#efefef);" style-hover="background:var(--bg-app,#fafafa);">
                 <div style="display:flex;align-items:center;gap:4px;min-width:0;">
                   <sc-if value="{{ r.nameReview }}" hint-placeholder-val="{{ false }}"><span title="{{ r.nameTitle }}" style="font-size:9px;font-weight:700;color:#b8860b;background:#fff3cd;border:1px solid #f0d48a;padding:0 3px;border-radius:3px;flex:none;cursor:help;">⚠</span></sc-if>
-                  <input value="{{ r.name }}" onchange="{{ r.onName }}" onkeydown="{{ r.onKeyEnter }}" style="border:none;background:transparent;font-size:13px;font-weight:600;padding:3px 2px;min-width:0;width:100%;color:var(--text-primary,#000);">
+                  <input value="{{ r.name }}" data-full="{{ r.name }}" onchange="{{ r.onName }}" onkeydown="{{ r.onKeyEnter }}" style="border:none;background:transparent;font-size:13px;font-weight:600;padding:3px 2px;min-width:0;width:100%;color:var(--text-primary,#000);">
                 </div>
                 <select value="{{ r.cls }}" onchange="{{ r.onCls }}" style="border:none;background:transparent;font-size:12px;padding:3px 0;color:{{ r.clsColor }};font-weight:600;">
                   <sc-for list="{{ classOpts }}" as="o" hint-placeholder-count="3"><option value="{{ o.key }}">{{ o.label }}</option></sc-for>
@@ -1658,7 +1681,7 @@
 
     <!-- ── 3. Target ─────────────────────────── -->
     <section class="pf-card">
-      <div class="pf-sec-head" style="padding:14px 18px 10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <div class="pf-sec-head" style="padding:14px var(--pf-sec-pad,18px) 10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
         <span class="pf-step">STEP 3</span>
         <span class="pf-step-title">목표 포트폴리오</span>
         <span class="pf-step-desc">추천안을 고른 뒤 비중을 직접 조정하세요</span>
@@ -1667,7 +1690,7 @@
           <button onclick="{{ pr.onApply }}" style="border:1px solid {{ pr.bd }};background:{{ pr.bg }};color:{{ pr.fg }};border-radius:999px;padding:5px 13px;font-size:12px;font-weight:600;cursor:pointer;">{{ pr.label }}</button>
         </sc-for>
       </div>
-      <div style="display:flex;gap:10px;padding:4px 18px 16px;flex-wrap:wrap;align-items:flex-end;">
+      <div style="display:flex;gap:10px;padding:4px var(--pf-sec-pad,18px) 16px;flex-wrap:wrap;align-items:flex-end;">
         <sc-for list="{{ targetRows }}" as="t" hint-placeholder-count="6">
           <div style="display:flex;flex-direction:column;gap:5px;min-width:104px;flex:1;">
             <span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;"><span style="width:9px;height:9px;border-radius:2px;background:{{ t.color }};"></span>{{ t.label }}</span>
@@ -1686,12 +1709,12 @@
 
     <!-- ── 4. Analysis ───────────────────────── -->
     <section class="pf-card">
-      <div class="pf-sec-head" style="padding:14px 18px 6px;display:flex;align-items:baseline;gap:10px;">
+      <div class="pf-sec-head" style="padding:14px var(--pf-sec-pad,18px) 6px;display:flex;align-items:baseline;gap:10px;">
         <span class="pf-step">STEP 4</span>
         <span class="pf-step-title">자산배분 분석</span>
         <span class="pf-step-desc">혼합형 펀드는 배당주 50% · 채권 50%로 분해해 집계</span>
       </div>
-      <div class="pf-analysis" style="padding:12px 18px 20px;align-items:start;">
+      <div class="pf-analysis" style="padding:12px var(--pf-sec-pad,18px) 20px;align-items:start;">
         <div style="display:flex;flex-direction:column;align-items:center;gap:12px;">
           <div style="position:relative;width:190px;height:190px;">
             <svg viewBox="0 0 200 200" style="width:100%;height:100%;">
@@ -1735,12 +1758,12 @@
 
     <!-- ── 5. Actions ────────────────────────── -->
     <section class="pf-card">
-      <div class="pf-sec-head" style="padding:14px 18px 8px;display:flex;align-items:baseline;gap:10px;">
+      <div class="pf-sec-head" style="padding:14px var(--pf-sec-pad,18px) 8px;display:flex;align-items:baseline;gap:10px;">
         <span class="pf-step">STEP 5</span>
         <span class="pf-step-title">리밸런싱 액션</span>
         <span class="pf-step-desc">이탈 ±{{ bandStr }}%p 이상만 · 이탈 큰 순</span>
       </div>
-      <div style="padding:4px 18px 14px;display:flex;flex-direction:column;gap:8px;">
+      <div style="padding:4px var(--pf-sec-pad,18px) 14px;display:flex;flex-direction:column;gap:8px;">
         <sc-if value="{{ noActions }}" hint-placeholder-val="{{ false }}">
           <div style="display:flex;align-items:center;gap:10px;padding:16px;border:1px solid var(--border-default,#dfdfe8);border-radius:8px;background:var(--bg-app,#fafafa);">
             <span style="font-size:16px;">✓</span>
@@ -1881,9 +1904,30 @@ class Component extends DCLogic {
     window.addEventListener('resize', this._setSticky);
     // 다시 재야 할 때: ① 화면이 바뀔 때(프리뷰 표가 붙고 행이 늘어나면 새 단이 생긴다)
     // ② 스크롤할 때(오프셋이 실제로 쓰이는 순간). 둘 다 rAF 로 프레임당 1회로 묶는다.
+    // 가려진 내용 신호 — 고정 스택에서 '맨 아래 붙어 있는 단'을 찾아 거기에만 얕은 그림자를 켠다.
+    // 붙었는지는 rect.top 이 자기 sticky top 과 같은지로 본다: 아직 안 붙었으면 그보다 아래에 있고,
+    // 컨테이너 끝에서 밀려나는 중이면 그보다 위에 있다. 둘 다 '가리는 중'이 아니므로 신호도 없다.
+    const BANDS = 'header,.pf-sec-head,.pf-res-head,.pf-colhead-vp,.pf-grp-1';
+    this._setScrim = () => {
+      let low = null, lowBottom = -1;
+      if ((window.scrollY || window.pageYOffset || 0) > 0) {   // 맨 위 = 가려진 것이 없다
+        document.querySelectorAll(BANDS).forEach(el => {
+          const r = el.getBoundingClientRect();
+          if (r.height <= 0) return;
+          const top = parseFloat(getComputedStyle(el).top) || 0;
+          if (Math.abs(r.top - top) > 0.5) return;
+          if (r.bottom > lowBottom) { lowBottom = r.bottom; low = el; }
+        });
+      }
+      if (low === this._scrimEl) return;
+      if (this._scrimEl) this._scrimEl.classList.remove('pf-scrim');
+      this._scrimEl = low;
+      if (low) low.classList.add('pf-scrim');
+    };
+    this._setScrim();
     this._remeasure = () => {
       if (this._raf) return;
-      this._raf = requestAnimationFrame(() => { this._raf = 0; this._setSticky(); });
+      this._raf = requestAnimationFrame(() => { this._raf = 0; this._setSticky(); this._setScrim(); });
     };
     window.addEventListener('scroll', this._remeasure, { passive: true });
     const main = document.querySelector('.pf-main');
@@ -1908,6 +1952,83 @@ class Component extends DCLogic {
       });
     };
     document.addEventListener('scroll', this._hsync, true);
+    // 고정된 그룹행 위에서의 좌우 밀기 → 그 그룹 본문의 가로 스크롤. 가로로 같이 움직이진 않지만
+    // 조작까지 죽은 영역은 아니다. 세로/가로 소유권은 CSS touch-action:pan-y 가 가른다 —
+    // 세로 팬은 브라우저(페이지 스크롤)로 가고 가로 제스처만 여기로 온다(플래그로 다투지 않는다).
+    const bodyOf = (row) => row.parentElement && row.parentElement.querySelector('.pf-tbl-body');
+    this._grpDown = (ev) => {
+      const row = ev.target && ev.target.closest && ev.target.closest('.pf-grp-1');
+      if (!row) return;
+      const body = bodyOf(row);
+      if (!body || body.scrollWidth <= body.clientWidth) return;   // 밀 폭이 없으면 관여하지 않는다
+      this._pan = { body, x: ev.clientX, id: ev.pointerId };
+      if (row.setPointerCapture) { row.setPointerCapture(ev.pointerId); this._pan.row = row; }
+    };
+    this._grpMove = (ev) => {
+      const p = this._pan;
+      if (!p || ev.pointerId !== p.id) return;
+      const dx = ev.clientX - p.x;
+      if (!dx) return;
+      p.x = ev.clientX;
+      p.body.scrollLeft -= dx;      // 표가 손끝을 따라오는 방향. 나머지 스크롤러는 _hsync 가 맞춘다
+      ev.preventDefault();
+    };
+    this._grpUp = (ev) => {
+      const p = this._pan;
+      if (!p || ev.pointerId !== p.id) return;
+      if (p.row && p.row.releasePointerCapture) { try { p.row.releasePointerCapture(p.id); } catch (e) {} }
+      this._pan = null;
+    };
+    this._grpWheel = (ev) => {    // 트랙패드 가로 스크롤·Shift+휠도 같은 통로로
+      const row = ev.target && ev.target.closest && ev.target.closest('.pf-grp-1');
+      if (!row) return;
+      const dx = ev.shiftKey ? (ev.deltaX || ev.deltaY) : ev.deltaX;
+      if (!dx) return;             // 순수 세로 휠은 페이지에 넘긴다
+      const body = bodyOf(row);
+      if (!body) return;
+      body.scrollLeft += dx;
+      ev.preventDefault();
+    };
+    document.addEventListener('pointerdown', this._grpDown);
+    document.addEventListener('pointermove', this._grpMove, { passive: false });
+    document.addEventListener('pointerup', this._grpUp);
+    document.addEventListener('pointercancel', this._grpUp);
+    document.addEventListener('wheel', this._grpWheel, { passive: false });
+    // 종목명 툴팁 — 열이 좁아 잘린 이름만 풀네임을 띄운다(안 잘렸으면 띄울 이유가 없다).
+    // 표 안에 그리면 본문 스크롤러(overflow-x:auto → overflow-y 도 auto)가 잘라내므로 body 에 붙인다.
+    this._tipHide = () => { if (this._tipEl) { this._tipEl.remove(); this._tipEl = null; this._tipFor = null; } };
+    this._tipShow = (el) => {
+      const full = el.getAttribute('data-full') || '';
+      // 편집 중인 입력칸 위에는 띄우지 않는다(글자를 가린다). 잘리지 않은 이름도 마찬가지.
+      if (!full || (el.tagName === 'INPUT' && el === document.activeElement)) return this._tipHide();
+      if (el.scrollWidth <= el.clientWidth + 1) return this._tipHide();
+      if (this._tipFor === el && this._tipEl) return;
+      this._tipHide();
+      const d = document.createElement('div');
+      d.className = 'pf-tip';
+      d.textContent = full;
+      document.body.appendChild(d);
+      const r = el.getBoundingClientRect();
+      let x = r.left, y = r.bottom + 6;
+      if (x + d.offsetWidth > window.innerWidth - 6) x = Math.max(6, window.innerWidth - 6 - d.offsetWidth);
+      if (y + d.offsetHeight > window.innerHeight - 6) y = Math.max(6, r.top - 6 - d.offsetHeight);
+      d.style.left = x + 'px';
+      d.style.top = y + 'px';
+      this._tipEl = d; this._tipFor = el;
+    };
+    this._tipPoint = (ev) => {
+      const el = ev.target && ev.target.closest && ev.target.closest('[data-full]');
+      if (el) this._tipShow(el); else this._tipHide();
+    };
+    this._tipFocus = (ev) => {    // 키보드 이동. 입력칸은 포커스 = 편집이므로 감춘다
+      const el = ev.target;
+      if (el && el.hasAttribute && el.hasAttribute('data-full') && el.tagName !== 'INPUT') this._tipShow(el);
+      else this._tipHide();
+    };
+    document.addEventListener('pointerover', this._tipPoint);   // 커서 올림
+    document.addEventListener('pointerdown', this._tipPoint);   // 탭
+    document.addEventListener('focusin', this._tipFocus);
+    document.addEventListener('scroll', this._tipHide, true);   // 고정 위치라 스크롤하면 어긋난다
   }
 
   componentWillUnmount() {
@@ -1917,6 +2038,20 @@ class Component extends DCLogic {
     if (this._stickyMO) this._stickyMO.disconnect();
     if (this._remeasure) window.removeEventListener('scroll', this._remeasure);
     if (this._hsync) document.removeEventListener('scroll', this._hsync, true);
+    if (this._grpDown) {
+      document.removeEventListener('pointerdown', this._grpDown);
+      document.removeEventListener('pointermove', this._grpMove, { passive: false });
+      document.removeEventListener('pointerup', this._grpUp);
+      document.removeEventListener('pointercancel', this._grpUp);
+      document.removeEventListener('wheel', this._grpWheel, { passive: false });
+    }
+    if (this._tipPoint) {
+      document.removeEventListener('pointerover', this._tipPoint);
+      document.removeEventListener('pointerdown', this._tipPoint);
+      document.removeEventListener('focusin', this._tipFocus);
+      document.removeEventListener('scroll', this._tipHide, true);
+      this._tipHide();
+    }
   }
 
   async fetchFx() {
