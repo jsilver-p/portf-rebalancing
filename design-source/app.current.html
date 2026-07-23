@@ -1388,6 +1388,10 @@
     .pf-colhead-vp{position:sticky;z-index:4;background:var(--bg-surface,#fff);overflow:hidden;}
     .pf-colhead-1{top:calc(var(--pf-bar-h,80px) + var(--pf-sec1-h,64px));}
     .pf-colhead-2{top:calc(var(--pf-bar-h,80px) + var(--pf-sec2-h,64px));}
+    /* 가로 스크롤 시 첫 열(종목명) 고정 — 헤더·본문 모두 각자 스크롤러(.pf-colhead-vp/.pf-tbl-body) 왼쪽에
+       sticky. 스크롤 중(.pf-hx)엔 우측 그림자로 프리즈 경계를 표시. */
+    .pf-hold-row > :first-child{position:sticky;left:8px;z-index:2;background:var(--bg-surface,#fff);}
+    .pf-hx .pf-hold-row > :first-child{box-shadow:6px 0 6px -4px rgba(0,0,0,0.12);}
     .pf-analysis{display:grid;grid-template-columns:250px 1fr;gap:20px;}
     .pf-num{font-variant-numeric:tabular-nums;}
     /* ── STEP 섹션 뼈대(카드·라벨·제목·설명이 5개 섹션에 반복) ── */
@@ -1858,9 +1862,11 @@ class Component extends DCLogic {
     this._hsync = (ev) => {
       const body = ev.target;
       if (!body || !body.classList || !body.classList.contains('pf-tbl-body')) return;
-      const vp = body.previousElementSibling;
-      const head = vp && vp.querySelector('.pf-hold-row');
-      if (head) head.style.transform = 'translateX(' + (-body.scrollLeft) + 'px)';
+      const vp = body.previousElementSibling;   // .pf-colhead-vp — 헤더를 같은 스크롤량으로 맞춰
+      if (vp) vp.scrollLeft = body.scrollLeft;   // 헤더·본문 첫 열 sticky-left 가 함께 고정되게
+      const on = body.scrollLeft > 0;            // 스크롤 중이면 프리즈 경계 그림자 표시
+      body.classList.toggle('pf-hx', on);
+      if (vp) vp.classList.toggle('pf-hx', on);
     };
     document.addEventListener('scroll', this._hsync, true);
   }
