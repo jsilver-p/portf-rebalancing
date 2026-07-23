@@ -1381,21 +1381,33 @@
     .pf-hold-row{display:grid;grid-template-columns:minmax(150px,1fr) 118px 82px 98px 98px 134px 56px 66px 24px;gap:8px;min-width:858px;}
     /* 가로: 표가 스크롤을 소유(페이지 아님) — 본문만 overflow-x:auto 로 좌우 스크롤. 세로: 페이지 스크롤.
        컬럼 헤더를 본문 스크롤러 안에 두면 세로 sticky 가 스크롤러에 갇히므로, 헤더는 스크롤러 밖
-       .pf-colhead-vp(세로 sticky·가로 clip)에 두고 본문 scrollLeft 를 JS 가 translateX 로 동기화한다.
-       상단바 높이(--pf-bar-h)·섹션 헤더 높이(--pf-secN-h)는 componentDidMount 의 ResizeObserver 가 발행. */
-    .pf-sec-head{position:sticky;top:var(--pf-bar-h,80px);z-index:5;background:var(--bg-surface,#fff);}
+       .pf-colhead-vp(세로 sticky·가로 clip)에 두고 본문 scrollLeft 를 JS 가 헤더에 그대로 옮긴다.
+       세로 고정 스택은 위에서부터 상단바 → STEP 제목 → (STEP1) 추출 결과 → 컬럼 헤더 → 증권사 그룹행.
+       각 단의 top 은 '윗단들의 실측 높이 합'이고, 그 높이는 _setSticky 가 :root 변수로 발행한다(단일 출처).
+       z-index 는 위 단이 아래 단을 덮도록 내림차순(6→2) — 스택 끝에서 단이 서로 지나갈 때 겹침 순서가 뒤집히지 않게. */
+    .pf-sec-head{position:sticky;top:var(--pf-bar-h,80px);z-index:6;background:var(--bg-surface,#fff);}
+    .pf-res-head{position:sticky;top:calc(var(--pf-bar-h,80px) + var(--pf-sec1-h,37px));z-index:5;}
+    /* 표의 좌우 인셋은 표마다 다르다(STEP1 만 12px) — 고정 밴드가 덮어야 할 폭이기도 하므로
+       패딩과 밴드 확장이 같은 값을 보게 --pf-tbl-pad 하나로 둔다(단일 출처). */
+    .pf-tbl{padding:0 var(--pf-tbl-pad,0px);}
     .pf-tbl-body{overflow-x:auto;overflow-y:visible;}
     .pf-colhead-vp{position:sticky;z-index:4;background:var(--bg-surface,#fff);overflow:hidden;}
-    .pf-colhead-1{top:calc(var(--pf-bar-h,80px) + var(--pf-sec1-h,64px));}
-    .pf-colhead-2{top:calc(var(--pf-bar-h,80px) + var(--pf-sec2-h,64px));}
+    .pf-colhead-1{top:calc(var(--pf-bar-h,80px) + var(--pf-sec1-h,37px) + var(--pf-res-h,35px));}
+    .pf-colhead-2{top:calc(var(--pf-bar-h,80px) + var(--pf-sec2-h,54px));}
+    .pf-grp-1{position:sticky;top:calc(var(--pf-bar-h,80px) + var(--pf-sec1-h,37px) + var(--pf-res-h,35px) + var(--pf-ch1-h,32px));z-index:3;}
+    /* 고정 밴드(컬럼 헤더·그룹행)는 표 좌우 여백(--pf-tbl-pad)까지 불투명하게 덮는다 —
+       그 여백이 비어 있으면 뒤로 지나가는 내용이 밴드 옆으로 새어 보인다(첫 열 고정과 같은 이유). */
+    .pf-colhead-vp,.pf-grp-1{box-shadow:calc(-1 * var(--pf-tbl-pad,0px)) 0 0 var(--bg-surface,#fff),var(--pf-tbl-pad,0px) 0 0 var(--bg-surface,#fff);}
     /* 가로 스크롤 시 첫 열(종목명) 고정 — 헤더·본문 모두 각자 스크롤러(.pf-colhead-vp/.pf-tbl-body) 왼쪽에
        sticky. 스크롤 중(.pf-hx)엔 셀 좌우의 투명 여백(좌 8px 인셋·우 8px 그리드 gap)을 불투명 밴드로
        메워 뒤 내용이 새어 보이지 않게 하고, 그 바깥에 소프트 그림자로 프리즈 경계를 표시. */
     .pf-hold-row > :first-child{position:sticky;left:8px;z-index:2;background:var(--bg-surface,#fff);}
     .pf-hx .pf-hold-row > :first-child{box-shadow:-8px 0 0 var(--bg-surface,#fff),8px 0 0 var(--bg-surface,#fff),11px 0 8px -6px rgba(0,0,0,0.14);}
-    /* 증권사 그룹행(브로커·합계)은 뷰포트 폭에 맞아 넘치지 않으므로 가로 스크롤 시 왼쪽에 고정.
+    /* 증권사 그룹행(브로커·합계) — STEP2 는 아직 그룹행이 본문 스크롤러 안에 있어 가로 고정만 가능하다.
        sc-for 래퍼 div 가 그룹행의 containing block 이라 그룹행을 직접 sticky 하면 래퍼 폭(=뷰포트)에
-       갇혀 무효 → 래퍼(:has)를 sticky 로 만들어 본문 스크롤 폭(858px) 안에서 고정되게 한다. */
+       갇혀 무효 → 래퍼(:has)를 sticky 로 만들어 본문 스크롤 폭(858px) 안에서 고정되게 한다.
+       STEP1 은 그룹마다 본문 스크롤러를 따로 둬 그룹행이 스크롤러 **밖**에 있다(.pf-grp-1) —
+       그래서 세로 sticky 가 페이지 기준으로 살아나고, 가로로는 애초에 움직이지 않는다. */
     .pf-tbl-body > div:has(> .pf-grp-row){position:sticky;left:0;z-index:3;background:var(--bg-surface,#fff);}
     .pf-grp-row{background:var(--bg-surface,#fff);}
     .pf-analysis{display:grid;grid-template-columns:250px 1fr;gap:20px;}
@@ -1484,7 +1496,7 @@
         <!-- 라이브 추출 프리뷰 — 화면별로 행이 써지듯 뜨고, 게이트 보정이 보인다. 확인 시 STEP2 반영 -->
         <sc-if value="{{ streamHasRows }}" hint-placeholder-val="{{ false }}">
           <div style="margin-top:14px;border:1px solid var(--border-default,#dfdfe8);border-radius:8px;overflow:visible;">
-            <div style="padding:8px 12px;background:var(--bg-app,#fafafa);border-bottom:1px solid var(--border-default,#dfdfe8);border-radius:8px 8px 0 0;display:flex;align-items:center;gap:8px;">
+            <div class="pf-res-head" style="padding:8px 12px;background:var(--bg-app,#fafafa);border-bottom:1px solid var(--border-default,#dfdfe8);border-radius:8px 8px 0 0;display:flex;align-items:center;gap:8px;">
               <span style="font-size:12px;font-weight:700;">추출 결과</span>
               <span style="font-size:11px;color:var(--text-tertiary,#999);">{{ streamStatusText }}</span>
               <div style="flex:1;"></div>
@@ -1492,49 +1504,51 @@
                 <span style="width:13px;height:13px;border:2px solid var(--ig-blue,#1fa1ff);border-top-color:transparent;border-radius:50%;animation:pfspin 0.8s linear infinite;flex:none;"></span>
               </sc-if>
             </div>
-            <div class="pf-tbl" style="padding:0 12px;">
+            <div class="pf-tbl" style="--pf-tbl-pad:12px;">
               <div class="pf-colhead-vp pf-colhead-1">
                 <div class="pf-hold-row pf-col-head-1" style="padding:7px 8px;border-bottom:1px solid var(--border-default,#dfdfe8);font-size:10.5px;font-weight:600;letter-spacing:0.4px;color:var(--text-tertiary,#999);text-transform:uppercase;">
                   <span>종목명</span><span>자산군</span><span style="text-align:right;">수량</span><span style="text-align:right;">현재가</span><span style="text-align:right;">평균가</span><span style="text-align:right;">평가금액 ₩</span><span style="text-align:right;">비중</span><span style="text-align:right;">손익</span><span></span>
                 </div>
               </div>
-              <div class="pf-tbl-body pf-tbl-body-1">
-              <sc-for list="{{ streamTableRows }}" as="sr" hint-placeholder-count="4">
+              <!-- 증권사·계좌 그룹마다 본문 스크롤러를 따로 둔다 — 그룹행이 스크롤러 밖에 있어야
+                   세로 sticky 가 페이지 기준으로 살아난다. 스크롤러들의 scrollLeft 는 _hsync 가 하나로 맞춘다. -->
+              <sc-for list="{{ streamGroups }}" as="g" hint-placeholder-count="2">
                 <div>
-                  <sc-if value="{{ sr.isHeader }}" hint-placeholder-val="{{ true }}">
-                    <div class="pf-grp-row" style="display:flex;align-items:center;gap:8px;padding:11px 8px 5px;border-bottom:2px solid var(--border-strong,#c4c4c4);margin-top:5px;">
-                      <span style="font-size:13px;font-weight:700;color:var(--text-primary,#000);white-space:nowrap;">{{ sr.broker }}</span>
-                      <span style="font-size:10px;font-weight:700;color:#fff;background:{{ sr.atypeColor }};padding:1.5px 8px;border-radius:999px;letter-spacing:0.3px;white-space:nowrap;">{{ sr.atype }}</span>
-                      <div style="flex:1;"></div>
-                      <span style="font-size:11.5px;color:var(--text-tertiary,#999);white-space:nowrap;">합계 <b style="color:var(--text-primary,#000);font-size:12.5px;">{{ sr.subtotalStr }}</b></span>
+                  <div class="pf-grp-row pf-grp-1" style="display:flex;align-items:center;gap:8px;padding:11px 8px 5px;border-bottom:2px solid var(--border-strong,#c4c4c4);margin-top:5px;">
+                    <span style="font-size:13px;font-weight:700;color:var(--text-primary,#000);white-space:nowrap;">{{ g.broker }}</span>
+                    <span style="font-size:10px;font-weight:700;color:#fff;background:{{ g.atypeColor }};padding:1.5px 8px;border-radius:999px;letter-spacing:0.3px;white-space:nowrap;">{{ g.atype }}</span>
+                    <div style="flex:1;"></div>
+                    <span style="font-size:11.5px;color:var(--text-tertiary,#999);white-space:nowrap;">합계 <b style="color:var(--text-primary,#000);font-size:12.5px;">{{ g.subtotalStr }}</b></span>
+                  </div>
+                  <div class="pf-tbl-body pf-tbl-body-1">
+                  <sc-for list="{{ g.rows }}" as="sr" hint-placeholder-count="3">
+                    <div>
+                      <div class="pf-hold-row pf-stream-row" style="align-items:center;padding:6px 8px;border-bottom:1px solid var(--ig-gray-05,#efefef);">
+                        <div style="display:flex;align-items:center;gap:4px;min-width:0;">
+                          <sc-if value="{{ sr.hasImg }}" hint-placeholder-val="{{ false }}"><span title="이미지 {{ sr.imgTag }}에서 추출" style="font-size:8px;font-weight:700;color:var(--text-tertiary,#999);background:var(--bg-secondary,#efefef);padding:0.5px 4px;border-radius:3px;flex:none;">{{ sr.imgTag }}</span></sc-if>
+                          <sc-if value="{{ sr.nameReview }}" hint-placeholder-val="{{ false }}"><span title="{{ sr.nameTitle }}" style="font-size:9px;font-weight:700;color:#b8860b;background:#fff3cd;border:1px solid #f0d48a;padding:0 3px;border-radius:3px;flex:none;cursor:help;">⚠</span></sc-if>
+                          <span style="font-size:13px;font-weight:600;color:var(--text-primary,#000);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;">{{ sr.name }}</span>
+                        </div>
+                        <span style="font-size:12px;font-weight:600;color:{{ sr.clsColor }};white-space:nowrap;">{{ sr.clsLabel }}</span>
+                        <div style="display:flex;align-items:center;justify-content:flex-end;gap:3px;min-width:0;">
+                          <sc-if value="{{ sr.qtyReview }}" hint-placeholder-val="{{ false }}"><span title="{{ sr.qtyTitle }}" style="font-size:9px;font-weight:700;color:#b8860b;background:#fff3cd;border:1px solid #f0d48a;padding:0 3px;border-radius:3px;flex:none;cursor:help;">⚠</span></sc-if>
+                          <span class="pf-num" style="font-size:12.5px;text-align:right;color:var(--text-primary,#000);">{{ sr.qtyStr }}</span>
+                        </div>
+                        <span class="pf-num" style="font-size:12.5px;text-align:right;color:var(--text-primary,#000);">{{ sr.priceStr }}</span>
+                        <span class="pf-num" style="font-size:12.5px;text-align:right;color:var(--text-primary,#000);">{{ sr.avgStr }}</span>
+                        <div style="display:flex;align-items:center;justify-content:flex-end;gap:4px;min-width:0;">
+                          <sc-if value="{{ sr.corrected }}" hint-placeholder-val="{{ false }}"><span title="{{ sr.correctedTitle }}" style="font-size:9px;font-weight:700;color:#b8860b;background:#fff3cd;border:1px solid #f0d48a;padding:0 3px;border-radius:3px;flex:none;">보정</span></sc-if>
+                          <span class="pf-num" style="font-size:12.5px;font-weight:600;text-align:right;">{{ sr.valueStr }}</span>
+                        </div>
+                        <span class="pf-num" style="font-size:12.5px;text-align:right;color:var(--text-secondary,#6e6e6e);">{{ sr.weightStr }}</span>
+                        <span class="pf-num" style="font-size:12.5px;font-weight:600;text-align:right;color:{{ sr.plColor }};">{{ sr.plStr }}</span>
+                        <span></span>
+                      </div>
                     </div>
-                  </sc-if>
-                  <sc-if value="{{ sr.isHolding }}" hint-placeholder-val="{{ false }}">
-                    <div class="pf-hold-row pf-stream-row" style="align-items:center;padding:6px 8px;border-bottom:1px solid var(--ig-gray-05,#efefef);">
-                      <div style="display:flex;align-items:center;gap:4px;min-width:0;">
-                        <sc-if value="{{ sr.hasImg }}" hint-placeholder-val="{{ false }}"><span title="이미지 {{ sr.imgTag }}에서 추출" style="font-size:8px;font-weight:700;color:var(--text-tertiary,#999);background:var(--bg-secondary,#efefef);padding:0.5px 4px;border-radius:3px;flex:none;">{{ sr.imgTag }}</span></sc-if>
-                        <sc-if value="{{ sr.nameReview }}" hint-placeholder-val="{{ false }}"><span title="{{ sr.nameTitle }}" style="font-size:9px;font-weight:700;color:#b8860b;background:#fff3cd;border:1px solid #f0d48a;padding:0 3px;border-radius:3px;flex:none;cursor:help;">⚠</span></sc-if>
-                        <span style="font-size:13px;font-weight:600;color:var(--text-primary,#000);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;">{{ sr.name }}</span>
-                      </div>
-                      <span style="font-size:12px;font-weight:600;color:{{ sr.clsColor }};white-space:nowrap;">{{ sr.clsLabel }}</span>
-                      <div style="display:flex;align-items:center;justify-content:flex-end;gap:3px;min-width:0;">
-                        <sc-if value="{{ sr.qtyReview }}" hint-placeholder-val="{{ false }}"><span title="{{ sr.qtyTitle }}" style="font-size:9px;font-weight:700;color:#b8860b;background:#fff3cd;border:1px solid #f0d48a;padding:0 3px;border-radius:3px;flex:none;cursor:help;">⚠</span></sc-if>
-                        <span class="pf-num" style="font-size:12.5px;text-align:right;color:var(--text-primary,#000);">{{ sr.qtyStr }}</span>
-                      </div>
-                      <span class="pf-num" style="font-size:12.5px;text-align:right;color:var(--text-primary,#000);">{{ sr.priceStr }}</span>
-                      <span class="pf-num" style="font-size:12.5px;text-align:right;color:var(--text-primary,#000);">{{ sr.avgStr }}</span>
-                      <div style="display:flex;align-items:center;justify-content:flex-end;gap:4px;min-width:0;">
-                        <sc-if value="{{ sr.corrected }}" hint-placeholder-val="{{ false }}"><span title="{{ sr.correctedTitle }}" style="font-size:9px;font-weight:700;color:#b8860b;background:#fff3cd;border:1px solid #f0d48a;padding:0 3px;border-radius:3px;flex:none;">보정</span></sc-if>
-                        <span class="pf-num" style="font-size:12.5px;font-weight:600;text-align:right;">{{ sr.valueStr }}</span>
-                      </div>
-                      <span class="pf-num" style="font-size:12.5px;text-align:right;color:var(--text-secondary,#6e6e6e);">{{ sr.weightStr }}</span>
-                      <span class="pf-num" style="font-size:12.5px;font-weight:600;text-align:right;color:{{ sr.plColor }};">{{ sr.plStr }}</span>
-                      <span></span>
-                    </div>
-                  </sc-if>
+                  </sc-for>
+                  </div>
                 </div>
               </sc-for>
-              </div>
             </div>
             <sc-if value="{{ hasGate }}" hint-placeholder-val="{{ false }}">
               <div style="padding:8px 12px;border-top:1px solid var(--border-default,#dfdfe8);background:#fffdf5;display:flex;flex-direction:column;gap:3px;">
@@ -1842,37 +1856,56 @@ class Component extends DCLogic {
     this.setState({ agentUrlInput: this.agentUrl() });
     this.pingHealth();
     this._healthTimer = setInterval(() => this.pingHealth(), 30000);
-    // 스크롤 시 컨텍스트 유지 — 상단바·섹션 헤더의 가변 높이를 CSS 변수로 발행해
-    // 섹션 제목·표 컬럼 헤더의 sticky top 오프셋이 상단바 랩(80↔135px) 등에 정확히 따라오게.
-    // 리렌더에 지워지지 않도록 요소가 아닌 :root 변수에 쓴다.
-    this._stickyEls = {
-      bar: document.querySelector('header'),
-      s1: document.querySelector('[data-sechead="1"]'),
-      s2: document.querySelector('[data-sechead="2"]'),
-    };
+    // 스크롤 시 컨텍스트 유지 — 세로 고정 스택(상단바 → STEP 제목 → 추출 결과 → 컬럼 헤더 → 그룹행)의
+    // 각 단 높이를 CSS 변수로 발행해, 아랫단의 sticky top 이 윗단 바로 밑에 붙게 한다. 한 칸이라도
+    // 실제보다 크면 그 틈으로 스크롤되는 내용이 새어 보이고, 작으면 단이 겹친다.
+    // 요소는 매번 다시 찾는다 — STEP1 프리뷰는 나타났다 사라지고 리렌더로 노드가 갈리므로,
+    // 마운트 때 잡아둔 참조는 detached 가 돼 높이 0(=틈)을 발행한다.
+    const HEADS = { '--pf-bar-h': 'header', '--pf-sec1-h': '[data-sechead="1"]',
+      '--pf-sec2-h': '[data-sechead="2"]', '--pf-res-h': '.pf-res-head', '--pf-ch1-h': '.pf-col-head-1' };
     this._setSticky = () => {
-      const r = document.documentElement.style, e = this._stickyEls;
-      if (e.bar) r.setProperty('--pf-bar-h', e.bar.offsetHeight + 'px');
-      if (e.s1) r.setProperty('--pf-sec1-h', e.s1.offsetHeight + 'px');
-      if (e.s2) r.setProperty('--pf-sec2-h', e.s2.offsetHeight + 'px');
+      const r = document.documentElement.style;
+      Object.keys(HEADS).forEach(k => {
+        const el = document.querySelector(HEADS[k]);
+        if (!el) return;                                  // 없는 단(프리뷰 미표시)은 마지막 값 유지
+        const v = el.getBoundingClientRect().height.toFixed(1) + 'px';
+        if (r.getPropertyValue(k) !== v) r.setProperty(k, v);   // 같은 값 재기입 = 불필요한 스타일 무효화
+      });
     };
     this._setSticky();
     if (window.ResizeObserver) {
       this._stickyRO = new ResizeObserver(this._setSticky);
-      Object.values(this._stickyEls).forEach(el => el && this._stickyRO.observe(el));
+      [document.querySelector('header'), document.querySelector('[data-sechead="1"]'),
+       document.querySelector('[data-sechead="2"]')].forEach(el => el && this._stickyRO.observe(el));
     }
     window.addEventListener('resize', this._setSticky);
-    // 표 가로 스크롤 동기화 — 본문(.pf-tbl-body)의 scrollLeft 를 세로 고정 헤더(.pf-colhead-vp 안)로
-    // translateX 미러링해 가로 스크롤 시에도 열이 어긋나지 않게. document 캡처 단계 위임이라
-    // STEP1 라이브표가 나중에 나타나도 재바인딩이 필요 없다(scroll 은 버블 안 하므로 capture:true).
+    // 다시 재야 할 때: ① 화면이 바뀔 때(프리뷰 표가 붙고 행이 늘어나면 새 단이 생긴다)
+    // ② 스크롤할 때(오프셋이 실제로 쓰이는 순간). 둘 다 rAF 로 프레임당 1회로 묶는다.
+    this._remeasure = () => {
+      if (this._raf) return;
+      this._raf = requestAnimationFrame(() => { this._raf = 0; this._setSticky(); });
+    };
+    window.addEventListener('scroll', this._remeasure, { passive: true });
+    const main = document.querySelector('.pf-main');
+    if (main && window.MutationObserver) {
+      this._stickyMO = new MutationObserver(this._remeasure);
+      this._stickyMO.observe(main, { childList: true, subtree: true });
+    }
+    // 표 가로 스크롤 동기화 — 한 표(.pf-tbl) 안의 스크롤러들(컬럼 헤더 뷰포트 + 그룹별 본문)이
+    // 항상 같은 scrollLeft 를 보게 한다. STEP1 은 그룹행을 스크롤러 밖으로 빼느라 본문이 여러 개로
+    // 쪼개졌으므로, 하나를 밀면 나머지도 같은 만큼 따라가야 열이 어긋나지 않는다.
+    // 같은 값 대입은 scroll 이벤트를 내지 않으므로 서로 밀어대는 되먹임은 생기지 않는다.
+    // document 캡처 단계 위임이라 STEP1 라이브표가 나중에 나타나도 재바인딩이 필요 없다(scroll 은 버블 안 함).
     this._hsync = (ev) => {
-      const body = ev.target;
-      if (!body || !body.classList || !body.classList.contains('pf-tbl-body')) return;
-      const vp = body.previousElementSibling;   // .pf-colhead-vp — 헤더를 같은 스크롤량으로 맞춰
-      if (vp) vp.scrollLeft = body.scrollLeft;   // 헤더·본문 첫 열 sticky-left 가 함께 고정되게
-      const on = body.scrollLeft > 0;            // 스크롤 중이면 프리즈 경계 그림자 표시
-      body.classList.toggle('pf-hx', on);
-      if (vp) vp.classList.toggle('pf-hx', on);
+      const src = ev.target;
+      if (!src || !src.classList || !src.classList.contains('pf-tbl-body')) return;
+      const tbl = src.closest('.pf-tbl');
+      if (!tbl) return;
+      const x = src.scrollLeft, on = x > 0;      // 스크롤 중이면 프리즈 경계 그림자 표시
+      tbl.querySelectorAll('.pf-colhead-vp,.pf-tbl-body').forEach(el => {
+        if (el !== src && el.scrollLeft !== x) el.scrollLeft = x;
+        el.classList.toggle('pf-hx', on);
+      });
     };
     document.addEventListener('scroll', this._hsync, true);
   }
@@ -1881,6 +1914,8 @@ class Component extends DCLogic {
     if (this._healthTimer) clearInterval(this._healthTimer);
     if (this._stickyRO) this._stickyRO.disconnect();
     if (this._setSticky) window.removeEventListener('resize', this._setSticky);
+    if (this._stickyMO) this._stickyMO.disconnect();
+    if (this._remeasure) window.removeEventListener('scroll', this._remeasure);
     if (this._hsync) document.removeEventListener('scroll', this._hsync, true);
   }
 
@@ -2097,7 +2132,9 @@ class Component extends DCLogic {
   // 라이브 프리뷰 행 — STEP2 보유표와 **같은 형태**(증권사·계좌 그룹헤더 + 소계, 동일 컬럼·수치 파생)로
   // 읽기전용 렌더한다. 값 파생은 STEP2와 같은 메서드(krw·costBasisKrw·avgKrw)를 공유해 단일 출처를 지킨다.
   // 입력은 원시(assetClass) 또는 최종(cls) dict 둘 다 받는다. 확인 전 편집은 없다(재업로드로 대체).
-  buildStreamRows(list) {
+  // 반환은 (증권사·계좌) 그룹 배열 — 그룹행이 표 본문 스크롤러 밖에 있어야 세로로 고정되므로,
+  // 화면 구조(그룹행 + 그룹별 본문)와 데이터 구조를 같은 모양으로 맞춘다.
+  buildStreamGroups(list) {
     const cmap = this.byKey(this.CLASSES), amap = this.byKey(this.ACCOUNTS);
     const clsMap = { '성장주': 'growth', '배당주': 'dividend', '채권': 'bond', '금·원자재': 'gold', '현금': 'cash', '부동산': 'realestate' };
     const norm = h => {
@@ -2124,17 +2161,17 @@ class Component extends DCLogic {
       if (!groups.has(key)) groups.set(key, { broker: h.broker, accountType: h.accountType, items: [], sub: 0 });
       const g = groups.get(key); g.items.push(h); g.sub += this.krw(h);
     });
-    const rows = [];
+    const out = [];
     groups.forEach(g => {
-      rows.push({ isHeader: true, isHolding: false, broker: g.broker, atype: g.accountType,
-        atypeColor: (amap[g.accountType] || amap['일반']).color, subtotalStr: this.fmtW(g.sub) });
+      const rows = [];
+      out.push({ broker: g.broker, atype: g.accountType,
+        atypeColor: (amap[g.accountType] || amap['일반']).color, subtotalStr: this.fmtW(g.sub), rows });
       g.items.forEach(h => {
         const v = this.krw(h), c = this.costBasisKrw(h);
         const pl = c != null && c > 0 ? (v - c) / c * 100 : null;
         const corrected = String(h.value_src || '').indexOf('보정') >= 0;
         const rf = this.reviewFlag(h);
         rows.push({
-          isHeader: false, isHolding: true,
           name: h.name, clsColor: (cmap[h.cls] || cmap.growth).color, clsLabel: (cmap[h.cls] || cmap.growth).label,
           qtyStr: h.qty == null ? '—' : this.fmtNum(h.qty),
           priceStr: h.price == null ? '—' : this.fmtNum(h.price),
@@ -2150,7 +2187,7 @@ class Component extends DCLogic {
         });
       });
     });
-    return rows;
+    return out;
   }
 
   // 중간 원시 행을 한 행씩 프리뷰에 흘려보낸다(써지듯). done 되면 pump가 멈춘다.
@@ -2578,7 +2615,7 @@ class Component extends DCLogic {
       repriceMsg: S.repriceMsg, hasRepriceMsg: !!S.repriceMsg,
       repriceSummaryText: this.repriceSummaryText(), hasRepriceSummary: !!S.repriceSummary,
       // 라이브 추출 프리뷰(STEP1)
-      streamTableRows: this.buildStreamRows(S.streamRows || []),
+      streamGroups: this.buildStreamGroups(S.streamRows || []),
       streamHasRows: (S.streamRows || []).length > 0,
       streamLive: S.streamStage === 'live',
       streamReview: S.streamStage === 'review',
