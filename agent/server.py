@@ -81,7 +81,7 @@ const esc=s=>String(s).replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[
 function qtyCell(x){
   if(x.qty==null) return '<span class=muted>—</span>';
   if(x.confidence==='estimated') return '<span class=est>≈'+x.qty+'</span><span class=badge title="'+esc(x.qty_src||'')+'">추정</span>';
-  if(x.confidence==='estimated-low') return '<span class=est>≈'+x.qty+'</span><span class="badge low" title="'+esc(x.qty_src||'')+'">추정·낮음</span>';
+  if(x.confidence==='estimated-low') return '<span class=est>≈'+x.qty+'</span><span class="badge low" title="'+esc(x.qty_src||'')+'">추정(정확도 낮음)</span>';
   return x.qty;
 }
 go.onclick=async()=>{
@@ -99,7 +99,7 @@ go.onclick=async()=>{
     let h='<div class=card><table><tr><th>종목</th><th>수량</th><th>주가</th><th>평가금액</th></tr>';
     for(const x of j.holdings){h+=`<tr><td>${esc(x.name||'')}</td><td>${qtyCell(x)}</td><td>${x.price!=null?Number(x.price).toLocaleString():'—'}</td><td>${x.value!=null?Number(x.value).toLocaleString():'—'}</td></tr>`;}
     h+='</table>';
-    if(nEst)h+='<div class="muted" style="margin-top:8px">≈ 표시는 캡처일('+esc(j.captureDate)+') 종가로 <b>역산한 추정 수량</b>입니다. 화면에 수량이 없어 시세로 추정했습니다.</div>';
+    if(nEst)h+='<div class="muted" style="margin-top:8px">≈ 표시는 캡처일('+esc(j.captureDate)+') 시세로 <b>역산한 추정 수량</b>입니다(화면에 수량이 없어). <span class=est>추정</span>은 정수에 잘 맞은 값, <span class="badge low">추정(정확도 낮음)</span>은 시세 노이즈로 정수 확정이 약한 값 — 수량이 보이는 상세화면을 함께 올리면 정확해집니다.</div>';
     if(j.warnings&&j.warnings.length)h+='<div class="warn muted" style="margin-top:8px">⚠ '+esc(j.warnings.join(' · '))+'</div>';
     h+='</div>';out.innerHTML=h;
   }catch(e){clearInterval(tick);st.innerHTML='<span class=warn>실패: '+esc(e)+'</span>';}
@@ -302,16 +302,32 @@ def job_result(jid):
     return {"status": "pending"}
 
 
-# T4 노이즈 전파 게이트: 수량 오차 = 주식수 × δ(기준가 상대오차). 반올림이 노이즈에도
-# 안 뒤집혀야 채택 →  잔차 + 주식수×δ < GATE.  주식수 적은(고가) 종목은 δ 커도 안전, 많은
-# 종목은 작은 δ에도 위험 → 자동으로 KRW·소수주식은 채택, USD·다수주식은 거부.
-# δ: KRW≈0(마감가라 기준가=화면가), USD≈장중가+환율 오차. (캡처시각 알면 축소 — EXIF 경로)
-GATE = 0.33
-DELTA = {"KRW": 0.0006, "USD": 0.015}
+# 유도 수량(T3 교차계좌·T4 캡처시점가) 채택 게이트: q = round(value/참가격)의 **소수부**만 본다.
+# 소수부가 크다 = rawq가 두 정수 사이에 걸쳐 어느 쪽인지 분별 불가(resid≥1/3이면 이웃 정수가 2배
+# 이내로 붙음). resid≥1/3 → 빈칸, resid<0.10 → 확신, 그 사이 → '정확도 낮음'. (옛 q×δ 항은
+# 주식수에 비례해 다수주 정답을 오기각 → 제거. 참가격 노이즈는 이미 소수부에 반영된다.)
+BLANK_MARGIN = 1 / 3   # resid ≥ 1/3 → 빈칸(정수 분별 불가)
+CONF_MARGIN = 0.10     # resid < 0.10 → 확신 티어, 그 사이 → 정확도 낮음 티어
 SYMBOL_TOL = 0.10   # 심볼 검증: 화면 단가 vs 캡처시점 참가격 허용 괴리(시간외가 여유)
 # 화면 수량 게이트: 명시된 정수 수량은 신뢰하고, 참가격 대비 이만큼(배수/자릿수급) 어긋날 때만 기각
 # (열-오매핑·이름 속 숫자 혼입만 컷). 정상 장중가 드리프트(수 %)는 통과.
 QTY_GROSS_TOL = 0.35
+
+
+def _round_qty(value, denom):
+    """value/denom → (정수, resid, tier). tier: 'conf'|'low'|None(빈칸). denom=참가격 분모(화면 통화 기준).
+    유도 수량의 단일 채택 판정(T3·T4 공용) — 소수부 마진만 본다."""
+    if not denom or value is None:
+        return None, None, None
+    rawq = value / denom
+    q = round(rawq)
+    if q <= 0:
+        return None, None, None
+    resid = round(abs(rawq - q), 3)
+    if resid >= BLANK_MARGIN:
+        return None, resid, None
+    return q, resid, ("conf" if resid < CONF_MARGIN else "low")
+
 
 def _is_cash(h):
     n = str(h.get("name") or "")
@@ -480,14 +496,12 @@ def enrich(rows, capture_dt, mode="extract"):
         unit = known.get(h.get("symbol"))
         if not unit:
             continue
-        rawq = h["value"] / unit
-        q = round(rawq); resid = round(abs(rawq - q), 3)
-        margin = round(resid + q * DELTA["KRW"], 3)
-        if q > 0 and margin < GATE:      # 정수 검증은 게이트 — 안 떨어지면 채택하지 않는다
+        q, resid, tier = _round_qty(h["value"], unit)
+        if tier:      # 소수부 분별되면 채택 — 확신이면 high, 낮으면 estimated-low
             h["qty"] = q
             h["qty_src"] = f"derived:cross-account({unit:,.0f})"
-            h["confidence"] = "high"
-            h["qty_resid"] = resid; h["qty_margin"] = margin
+            h["confidence"] = "high" if tier == "conf" else "estimated-low"
+            h["qty_resid"] = resid
             if h.get("price") is None:
                 h["price"] = round(unit, 2); h["price_src"] = "cross-account"
 
@@ -499,23 +513,23 @@ def enrich(rows, capture_dt, mode="extract"):
         close, cday = close_of(h, h.get("currency"))
         fx = get_fx()
         denom = (close * fx if (usd and fx) else (None if usd else close)) if close else None
-        if denom:
-            rawq = h["value"] / denom
-            q = round(rawq); resid = round(abs(rawq - q), 3)
-            margin = round(resid + q * (DELTA["USD"] if usd else DELTA["KRW"]), 3)
-            if q > 0 and margin < GATE:
-                h["qty"] = q
-                h["qty_src"] = f"derived:capture-close({cday})"
-                h["confidence"] = "estimated-low" if usd else "estimated"
-                h["qty_resid"] = resid; h["qty_margin"] = margin
-                if h.get("price") is None:
-                    h["price"] = round(close, 2); h["price_src"] = f"capture-close:{cday}"
-            else:
-                h["confidence"] = "unreproducible"
-                h["qty_note"] = f"수량 추정 신뢰 부족(잔차 {resid}, 여유 {margin}≥{GATE}) — 재평가 불가"
-        else:
+        if not denom:
             h["confidence"] = "unreproducible"
             h["qty_note"] = "캡처시점 참가격 미취득 — 재평가 불가"
+            continue
+        q, resid, tier = _round_qty(h["value"], denom)
+        if tier:
+            h["qty"] = q
+            h["qty_src"] = f"derived:capture-close({cday})"
+            # USD는 FX 노이즈가 더해져 확신 티어로 올리지 않는다.
+            h["confidence"] = "estimated" if (tier == "conf" and not usd) else "estimated-low"
+            h["qty_resid"] = resid
+            if h.get("price") is None:
+                h["price"] = round(close, 2); h["price_src"] = f"capture-close:{cday}"
+        else:
+            h["confidence"] = "unreproducible"
+            h["qty_note"] = (f"정수 추정 불가(소수부 {resid} — 이웃 정수와 분별 안 됨)"
+                             if resid is not None else "수량 추정 불가")
 
     # 통화 표현 통일 — USD 자산의 금액 필드는 **네이티브(달러)**로 내보낸다.
     # 한국 앱 화면은 해외주식도 '원화 평가금액'으로 보여주지만, 앱(프론트)은 USD 행을 fx로 환산한다
