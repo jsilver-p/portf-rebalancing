@@ -59,9 +59,9 @@ def fetch_one(symbol, retries=2):
     raise last
 
 
-def chart(symbol, rng="1d", retries=2):
-    """심볼 → chart result(meta+indicators) 또는 예외."""
-    url = CHART + urllib.parse.quote(symbol) + f"?range={rng}&interval=1d"
+def chart(symbol, rng="1d", interval="1d", retries=2):
+    """심볼 → chart result(meta+indicators) 또는 예외. interval로 분봉도 받는다(장중가용)."""
+    url = CHART + urllib.parse.quote(symbol) + f"?range={rng}&interval={interval}"
     last = None
     for i in range(retries + 1):
         try:
@@ -96,9 +96,10 @@ def history_close(symbol, date, rng="3mo"):
     return None, None
 
 
-# 시장 마감의 UTC 근사 시각: KRX 15:30 KST=06:30 UTC, US 16:00 ET≈20:00 UTC(EDT).
-# (zoneinfo 없는 3.8 호환. DST로 겨울 US 마감은 21:00 UTC지만, 한국 낮 캡처는 마감과 멀어 무영향.)
+# 시장 개장·마감의 UTC 근사 시각: KRX 09:00~15:30 KST=00:00~06:30 UTC,
+# US 09:30~16:00 ET≈13:30~20:00 UTC(EDT). (zoneinfo 없는 3.8 호환.)
 _CLOSE_UTC_H = {"USD": 20.0, "KRW": 6.5}
+_OPEN_UTC_H = {"USD": 13.5, "KRW": 0.0}
 
 
 def price_asof(symbol, capture_dt, currency, rng="3mo"):
@@ -116,6 +117,62 @@ def price_asof(symbol, capture_dt, currency, rng="3mo"):
     except Exception:
         d = capture_dt.strftime("%Y-%m-%d") if hasattr(capture_dt, "strftime") else str(capture_dt)
         return history_close(symbol, d, rng)
+
+
+# 캡처 나이별 장중 세밀도 사다리 (Yahoo 실측 캡: 1m≤~8일, 5m≤~1개월, 15m≤~60일, 1h≤~90일+).
+# (max_age_days, range, interval) — 나이에 맞는 가장 세밀한 조합 하나만 시도, 실패 시 일봉 폴백.
+_INTRADAY_LADDER = [(7, "7d", "1m"), (29, "1mo", "5m"), (55, "60d", "15m"), (90, "3mo", "1h")]
+
+
+def price_at(symbol, capture_dt, currency, cache=None):
+    """캡처 '시점'의 참가격. → (price, when).
+
+    **장중(개장~마감) 캡처만** 장중 분봉에서 capture_dt 이하 최근 bar를 쓴다(폭락일 정상수량 오기각·
+    추정 편향 제거). **마감 후·개장 전·휴장**이면 공식 일봉 종가(price_asof) — 마감 후 장중 마지막 분봉은
+    종가 단일가와 달라(경매) 오히려 부정확하기 때문. 분봉 실패/구캡처도 price_asof로 폴백.
+    cache: {(symbol,range,interval): [(ts,close),...]} — enrich 1회 실행 동안 재요청 방지(옵션)."""
+    try:
+        cu = capture_dt.astimezone(timezone.utc)
+        age = (datetime.now(timezone.utc) - cu).days
+        cts = cu.timestamp()
+        # 세션 게이트: 캡처가 그 날의 개장~마감 사이(장중)일 때만 분봉을 쓴다.
+        day = cu.date()
+        base = datetime(day.year, day.month, day.day, tzinfo=timezone.utc)
+        open_t = base + timedelta(hours=_OPEN_UTC_H.get(currency, _OPEN_UTC_H["KRW"]))
+        close_t = base + timedelta(hours=_CLOSE_UTC_H.get(currency, _CLOSE_UTC_H["KRW"]))
+        if not (open_t <= cu < close_t):
+            return price_asof(symbol, capture_dt, currency,
+                              rng=("2y" if age > 80 else "3mo"))
+        for max_age, rng, itv in _INTRADAY_LADDER:
+            if age > max_age:
+                continue
+            try:
+                key = (symbol, rng, itv)
+                if cache is not None and key in cache:
+                    pairs = cache[key]
+                else:
+                    res = chart(symbol, rng, itv)
+                    ts = res.get("timestamp", []) or []
+                    cl = res.get("indicators", {}).get("quote", [{}])[0].get("close", []) or []
+                    pairs = [(t, c) for t, c in zip(ts, cl) if c is not None]
+                    if cache is not None:
+                        cache[key] = pairs
+                below = [p for p in pairs if p[0] <= cts]
+                if below:                       # capture 이하 최근 bar = 그 시점 참가격
+                    t, c = below[-1]
+                    when = datetime.fromtimestamp(t, tz=timezone.utc).strftime("%Y-%m-%d %H:%M")
+                    return c, when
+            except Exception:
+                pass
+            break                               # 이 나이대 조합 1회만 — 실패/빈 시리즈면 일봉 폴백
+    except Exception:
+        pass
+    # 폴백: 마감 종가. 오래된 캡처는 넓은 일봉 창으로(기본 3mo는 90일+ 캡처를 못 덮어 None이 된다).
+    try:
+        age = (datetime.now(timezone.utc) - capture_dt.astimezone(timezone.utc)).days
+    except Exception:
+        age = 0
+    return price_asof(symbol, capture_dt, currency, rng=("2y" if age > 80 else "3mo"))
 
 
 def build(symbols, now=None):
