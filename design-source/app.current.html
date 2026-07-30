@@ -1396,6 +1396,8 @@
     .pf-header-inner{padding:14px 20px;}
     /* 배지 범례 — 넓은 화면은 한 줄(가로), 좁은 화면은 항목별 세로 정렬(아래 미디어쿼리). */
     .pf-legend{align-items:center;}
+    /* 각 배지+설명은 한 덩어리로 유지(중간 줄바꿈 금지) — 항목 사이에서만 접힌다. */
+    .pf-legend-item{display:inline-flex;align-items:center;gap:4px;white-space:nowrap;}
     .pf-sec-head{position:sticky;top:var(--pf-bar-h,80px);z-index:6;background:var(--bg-surface,#fff);}
     .pf-res-head{position:sticky;top:calc(var(--pf-bar-h,80px) + var(--pf-sec1-h,37px));z-index:5;}
     /* 표의 좌우 인셋은 표마다 다르다(STEP1 만 12px) — 고정 밴드가 덮어야 할 폭이기도 하므로
@@ -1563,16 +1565,16 @@
                       <div class="pf-hold-row pf-stream-row" style="align-items:center;padding:6px 8px;border-bottom:1px solid var(--ig-gray-05,#efefef);">
                         <div style="display:flex;align-items:center;gap:4px;min-width:0;">
                           <sc-if value="{{ sr.hasImg }}" hint-placeholder-val="{{ false }}"><span title="이미지 {{ sr.imgTag }}에서 추출" style="font-size:8px;font-weight:700;color:var(--text-tertiary,#999);background:var(--bg-secondary,#efefef);padding:0.5px 4px;border-radius:3px;flex:none;">{{ sr.imgTag }}</span></sc-if>
+                          <sc-if value="{{ sr.editable }}" hint-placeholder-val="{{ false }}"><input value="{{ sr.name }}" data-full="{{ sr.name }}" onchange="{{ sr.onName }}" onkeydown="{{ sr.onKeyEnter }}" style="border:none;background:transparent;font-size:13px;font-weight:600;padding:3px 2px;min-width:0;flex:1;color:var(--text-primary,#000);"></sc-if>
+                          <sc-if value="{{ sr.readonly }}" hint-placeholder-val="{{ true }}"><span class="pf-name" data-full="{{ sr.name }}" tabindex="0" style="font-size:13px;font-weight:600;flex:1;color:var(--text-primary,#000);">{{ sr.name }}</span></sc-if>
                           <sc-if value="{{ sr.nameReview }}" hint-placeholder-val="{{ false }}"><span data-tip="{{ sr.nameTitle }}" tabindex="0" style="font-size:9px;font-weight:700;color:#b8860b;background:#fff3cd;border:1px solid #f0d48a;padding:0 3px;border-radius:3px;flex:none;cursor:pointer;">⚠</span></sc-if>
-                          <sc-if value="{{ sr.editable }}" hint-placeholder-val="{{ false }}"><input value="{{ sr.name }}" data-full="{{ sr.name }}" onchange="{{ sr.onName }}" onkeydown="{{ sr.onKeyEnter }}" style="border:none;background:transparent;font-size:13px;font-weight:600;padding:3px 2px;min-width:0;width:100%;color:var(--text-primary,#000);"></sc-if>
-                          <sc-if value="{{ sr.readonly }}" hint-placeholder-val="{{ true }}"><span class="pf-name" data-full="{{ sr.name }}" tabindex="0" style="font-size:13px;font-weight:600;color:var(--text-primary,#000);">{{ sr.name }}</span></sc-if>
                         </div>
                         <sc-if value="{{ sr.editable }}" hint-placeholder-val="{{ false }}"><select value="{{ sr.cls }}" onchange="{{ sr.onCls }}" style="border:none;background:transparent;font-size:12px;padding:3px 0;color:{{ sr.clsColor }};font-weight:600;"><sc-for list="{{ classOpts }}" as="o" hint-placeholder-count="3"><option value="{{ o.key }}">{{ o.label }}</option></sc-for></select></sc-if>
                         <sc-if value="{{ sr.readonly }}" hint-placeholder-val="{{ true }}"><span style="font-size:12px;font-weight:600;color:{{ sr.clsColor }};white-space:nowrap;">{{ sr.clsLabel }}</span></sc-if>
                         <div style="display:flex;align-items:center;justify-content:flex-end;gap:3px;min-width:0;">
+                          <sc-if value="{{ sr.editable }}" hint-placeholder-val="{{ false }}"><input value="{{ sr.qtyInput }}" onchange="{{ sr.onQty }}" onkeydown="{{ sr.onKeyEnter }}" placeholder="—" class="pf-num" style="border:none;background:transparent;font-size:12.5px;text-align:right;padding:3px 2px;min-width:0;flex:1;color:var(--text-primary,#000);"></sc-if>
+                          <sc-if value="{{ sr.readonly }}" hint-placeholder-val="{{ true }}"><span class="pf-num" style="font-size:12.5px;text-align:right;flex:1;color:var(--text-primary,#000);">{{ sr.qtyStr }}</span></sc-if>
                           <sc-if value="{{ sr.qtyBadge }}" hint-placeholder-val="{{ false }}"><span data-tip="{{ sr.qtyExplain }}" tabindex="0" style="font-size:9px;font-weight:700;color:{{ sr.qtyBadgeC }};background:{{ sr.qtyBadgeBg }};border:1px solid {{ sr.qtyBadgeBd }};padding:0 4px;border-radius:3px;flex:none;cursor:pointer;white-space:nowrap;">{{ sr.qtyBadgeText }}</span></sc-if>
-                          <sc-if value="{{ sr.editable }}" hint-placeholder-val="{{ false }}"><input value="{{ sr.qtyInput }}" onchange="{{ sr.onQty }}" onkeydown="{{ sr.onKeyEnter }}" placeholder="—" class="pf-num" style="border:none;background:transparent;font-size:12.5px;text-align:right;padding:3px 2px;min-width:0;width:100%;color:var(--text-primary,#000);"></sc-if>
-                          <sc-if value="{{ sr.readonly }}" hint-placeholder-val="{{ true }}"><span class="pf-num" style="font-size:12.5px;text-align:right;color:var(--text-primary,#000);">{{ sr.qtyStr }}</span></sc-if>
                         </div>
                         <div style="display:flex;align-items:center;justify-content:flex-end;gap:3px;min-width:0;">
                           <sc-if value="{{ sr.editable }}" hint-placeholder-val="{{ false }}"><input value="{{ sr.priceInput }}" onchange="{{ sr.onPrice }}" onkeydown="{{ sr.onKeyEnter }}" placeholder="—" class="pf-num" style="border:none;background:transparent;font-size:12.5px;text-align:right;padding:3px 0;width:100%;min-width:0;color:var(--text-primary,#000);"></sc-if>
@@ -1584,9 +1586,9 @@
                           <span style="font-size:10px;color:var(--text-tertiary,#999);flex:none;">{{ sr.cur }}</span>
                         </div>
                         <div style="display:flex;align-items:center;justify-content:flex-end;gap:4px;min-width:0;">
+                          <sc-if value="{{ sr.valueEdit }}" hint-placeholder-val="{{ false }}"><input value="{{ sr.valueInput }}" onchange="{{ sr.onValue }}" onkeydown="{{ sr.onKeyEnter }}" class="pf-num" style="border:none;background:transparent;font-size:12.5px;font-weight:600;text-align:right;padding:3px 2px;min-width:0;flex:1;color:var(--text-primary,#000);"></sc-if>
+                          <sc-if value="{{ sr.valueRO }}" hint-placeholder-val="{{ true }}"><span class="pf-num" style="font-size:12.5px;font-weight:600;text-align:right;flex:1;">{{ sr.valueStr }}</span></sc-if>
                           <sc-if value="{{ sr.corrected }}" hint-placeholder-val="{{ false }}"><span data-tip="{{ sr.correctedTitle }}" tabindex="0" style="font-size:9px;font-weight:700;color:#2e7d32;background:#e7f4e8;border:1px solid #b6dcb9;padding:0 4px;border-radius:3px;flex:none;cursor:pointer;">✓ 보정</span></sc-if>
-                          <sc-if value="{{ sr.valueEdit }}" hint-placeholder-val="{{ false }}"><input value="{{ sr.valueInput }}" onchange="{{ sr.onValue }}" onkeydown="{{ sr.onKeyEnter }}" class="pf-num" style="border:none;background:transparent;font-size:12.5px;font-weight:600;text-align:right;padding:3px 2px;min-width:0;width:100%;color:var(--text-primary,#000);"></sc-if>
-                          <sc-if value="{{ sr.valueRO }}" hint-placeholder-val="{{ true }}"><span class="pf-num" style="font-size:12.5px;font-weight:600;text-align:right;">{{ sr.valueStr }}</span></sc-if>
                         </div>
                         <span class="pf-num" style="font-size:12.5px;text-align:right;color:var(--text-secondary,#6e6e6e);">{{ sr.weightStr }}</span>
                         <span class="pf-num" style="font-size:12.5px;font-weight:600;text-align:right;color:{{ sr.plColor }};">{{ sr.plStr }}</span>
@@ -1667,15 +1669,15 @@
             <sc-if value="{{ r.isHolding }}" hint-placeholder-val="{{ false }}">
               <div class="pf-hold-row" style="align-items:center;padding:6px 8px;border-bottom:1px solid var(--ig-gray-05,#efefef);" style-hover="background:var(--bg-app,#fafafa);">
                 <div style="display:flex;align-items:center;gap:4px;min-width:0;">
+                  <input value="{{ r.name }}" data-full="{{ r.name }}" onchange="{{ r.onName }}" onkeydown="{{ r.onKeyEnter }}" style="border:none;background:transparent;font-size:13px;font-weight:600;padding:3px 2px;min-width:0;flex:1;color:var(--text-primary,#000);">
                   <sc-if value="{{ r.nameReview }}" hint-placeholder-val="{{ false }}"><span data-tip="{{ r.nameTitle }}" tabindex="0" style="font-size:9px;font-weight:700;color:#b8860b;background:#fff3cd;border:1px solid #f0d48a;padding:0 3px;border-radius:3px;flex:none;cursor:pointer;">⚠</span></sc-if>
-                  <input value="{{ r.name }}" data-full="{{ r.name }}" onchange="{{ r.onName }}" onkeydown="{{ r.onKeyEnter }}" style="border:none;background:transparent;font-size:13px;font-weight:600;padding:3px 2px;min-width:0;width:100%;color:var(--text-primary,#000);">
                 </div>
                 <select value="{{ r.cls }}" onchange="{{ r.onCls }}" style="border:none;background:transparent;font-size:12px;padding:3px 0;color:{{ r.clsColor }};font-weight:600;">
                   <sc-for list="{{ classOpts }}" as="o" hint-placeholder-count="3"><option value="{{ o.key }}">{{ o.label }}</option></sc-for>
                 </select>
                 <div style="display:flex;align-items:center;justify-content:flex-end;gap:3px;min-width:0;">
+                  <input value="{{ r.qty }}" onchange="{{ r.onQty }}" onkeydown="{{ r.onKeyEnter }}" placeholder="—" class="pf-num" style="border:none;background:transparent;font-size:12.5px;text-align:right;padding:3px 2px;min-width:0;flex:1;color:var(--text-primary,#000);">
                   <sc-if value="{{ r.qtyBadge }}" hint-placeholder-val="{{ false }}"><span data-tip="{{ r.qtyExplain }}" tabindex="0" style="font-size:9px;font-weight:700;color:{{ r.qtyBadgeC }};background:{{ r.qtyBadgeBg }};border:1px solid {{ r.qtyBadgeBd }};padding:0 4px;border-radius:3px;flex:none;cursor:pointer;white-space:nowrap;">{{ r.qtyBadgeText }}</span></sc-if>
-                  <input value="{{ r.qty }}" onchange="{{ r.onQty }}" onkeydown="{{ r.onKeyEnter }}" placeholder="—" class="pf-num" style="border:none;background:transparent;font-size:12.5px;text-align:right;padding:3px 2px;min-width:0;width:100%;color:var(--text-primary,#000);">
                 </div>
                 <div style="display:flex;align-items:center;justify-content:flex-end;gap:3px;min-width:0;">
                   <span title="{{ r.staleTitle }}" style="width:6px;height:6px;border-radius:50%;background:{{ r.staleColor }};flex:none;"></span>
@@ -1687,9 +1689,9 @@
                   <span style="font-size:10px;color:var(--text-tertiary,#999);flex:none;">{{ r.cur }}</span>
                 </div>
                 <div style="display:flex;align-items:center;justify-content:flex-end;gap:3px;min-width:0;">
+                  <sc-if value="{{ r.hasQP }}" hint-placeholder-val="{{ true }}"><span class="pf-num" style="font-size:12.5px;font-weight:600;text-align:right;flex:1;">{{ r.valueStr }}</span></sc-if>
+                  <sc-if value="{{ r.noQP }}" hint-placeholder-val="{{ false }}"><input value="{{ r.valueInput }}" onchange="{{ r.onValue }}" onkeydown="{{ r.onKeyEnter }}" class="pf-num" style="border:none;background:transparent;font-size:12.5px;font-weight:600;text-align:right;padding:3px 2px;min-width:0;flex:1;color:var(--text-primary,#000);"></sc-if>
                   <sc-if value="{{ r.valueReview }}" hint-placeholder-val="{{ false }}"><span data-tip="{{ r.valueTitle }}" tabindex="0" style="font-size:9px;font-weight:700;color:#b8860b;background:#fff3cd;border:1px solid #f0d48a;padding:0 3px;border-radius:3px;flex:none;cursor:pointer;">⚠</span></sc-if>
-                  <sc-if value="{{ r.hasQP }}" hint-placeholder-val="{{ true }}"><span class="pf-num" style="font-size:12.5px;font-weight:600;text-align:right;">{{ r.valueStr }}</span></sc-if>
-                  <sc-if value="{{ r.noQP }}" hint-placeholder-val="{{ false }}"><input value="{{ r.valueInput }}" onchange="{{ r.onValue }}" onkeydown="{{ r.onKeyEnter }}" class="pf-num" style="border:none;background:transparent;font-size:12.5px;font-weight:600;text-align:right;padding:3px 2px;min-width:0;width:100%;color:var(--text-primary,#000);"></sc-if>
                 </div>
                 <span class="pf-num" style="font-size:12.5px;text-align:right;color:var(--text-secondary,#6e6e6e);">{{ r.weightStr }}</span>
                 <span class="pf-num" style="font-size:12.5px;font-weight:600;text-align:right;color:{{ r.plColor }};">{{ r.plStr }}</span>
@@ -1701,13 +1703,16 @@
         </div>
        </div>
         <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:6px 16px;padding:10px 8px 14px;font-size:11.5px;color:var(--text-tertiary,#999);">
-          <div class="pf-legend" style="display:flex;flex-wrap:wrap;gap:5px 12px;flex:1;min-width:0;">
-            <span style="display:inline-flex;align-items:center;gap:4px;">수량 표시 —
-              <span style="font-size:9px;font-weight:700;color:#1a6dc4;background:#e8f2fd;border:1px solid #bcdcfb;padding:0 4px;border-radius:3px;">추정</span>시세로 역산(대체로 정확)
-              <span style="font-size:9px;font-weight:700;color:#b8860b;background:#fff3cd;border:1px solid #f0d48a;padding:0 4px;border-radius:3px;">확인 권장</span>정확도 낮음
-              <span style="font-size:9px;font-weight:700;color:#8a8a93;background:#f0f0f2;border:1px solid #d8d8de;padding:0 4px;border-radius:3px;">수량 미확인</span>상세화면 추가 시 채워짐 · <b style="color:var(--text-secondary,#6e6e6e);">배지를 탭하면 계산 근거</b></span>
-            <span style="display:inline-flex;align-items:center;gap:4px;"><span style="font-size:9px;font-weight:700;color:#b8860b;background:#fff3cd;border:1px solid #f0d48a;padding:0 3px;border-radius:3px;">⚠</span>종목·평가금액 확인 필요(탭하면 사유)</span>
-            <span style="display:inline-flex;align-items:center;gap:4px;"><span style="width:6px;height:6px;border-radius:50%;background:#f5a623;display:inline-block;"></span>노란 점 = 시세 24h 경과(재업로드 시 자동 갱신)</span>
+          <!-- 배지 범례 — 각 배지+설명을 독립 단위(white-space:nowrap)로 두어, 좁은 화면에선 항목별로
+               줄바꿈되고(넓은 화면은 한 줄로 흐름) 한 배지 설명이 중간에 잘리지 않는다. -->
+          <div class="pf-legend" style="display:flex;flex-wrap:wrap;gap:4px 10px;flex:1;min-width:0;">
+            <span style="white-space:nowrap;font-weight:600;">수량 배지</span>
+            <span class="pf-legend-item"><span style="font-size:9px;font-weight:700;color:#1a6dc4;background:#e8f2fd;border:1px solid #bcdcfb;padding:0 4px;border-radius:3px;">추정</span>시세로 역산(대체로 정확)</span>
+            <span class="pf-legend-item"><span style="font-size:9px;font-weight:700;color:#b8860b;background:#fff3cd;border:1px solid #f0d48a;padding:0 4px;border-radius:3px;">확인 권장</span>정확도 낮음</span>
+            <span class="pf-legend-item"><span style="font-size:9px;font-weight:700;color:#8a8a93;background:#f0f0f2;border:1px solid #d8d8de;padding:0 4px;border-radius:3px;">수량 미확인</span>상세화면 추가 시 채워짐</span>
+            <span class="pf-legend-item"><span style="font-size:9px;font-weight:700;color:#b8860b;background:#fff3cd;border:1px solid #f0d48a;padding:0 3px;border-radius:3px;">⚠</span>종목·평가금액 확인 필요</span>
+            <span class="pf-legend-item"><span style="width:6px;height:6px;border-radius:50%;background:#f5a623;display:inline-block;flex:none;"></span>시세 24h 경과</span>
+            <span style="white-space:nowrap;color:var(--text-tertiary,#999);">· <b style="color:var(--text-secondary,#6e6e6e);">배지를 탭하면 근거</b></span>
           </div>
           <span style="white-space:nowrap;">합계 <b class="pf-num" style="color:var(--text-primary,#000);font-size:12.5px;">{{ totalStr }}</b></span>
         </div>
