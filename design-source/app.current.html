@@ -1382,15 +1382,20 @@
     input[type=number]{-moz-appearance:textfield;appearance:textfield;}
     /* ── 표 레이아웃(단일 출처: 헤더·행이 같은 클래스를 공유) ── */
     /* 열 너비: 종목명만 가변(--pf-name-w = 최소폭), 나머지는 고정. 좁은 화면에선 종목명을 더 줄이고
-       잘린 이름은 말줄임 + 툴팁(.pf-name)으로 본다. min-width 는 '고정열 676px + gap 8×8px = 740px'
+       잘린 이름은 말줄임 + 툴팁(.pf-name)으로 본다. min-width 는 '고정열 638px + gap 8×8px = 702px'
        에 종목명 최소폭을 더한 값 — 트랙 합과 어긋나면 표가 잘리거나 빈 여백이 남으므로 같이 계산한다. */
-    .pf-hold-row{--pf-name-w:112px;display:grid;grid-template-columns:minmax(var(--pf-name-w),1fr) 118px 82px 98px 98px 134px 56px 66px 24px;gap:8px;min-width:calc(740px + var(--pf-name-w));}
+    .pf-hold-row{--pf-name-w:128px;display:grid;grid-template-columns:minmax(var(--pf-name-w),1fr) 80px 82px 98px 98px 134px 56px 66px 24px;gap:8px;min-width:calc(702px + var(--pf-name-w));}
     /* 가로: 표가 스크롤을 소유(페이지 아님) — 본문만 overflow-x:auto 로 좌우 스크롤. 세로: 페이지 스크롤.
        컬럼 헤더를 본문 스크롤러 안에 두면 세로 sticky 가 스크롤러에 갇히므로, 헤더는 스크롤러 밖
        .pf-colhead-vp(세로 sticky·가로 clip)에 두고 본문 scrollLeft 를 JS 가 헤더에 그대로 옮긴다.
        세로 고정 스택은 위에서부터 상단바 → STEP 제목 → (STEP1) 추출 결과 → 컬럼 헤더 → 증권사 그룹행.
        각 단의 top 은 '윗단들의 실측 높이 합'이고, 그 높이는 _setSticky 가 :root 변수로 발행한다(단일 출처).
        z-index 는 위 단이 아래 단을 덮도록 내림차순(6→2) — 스택 끝에서 단이 서로 지나갈 때 겹침 순서가 뒤집히지 않게. */
+    /* 상단바 고정 — position 을 인라인이 아닌 여기(단일 출처)에 둬 좁은 화면 미디어쿼리가 덮을 수 있게 한다. */
+    .pf-header{position:sticky;top:0;}
+    .pf-header-inner{padding:14px 20px;}
+    /* 배지 범례 — 넓은 화면은 한 줄(가로), 좁은 화면은 항목별 세로 정렬(아래 미디어쿼리). */
+    .pf-legend{align-items:center;}
     .pf-sec-head{position:sticky;top:var(--pf-bar-h,80px);z-index:6;background:var(--bg-surface,#fff);}
     .pf-res-head{position:sticky;top:calc(var(--pf-bar-h,80px) + var(--pf-sec1-h,37px));z-index:5;}
     /* 표의 좌우 인셋은 표마다 다르다(STEP1 만 12px) — 고정 밴드가 덮어야 할 폭이기도 하므로
@@ -1443,7 +1448,12 @@
       .pf-analysis{grid-template-columns:1fr;}
       :root{--pf-page-pad:6px;--pf-sec-pad:8px;}
       .pf-tbl-1{--pf-tbl-pad:6px;}
-      .pf-hold-row{--pf-name-w:84px;}
+      .pf-hold-row{--pf-name-w:104px;}
+      /* 좁은 화면: 상단바가 위로 스크롤되며 사라진다(고정 해제). _setSticky 가 이를 감지해
+         --pf-bar-h 를 0 으로 발행하므로 STEP 섹션 헤더는 화면 맨 위에 유령 여백 없이 붙는다. */
+      .pf-header{position:static;}
+      .pf-header-inner{padding:10px 12px;gap:10px;}
+      .pf-legend{flex-direction:column;align-items:flex-start;gap:6px;}
     }
   </style>
 </helmet>
@@ -1451,8 +1461,8 @@
 <div data-reading="{{ readingAttr }}" style="min-height:100vh;font-family:var(--font-ui,system-ui);color:var(--text-primary,#000);background:var(--bg-app,#fafafa);">
 
   <!-- ── Header ─────────────────────────────── -->
-  <header style="position:sticky;top:0;z-index:20;background:var(--bg-surface,#fff);border-bottom:1px solid var(--border-default,#dfdfe8);">
-    <div style="max-width:1060px;margin:0 auto;padding:14px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;row-gap:6px;">
+  <header class="pf-header" style="z-index:20;background:var(--bg-surface,#fff);border-bottom:1px solid var(--border-default,#dfdfe8);">
+    <div class="pf-header-inner" style="max-width:1060px;margin:0 auto;display:flex;align-items:center;gap:16px;flex-wrap:wrap;row-gap:6px;">
       <div style="display:flex;flex-direction:column;gap:2px;">
         <span style="font-size:18px;font-weight:700;line-height:1.2;">포트폴리오</span>
         <span style="font-size:11px;font-weight:500;letter-spacing:0.3px;color:var(--text-tertiary,#999);text-transform:uppercase;">Rebalancing Dashboard</span>
@@ -1491,7 +1501,7 @@
       <div class="pf-sec-head" data-sechead="1" style="padding:14px var(--pf-sec-pad,18px) 0;display:flex;align-items:baseline;gap:10px;">
         <span class="pf-step">STEP 1</span>
         <span class="pf-step-title">스크린샷 업로드</span>
-        <span class="pf-step-desc">스크린샷 = 그 계좌의 현재 스냅샷 — 갱신·추가는 물론, 화면에 없는 종목은 자동 제거됩니다</span>
+        <span class="pf-step-desc">스크린샷이 그 계좌의 현재 스냅샷 — 화면에 없는 종목은 자동 제거됩니다</span>
       </div>
       <div style="padding:14px var(--pf-sec-pad,18px) 18px;">
         <label ondrop="{{ onDrop }}" ondragover="{{ onDragOver }}" style="display:flex;align-items:center;justify-content:center;gap:12px;border:1.5px dashed var(--border-strong,#c4c4c4);border-radius:8px;padding:26px 16px;cursor:pointer;background:var(--bg-app,#fafafa);" style-hover="border-color:var(--ig-blue,#1fa1ff);background:#f4faff;">
@@ -1506,9 +1516,8 @@
           </sc-if>
         </label>
         <div style="margin-top:10px;font-size:12px;line-height:1.55;color:var(--text-secondary,#6e6e6e);background:var(--bg-app,#fafafa);border:1px solid var(--border-default,#dfdfe8);border-radius:8px;padding:10px 12px;">
-          📸 <b>종목명 · 수량 · 매수금액</b>(또는 <b>평가손익</b>)이 보이는 보유목록 화면이 가장 정확합니다.
-          화면에 없는 값은 캡처 시점 시세로 <b>자동 추정</b>해 <span style="color:var(--ig-blue,#1fa1ff);font-weight:600;">‘추정’</span>으로 표시돼요(정확도가 낮으면 따로 표시하고, 정수 확정이 어려우면 비워 둡니다).
-          <span style="color:var(--text-tertiary,#999);">연금·상품별 화면은 수량이 안 보일 수 있으니, 종목별/잔고 화면이 있으면 함께 올리면 좋습니다.</span>
+          📸 <b>종목명·수량·매수금액</b>(또는 <b>평가손익</b>)이 보이는 화면이 가장 정확해요. 없는 값은 시세로 <span style="color:var(--ig-blue,#1fa1ff);font-weight:600;">자동 추정</span>합니다.
+          <span style="color:var(--text-tertiary,#999);">연금 등 수량이 안 보이는 화면은 종목별/잔고 화면을 함께 올리면 채워져요.</span>
         </div>
         <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
           <button onclick="{{ onLoadDemo }}" style="border:1px solid var(--border-default,#dfdfe8);background:var(--bg-surface,#fff);border-radius:999px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;color:var(--text-secondary,#6e6e6e);" style-hover="border-color:var(--ig-blue,#1fa1ff);color:var(--ig-blue,#1fa1ff);">예시 데이터로 둘러보기</button>
@@ -1555,18 +1564,29 @@
                         <div style="display:flex;align-items:center;gap:4px;min-width:0;">
                           <sc-if value="{{ sr.hasImg }}" hint-placeholder-val="{{ false }}"><span title="이미지 {{ sr.imgTag }}에서 추출" style="font-size:8px;font-weight:700;color:var(--text-tertiary,#999);background:var(--bg-secondary,#efefef);padding:0.5px 4px;border-radius:3px;flex:none;">{{ sr.imgTag }}</span></sc-if>
                           <sc-if value="{{ sr.nameReview }}" hint-placeholder-val="{{ false }}"><span data-tip="{{ sr.nameTitle }}" tabindex="0" style="font-size:9px;font-weight:700;color:#b8860b;background:#fff3cd;border:1px solid #f0d48a;padding:0 3px;border-radius:3px;flex:none;cursor:pointer;">⚠</span></sc-if>
-                          <span class="pf-name" data-full="{{ sr.name }}" tabindex="0" style="font-size:13px;font-weight:600;color:var(--text-primary,#000);">{{ sr.name }}</span>
+                          <sc-if value="{{ sr.editable }}" hint-placeholder-val="{{ false }}"><input value="{{ sr.name }}" data-full="{{ sr.name }}" onchange="{{ sr.onName }}" onkeydown="{{ sr.onKeyEnter }}" style="border:none;background:transparent;font-size:13px;font-weight:600;padding:3px 2px;min-width:0;width:100%;color:var(--text-primary,#000);"></sc-if>
+                          <sc-if value="{{ sr.readonly }}" hint-placeholder-val="{{ true }}"><span class="pf-name" data-full="{{ sr.name }}" tabindex="0" style="font-size:13px;font-weight:600;color:var(--text-primary,#000);">{{ sr.name }}</span></sc-if>
                         </div>
-                        <span style="font-size:12px;font-weight:600;color:{{ sr.clsColor }};white-space:nowrap;">{{ sr.clsLabel }}</span>
+                        <sc-if value="{{ sr.editable }}" hint-placeholder-val="{{ false }}"><select value="{{ sr.cls }}" onchange="{{ sr.onCls }}" style="border:none;background:transparent;font-size:12px;padding:3px 0;color:{{ sr.clsColor }};font-weight:600;"><sc-for list="{{ classOpts }}" as="o" hint-placeholder-count="3"><option value="{{ o.key }}">{{ o.label }}</option></sc-for></select></sc-if>
+                        <sc-if value="{{ sr.readonly }}" hint-placeholder-val="{{ true }}"><span style="font-size:12px;font-weight:600;color:{{ sr.clsColor }};white-space:nowrap;">{{ sr.clsLabel }}</span></sc-if>
                         <div style="display:flex;align-items:center;justify-content:flex-end;gap:3px;min-width:0;">
                           <sc-if value="{{ sr.qtyBadge }}" hint-placeholder-val="{{ false }}"><span data-tip="{{ sr.qtyExplain }}" tabindex="0" style="font-size:9px;font-weight:700;color:{{ sr.qtyBadgeC }};background:{{ sr.qtyBadgeBg }};border:1px solid {{ sr.qtyBadgeBd }};padding:0 4px;border-radius:3px;flex:none;cursor:pointer;white-space:nowrap;">{{ sr.qtyBadgeText }}</span></sc-if>
-                          <span class="pf-num" style="font-size:12.5px;text-align:right;color:var(--text-primary,#000);">{{ sr.qtyStr }}</span>
+                          <sc-if value="{{ sr.editable }}" hint-placeholder-val="{{ false }}"><input value="{{ sr.qtyInput }}" onchange="{{ sr.onQty }}" onkeydown="{{ sr.onKeyEnter }}" placeholder="—" class="pf-num" style="border:none;background:transparent;font-size:12.5px;text-align:right;padding:3px 2px;min-width:0;width:100%;color:var(--text-primary,#000);"></sc-if>
+                          <sc-if value="{{ sr.readonly }}" hint-placeholder-val="{{ true }}"><span class="pf-num" style="font-size:12.5px;text-align:right;color:var(--text-primary,#000);">{{ sr.qtyStr }}</span></sc-if>
                         </div>
-                        <span class="pf-num" style="font-size:12.5px;text-align:right;color:var(--text-primary,#000);">{{ sr.priceStr }}</span>
-                        <span class="pf-num" style="font-size:12.5px;text-align:right;color:var(--text-primary,#000);">{{ sr.avgStr }}</span>
+                        <div style="display:flex;align-items:center;justify-content:flex-end;gap:3px;min-width:0;">
+                          <sc-if value="{{ sr.editable }}" hint-placeholder-val="{{ false }}"><input value="{{ sr.priceInput }}" onchange="{{ sr.onPrice }}" onkeydown="{{ sr.onKeyEnter }}" placeholder="—" class="pf-num" style="border:none;background:transparent;font-size:12.5px;text-align:right;padding:3px 0;width:100%;min-width:0;color:var(--text-primary,#000);"></sc-if>
+                          <sc-if value="{{ sr.readonly }}" hint-placeholder-val="{{ true }}"><span class="pf-num" style="font-size:12.5px;text-align:right;color:var(--text-primary,#000);">{{ sr.priceStr }}</span></sc-if>
+                          <span style="font-size:10px;color:var(--text-tertiary,#999);flex:none;">{{ sr.cur }}</span>
+                        </div>
+                        <div style="display:flex;align-items:center;justify-content:flex-end;gap:3px;min-width:0;">
+                          <span class="pf-num" style="font-size:12.5px;text-align:right;color:var(--text-primary,#000);">{{ sr.avgStr }}</span>
+                          <span style="font-size:10px;color:var(--text-tertiary,#999);flex:none;">{{ sr.cur }}</span>
+                        </div>
                         <div style="display:flex;align-items:center;justify-content:flex-end;gap:4px;min-width:0;">
                           <sc-if value="{{ sr.corrected }}" hint-placeholder-val="{{ false }}"><span data-tip="{{ sr.correctedTitle }}" tabindex="0" style="font-size:9px;font-weight:700;color:#2e7d32;background:#e7f4e8;border:1px solid #b6dcb9;padding:0 4px;border-radius:3px;flex:none;cursor:pointer;">✓ 보정</span></sc-if>
-                          <span class="pf-num" style="font-size:12.5px;font-weight:600;text-align:right;">{{ sr.valueStr }}</span>
+                          <sc-if value="{{ sr.valueEdit }}" hint-placeholder-val="{{ false }}"><input value="{{ sr.valueInput }}" onchange="{{ sr.onValue }}" onkeydown="{{ sr.onKeyEnter }}" class="pf-num" style="border:none;background:transparent;font-size:12.5px;font-weight:600;text-align:right;padding:3px 2px;min-width:0;width:100%;color:var(--text-primary,#000);"></sc-if>
+                          <sc-if value="{{ sr.valueRO }}" hint-placeholder-val="{{ true }}"><span class="pf-num" style="font-size:12.5px;font-weight:600;text-align:right;">{{ sr.valueStr }}</span></sc-if>
                         </div>
                         <span class="pf-num" style="font-size:12.5px;text-align:right;color:var(--text-secondary,#6e6e6e);">{{ sr.weightStr }}</span>
                         <span class="pf-num" style="font-size:12.5px;font-weight:600;text-align:right;color:{{ sr.plColor }};">{{ sr.plStr }}</span>
@@ -1681,7 +1701,7 @@
         </div>
        </div>
         <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:6px 16px;padding:10px 8px 14px;font-size:11.5px;color:var(--text-tertiary,#999);">
-          <div style="display:flex;flex-wrap:wrap;align-items:center;gap:5px 12px;flex:1;min-width:0;">
+          <div class="pf-legend" style="display:flex;flex-wrap:wrap;gap:5px 12px;flex:1;min-width:0;">
             <span style="display:inline-flex;align-items:center;gap:4px;">수량 표시 —
               <span style="font-size:9px;font-weight:700;color:#1a6dc4;background:#e8f2fd;border:1px solid #bcdcfb;padding:0 4px;border-radius:3px;">추정</span>시세로 역산(대체로 정확)
               <span style="font-size:9px;font-weight:700;color:#b8860b;background:#fff3cd;border:1px solid #f0d48a;padding:0 4px;border-radius:3px;">확인 권장</span>정확도 낮음
@@ -1906,7 +1926,11 @@ class Component extends DCLogic {
       Object.keys(HEADS).forEach(k => {
         const el = document.querySelector(HEADS[k]);
         if (!el) return;                                  // 없는 단(프리뷰 미표시)은 마지막 값 유지
-        const v = el.getBoundingClientRect().height.toFixed(1) + 'px';
+        // 상단바가 좁은 화면에서 고정 해제(position:static)되면 위로 흘러가 사라지므로, 아래 단은
+        // 그 높이만큼 오프셋을 두면 안 된다(유령 여백). 실측 높이 대신 0 을 발행한다(브레이크포인트 단일 출처=CSS).
+        const pos = k === '--pf-bar-h' ? getComputedStyle(el).position : '';
+        const v = (pos === 'static' || pos === 'relative')
+          ? '0px' : el.getBoundingClientRect().height.toFixed(1) + 'px';
         if (r.getPropertyValue(k) !== v) r.setProperty(k, v);   // 같은 값 재기입 = 불필요한 스타일 무효화
       });
     };
@@ -2166,6 +2190,9 @@ class Component extends DCLogic {
     return '₩' + Math.round(n / 10000).toLocaleString('ko-KR') + '만';
   }
   fmtNum(n) { return n == null ? '' : Number(n).toLocaleString('ko-KR', { maximumFractionDigits: 2 }); }
+  // 통화 기호 단일 출처 — 현재가·평균가 등 '주당 원통화' 표시 옆에 붙인다(평가금액은 항상 ₩ 환산).
+  // 향후 다통화 확장은 이 맵만 넓히면 된다(인라인 삼항 흩뿌리지 않기).
+  curSym(c) { return ({ USD: '$', KRW: '₩' })[c] || '₩'; }
   // key를 가진 목록(CLASSES·ACCOUNTS·ALLOC) → key로 찾는 맵.
   byKey(list) { const m = {}; list.forEach(x => m[x.key] = x); return m; }
   // 추출 결과의 낯선 계좌명은 '일반'으로 — 아는 계좌는 ACCOUNTS가 단일 출처.
@@ -2177,6 +2204,12 @@ class Component extends DCLogic {
 
   updateHolding(id, patch) {
     this.set({ holdings: this.state.holdings.map(h => h.id === id ? { ...h, ...patch } : h) });
+  }
+
+  // STEP1 프리뷰(review) 인라인 편집 — 확인 대기 중인 streamPending 을 갱신한다. commitStream 이
+  // 이 streamPending 을 그대로 applySnapshot 에 넘기므로, 여기서 고친 값이 STEP2 반영에 반영된다.
+  updateStreamPending(id, patch) {
+    this.setState({ streamPending: (this.state.streamPending || []).map(p => p.id === id ? { ...p, ...patch } : p) });
   }
 
   // ---------- extraction ----------
@@ -2348,10 +2381,12 @@ class Component extends DCLogic {
   // 한 행(원시 dict 또는 최종 보정본)을 프리뷰 표시용으로. 중간·최종이 같은 매핑을 탄다(단일 출처).
   // 라이브 프리뷰 행 — STEP2 보유표와 **같은 형태**(증권사·계좌 그룹헤더 + 소계, 동일 컬럼·수치 파생)로
   // 읽기전용 렌더한다. 값 파생은 STEP2와 같은 메서드(krw·costBasisKrw·avgKrw)를 공유해 단일 출처를 지킨다.
-  // 입력은 원시(assetClass) 또는 최종(cls) dict 둘 다 받는다. 확인 전 편집은 없다(재업로드로 대체).
+  // 입력은 원시(assetClass) 또는 최종(cls) dict 둘 다 받는다. editable=true(review 단계, 소스는
+  // id 를 가진 streamPending)이면 셀을 입력으로 열고 핸들러(updateStreamPending)를 붙인다 —
+  // 수동 편집은 '확인'으로 간주해 해당 경고 배지를 함께 해제한다(STEP2 편집과 같은 단일 출처 규칙).
   // 반환은 (증권사·계좌) 그룹 배열 — 그룹행이 표 본문 스크롤러 밖에 있어야 세로로 고정되므로,
   // 화면 구조(그룹행 + 그룹별 본문)와 데이터 구조를 같은 모양으로 맞춘다.
-  buildStreamGroups(list) {
+  buildStreamGroups(list, editable) {
     const cmap = this.byKey(this.CLASSES), amap = this.byKey(this.ACCOUNTS);
     const clsMap = { '성장주': 'growth', '배당주': 'dividend', '채권': 'bond', '금·원자재': 'gold', '현금': 'cash', '부동산': 'realestate' };
     const norm = h => {
@@ -2359,7 +2394,7 @@ class Component extends DCLogic {
       const cost = h.cost != null ? Number(h.cost) : null;
       const qty = h.qty != null ? Number(h.qty) : null;
       return {
-        broker: h.broker || '미상', accountType: this.normAcct(h.accountType),
+        id: h.id, broker: h.broker || '미상', accountType: this.normAcct(h.accountType),
         name: h.name || '(이름 없음)', cls, currency: h.currency === 'USD' ? 'USD' : 'KRW',
         qty, price: h.price != null ? Number(h.price) : null,
         value: h.value != null ? Number(h.value) : null, cost,
@@ -2387,12 +2422,15 @@ class Component extends DCLogic {
         const v = this.krw(h), c = this.costBasisKrw(h);
         const pl = c != null && c > 0 ? (v - c) / c * 100 : null;
         const corrected = String(h.value_src || '').indexOf('보정') >= 0;
+        const hasQP = h.qty != null && h.price != null;
         const rf = this.reviewFlag(h);
+        const id = h.id;
         rows.push({
-          name: h.name, clsColor: (cmap[h.cls] || cmap.growth).color, clsLabel: (cmap[h.cls] || cmap.growth).label,
+          name: h.name, cls: h.cls, clsColor: (cmap[h.cls] || cmap.growth).color, clsLabel: (cmap[h.cls] || cmap.growth).label,
           qtyStr: h.qty == null ? '—' : ((rf.qtyTier === 'est' || rf.qtyTier === 'low') ? '≈' : '') + this.fmtNum(h.qty),
           priceStr: h.price == null ? '—' : this.fmtNum(h.price),
           avgStr: h.avgCost == null ? '—' : this.fmtNum(h.avgCost),
+          cur: this.curSym(h.currency),
           valueStr: this.fmtW(v),
           weightStr: total > 0 ? (v / total * 100).toFixed(1) + '%' : '—',
           plStr: pl == null ? '—' : (pl >= 0 ? '+' : '') + pl.toFixed(1) + '%',
@@ -2401,7 +2439,21 @@ class Component extends DCLogic {
           nameReview: rf.nameReview, nameTitle: rf.nameTitle,
           qtyBadge: rf.qtyBadge, qtyBadgeText: rf.qtyBadgeText,
           qtyBadgeC: rf.qtyBadgeC, qtyBadgeBg: rf.qtyBadgeBg, qtyBadgeBd: rf.qtyBadgeBd, qtyExplain: rf.qtyExplain,
-          hasImg: h.img != null, imgTag: h.img != null ? String(h.img) : ''
+          hasImg: h.img != null, imgTag: h.img != null ? String(h.img) : '',
+          // ── review 단계 인라인 편집(소스=streamPending, id 보유) ──
+          editable: !!editable, readonly: !editable,
+          hasQP, noQP: !hasQP,
+          // 평가금액은 수량·현재가가 있으면 계산값(읽기전용) — 편집은 둘이 없는 행(현금·부동산 등)만.
+          valueEdit: !!editable && !hasQP, valueRO: !(!!editable && !hasQP),
+          qtyInput: h.qty == null ? '' : this.fmtNum(h.qty),
+          priceInput: h.price == null ? '' : this.fmtNum(h.price),
+          valueInput: h.value == null ? '' : this.fmtNum(h.value),
+          onName:  editable ? (e => this.updateStreamPending(id, { name: e.target.value, symbol_note: '' })) : null,
+          onCls:   editable ? (e => this.updateStreamPending(id, { cls: e.target.value })) : null,
+          onQty:   editable ? (e => this.updateStreamPending(id, { qty: this.parseNum(e.target.value), qty_src: 'manual', confidence: 1, qty_note: '' })) : null,
+          onPrice: editable ? (e => this.updateStreamPending(id, { price: this.parseNum(e.target.value), price_src: 'manual' })) : null,
+          onValue: editable ? (e => this.updateStreamPending(id, { value: this.parseNum(e.target.value), value_src: 'manual', checkFail: false })) : null,
+          onKeyEnter: e => { if (e.key === 'Enter') e.target.blur(); }
         });
       });
     });
@@ -2833,7 +2885,11 @@ class Component extends DCLogic {
       repriceMsg: S.repriceMsg, hasRepriceMsg: !!S.repriceMsg,
       repriceSummaryText: this.repriceSummaryText(), hasRepriceSummary: !!S.repriceSummary,
       // 라이브 추출 프리뷰(STEP1)
-      streamGroups: this.buildStreamGroups(S.streamRows || []),
+      // live: 스트리밍 중 원시행(streamRows)을 읽기전용으로. review: id 를 가진 streamPending 을
+      // 편집 가능하게 — 여기서 고친 값이 곧 commitStream 이 넘길 커밋 데이터다(단일 출처).
+      streamGroups: S.streamStage === 'review'
+        ? this.buildStreamGroups(S.streamPending || [], true)
+        : this.buildStreamGroups(S.streamRows || [], false),
       streamHasRows: (S.streamRows || []).length > 0,
       streamLive: S.streamStage === 'live',
       streamReview: S.streamStage === 'review',
@@ -2844,7 +2900,8 @@ class Component extends DCLogic {
       gateLines: (S.gateReport && S.gateReport.lines) || [],
       hasGate: !!(S.gateReport && S.gateReport.lines && S.gateReport.lines.length),
       // 상단 요약 배너 — STEP1(추출 직후, 게이트 보정 건수 포함) / STEP2(보유 현황)
-      streamSummary: this._summaryStr(this._tierCounts(S.streamRows || []),
+      // review 단계는 편집 대상인 streamPending 기준으로 집계 — 사용자가 값을 고쳐 배지가 사라지면 요약도 따라 준다.
+      streamSummary: this._summaryStr(this._tierCounts(S.streamStage === 'review' ? (S.streamPending || []) : (S.streamRows || [])),
         ((S.gateReport && S.gateReport.lines) || []).filter(l => l.kind === 'repair').length),
       hasStreamSummary: S.streamStage === 'review' && (S.streamRows || []).length > 0,
       holdSummary: this._summaryStr(this._tierCounts(S.holdings || []), 0),
@@ -2913,7 +2970,7 @@ class Component extends DCLogic {
         name: h.name, cls: h.cls, clsColor: (cmap[h.cls] || cmap.growth).color,
         qty: h.qty == null ? '' : this.fmtNum(h.qty),
         price: h.price == null ? '' : this.fmtNum(h.price),
-        cur: h.currency === 'USD' ? '$' : '₩',
+        cur: this.curSym(h.currency),
         avgInput: h.avgCost == null ? '' : this.fmtNum(h.avgCost),
         hasQP, noQP: !hasQP,
         valueStr: this.fmtW(v),
@@ -2926,11 +2983,12 @@ class Component extends DCLogic {
         plColor: pl == null ? '#999' : pl >= 0 ? '#ed4956' : '#3897f0',
         staleColor: stale ? '#f5a623' : 'transparent',
         staleTitle: stale ? '시세가 24시간 이상 지났습니다 — 현재가를 갱신하세요' : '',
-        onName: e => this.updateHolding(h.id, { name: e.target.value }),
+        // 수동 편집은 '확인'으로 간주 — 해당 필드의 확인필요 신호(경고 배지 근거)를 함께 해제한다(단일 출처 규칙).
+        onName: e => this.updateHolding(h.id, { name: e.target.value, symbol_note: '' }),
         onCls: e => this.updateHolding(h.id, { cls: e.target.value }),
-        onQty: e => this.updateHolding(h.id, { qty: this.parseNum(e.target.value), qty_src: 'manual' }),
+        onQty: e => this.updateHolding(h.id, { qty: this.parseNum(e.target.value), qty_src: 'manual', confidence: 1, qty_note: '' }),
         onPrice: e => this.updateHolding(h.id, { price: this.parseNum(e.target.value), price_src: 'manual', updatedAt: Date.now() }),
-        onValue: e => this.updateHolding(h.id, { value: this.parseNum(e.target.value), value_src: 'manual', updatedAt: Date.now() }),
+        onValue: e => this.updateHolding(h.id, { value: this.parseNum(e.target.value), value_src: 'manual', reprice_note: '', checkFail: false, updatedAt: Date.now() }),
         onAvg: e => this.updateHolding(h.id, { avgCost: this.parseNum(e.target.value), avgCost_src: 'manual' }),
         onKeyEnter: e => { if (e.key === 'Enter') e.target.blur(); },
         onDelete: () => this.set({ holdings: S.holdings.filter(x => x.id !== h.id) })
