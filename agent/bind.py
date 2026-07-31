@@ -484,6 +484,17 @@ def bind(boxes, width=1080, height=None):
         if not name or len(name) < 2:
             continue
         if _is_field_label(name):
+            # 필드 라벨은 보유행이 아니다. 단 **화면 자신의 평가금액 총액**은 버리지 말고
+            # 예약행으로 넘긴다 — 게이트가 대조할 유일한 근거인 화면이 있다(전체계좌 폼처럼
+            # 계좌요약 화면이 함께 올라오지 않는 경우). finalize가 이 행을 홀딩에서 빼고
+            # 그 화면의 대조 기준으로 쓴다. VLM 경로는 이 행을 내지 않으므로 동작이 안 바뀐다.
+            bare = re.sub(r"\(.*?\)", "", name).strip()
+            if bare in H_VALUE and r.get("value"):
+                tot = dict.fromkeys(F.COMPACT_COLUMNS)
+                tot["name"] = F.SCREEN_TOTAL
+                tot["value"] = _clean_num(r.get("value"))
+                tot["confidence"] = 0.95
+                out.append([tot[c] for c in F.COMPACT_COLUMNS])
             continue
         qty = None
         mq = QTY_RE.match(name.split()[-1]) if name.split() else None
