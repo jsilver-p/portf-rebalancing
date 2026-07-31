@@ -293,14 +293,6 @@ def rows_from_list(lines, width=1080):
     seen = {}
     for b in labels:
         seen[b["text"].strip()] = seen.get(b["text"].strip(), 0) + 1
-    # **반복되는데 계좌토큰을 가진 라벨은 크롬이 아니라 '행 그룹의 머리'다.**
-    # '전체계좌' 화면은 종목마다 그 위에 계좌 라벨을 다시 찍는다
-    # (측정 20260731T085311Z img1: '1234-5678-01(Super365)'가 380px 간격으로 10회,
-    #  각 라벨 바로 아래에 종목명·수량·평가금액·손익 한 블록).
-    # 위 규칙("반복 = 행 이름 아님")은 맞지만 **버리면 안 된다** — 이게 그 행의 broker 근거다.
-    # 버렸을 때의 결과: 값은 전부 정확한데 broker가 통째로 None이 된다(실측 15/15).
-    seps = [b for b in labels if seen[b["text"].strip()] > 1 and F.acct_tokens(b["text"])]
-    labels = [b for b in labels if seen[b["text"].strip()] == 1]
     amounts = [b for b in boxes if _is_amount(b["text"]) and _right(b) > width * 0.45]
     if not labels or not amounts:
         return []
@@ -318,6 +310,45 @@ def rows_from_list(lines, width=1080):
     inter = [b - a for a, b in zip(acy, acy[1:]) if (b - a) > med_h * 2]
     pitch = sorted(inter)[len(inter) // 2] if inter else med_h * 4
     limit = max(med_h * 1.6, pitch * 0.60)
+
+    # ── 계좌 구분자 분리 ─────────────────────────────────────────────────────
+    # '전체계좌' 화면은 종목마다 **그 위에** 계좌 라벨을 다시 찍는다(측정
+    # 20260731T085311Z img1: '1234-5678-01(Super365)'가 380px 간격으로 10회, 각 라벨 바로
+    # 아래에 종목명·수량·평가금액·손익 한 블록). 이건 행 이름이 아니라 **행 그룹의 머리**이고,
+    # 그 행의 broker 근거다. 안 갈라내면 값은 다 맞는데 broker가 통째로 None이 된다(실측 15/15).
+    #
+    # **반복 횟수로 판별하면 안 된다.** 처음엔 `반복 2회 이상 + 계좌토큰`으로 잡았는데,
+    # 종목이 **하나뿐인 계좌**는 구분자가 1회만 나와 걸리지 않는다 → 그 라벨이 종목명 행으로
+    # 둔갑해 아래 행의 손익을 훔친다(측정 9:1 합성: 가짜 행 `1234-5678-77(Super365)`
+    # value=-1,633,630 생성, 행 수 10→11, 다음 종목의 계좌도 오배정).
+    #
+    # **'아래 한 행 안에 종목명이 있으면 구분자'도 안 된다.** 계좌요약 화면도 계좌 라벨 아래
+    # 어딘가에 UI 라벨이 있어서 같이 걸린다 → 계좌요약이 통째로 무너진다
+    # (측정 160333: 3행 → 2행, 이름이 '상품구성'·'계좌현황'으로 바뀌고 broker 27/31로 FAIL).
+    #
+    # 두 폼의 **실측 기하**가 답을 준다 — 계좌 라벨에서 아래로 내려갈 때 무엇이 먼저 오는가:
+    #   계좌요약(160333)  y=579 라벨 → y=665 **금액 '5원'**      (자기 값. 사이에 이름 없음)
+    #   전체계좌(img1)    y=1128 라벨 → y=1192 **이름 'AIPO'** → y=1304 금액
+    # 즉 **계좌 라벨과 그 아래 첫 금액 사이에 종목명이 끼면 구분자**, 금액이 먼저 오면
+    # 그 라벨 자신이 행이다. 상수 없이 두 폼을 가른다.
+    def _is_sep(b):
+        if not F.acct_tokens(b["text"]):
+            return False
+        cy = _cy(b)
+        nxt_amt = min([_cy(a) for a in amounts if _cy(a) > cy], default=None)
+        if nxt_amt is None:
+            return False
+        return any(cy < _cy(l) < nxt_amt and not F.acct_tokens(l["text"]) for l in labels)
+
+    seps = [b for b in labels if _is_sep(b)]
+    sep_ids = {id(b) for b in seps}
+    # 남은 라벨에서 **반복되는 문구는 UI 크롬**이다(계좌마다 붙는 '이체'·'거래내역'·'주식주문').
+    # 행 이름은 화면에서 유일하다('한 자산 = 한 행'). 안 걸러내면 크롬이 최근접 분할에서 금액을
+    # 훔쳐 가짜 행을 만들고 화면 유형 판정까지 뒤집는다(측정: 160333이 detail로 오분류).
+    labels = [b for b in labels
+              if id(b) not in sep_ids and seen[b["text"].strip()] == 1]
+    if not labels:
+        return []
 
     def _nearest_label(b):
         near = min(labels, key=lambda l: abs(_cy(l) - _cy(b)))
