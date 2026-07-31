@@ -1391,45 +1391,16 @@
        세로 고정 스택은 위에서부터 상단바 → STEP 제목 → (STEP1) 추출 결과 → 컬럼 헤더 → 증권사 그룹행.
        각 단의 top 은 '윗단들의 실측 높이 합'이고, 그 높이는 _setSticky 가 :root 변수로 발행한다(단일 출처).
        z-index 는 위 단이 아래 단을 덮도록 내림차순(6→2) — 스택 끝에서 단이 서로 지나갈 때 겹침 순서가 뒤집히지 않게. */
-    /* 상단바 고정 — 모든 폭에서 sticky. 좁은 화면에서 자리를 잡아먹는 문제는 '고정을 푸는' 게 아니라
-       '스크롤하면 접는' 것으로 푼다: 맨 위에선 전체를 보여주고, 스크롤이 시작되면(:root[data-pf-cond],
-       _remeasure 가 발행) 한 줄로 접는다. 접힌 뒤 남기는 것은 제목·부제·에이전트 상태·총자산.
-       실측 높이는 _setSticky 가 --pf-bar-h 로 다시 발행하므로 아래 고정단들이 알아서 따라온다. */
+    /* 상단바 고정 — 모든 폭에서 sticky, 그리고 **높이가 상수다**. 한때 스크롤하면 접었는데(110↔41px)
+       헤더는 flow 안이라 접는 순간 아래 내용 전체가 69px 튀었다 — 스크롤 12px 에 69px 점프.
+       고친 방법은 임계값·보정마진이 아니라 기구 제거다: 접기를 만든 이유였던 총자산·평가손익을
+       STEP2 계좌칩 줄로 내보내니 헤더가 애초에 한 줄(≈62px)이 되어 접을 것이 없어졌다.
+       그러니 이 아래 규칙들에 **스크롤 상태로 갈리는 값을 다시 넣지 말 것** — 점프가 그대로 돌아온다. */
     .pf-header{position:sticky;top:0;}
     .pf-header-inner{padding:14px 20px;display:flex;gap:16px;flex-wrap:wrap;}
     .pf-title{display:flex;flex-direction:column;gap:2px;min-width:0;}
     .pf-title-1{font-size:18px;font-weight:700;line-height:1.2;}
     .pf-title-2{font-size:11px;font-weight:500;letter-spacing:0.3px;color:var(--text-tertiary,#999);text-transform:uppercase;}
-    .pf-total,.pf-pl{display:flex;flex-direction:column;align-items:flex-end;gap:1px;flex:none;}
-    .pf-total-v{font-size:17px;font-weight:700;}
-    /* 압축 — 남기는 것: 제목·부제·에이전트·총자산. 좁은 화면(360px)의 가로 예산이 빠듯하므로
-       제목/부제는 **세로로 쌓은 채** 글자만 줄인다(가로로 눕히면 둘이 합쳐 160px+ 라 제목이 잘린다).
-       총자산은 축약형(₩2.25억)으로 바꿔 ~33px 을 돌려받고, 에이전트 칩의 '에이전트' 라벨은 뺀다. */
-    :root[data-pf-cond] .pf-header-inner{padding:5px 12px;flex-wrap:nowrap;gap:9px;}
-    :root[data-pf-cond] .pf-title{gap:0;overflow:hidden;flex:0 1 auto;}
-    :root[data-pf-cond] .pf-title-1{font-size:13.5px;line-height:1.15;white-space:nowrap;}
-    :root[data-pf-cond] .pf-title-2{font-size:8.5px;line-height:1.2;white-space:nowrap;}
-    :root[data-pf-cond] .pf-chip-label{display:none;}
-    /* STEP 설명문은 고정 밴드(.pf-sec-head) 안에 있어 좁은 화면에선 3줄까지 랩되며 표를 덮는다.
-       한 번 읽는 안내이므로 스크롤을 시작하면 접는다 — 고정되는 건 STEP 제목까지. */
-    :root[data-pf-cond] .pf-step-desc{display:none;}
-    :root[data-pf-cond] .pf-pl{display:none;}
-    :root[data-pf-cond] .pf-total > :first-child{display:none;}
-    /* 총자산 전체형 ↔ 축약형은 CSS 로만 갈아끼운다(둘 다 렌더해 두고 하나를 숨긴다). */
-    .pf-total-s{display:none;}
-    :root[data-pf-cond] .pf-total-v{display:none;}
-    :root[data-pf-cond] .pf-total-s{display:inline;font-size:14px;font-weight:700;}
-    /* 넓은 화면은 한 줄에 여유가 있다 — 압축해도 평가손익·전체 금액·라벨을 도로 켜고, 대신 세로로
-       쌓이지 않게 가로형으로 눕힌다(압축의 목적은 '한 줄'이지 '정보 삭제'가 아니다). */
-    @media (min-width:641px){
-      :root[data-pf-cond] .pf-total,:root[data-pf-cond] .pf-pl{flex-direction:row;align-items:baseline;gap:6px;}
-      :root[data-pf-cond] .pf-total > :first-child{display:inline;}
-      :root[data-pf-cond] .pf-total-v{display:inline;font-size:15px;}
-      :root[data-pf-cond] .pf-total-s{display:none;}
-      :root[data-pf-cond] .pf-pl{display:flex;}
-      :root[data-pf-cond] .pf-chip-label{display:inline;}
-      :root[data-pf-cond] .pf-step-desc{display:inline;}
-    }
     /* 배지 범례 — 넓은 화면은 한 줄(가로), 좁은 화면은 항목별 세로 정렬(아래 미디어쿼리). */
     .pf-legend{align-items:center;}
     /* 각 배지+설명은 한 덩어리로 유지(중간 줄바꿈 금지) — 항목 사이에서만 접힌다. */
@@ -1455,7 +1426,12 @@
     /* 표별로 다른 값은 여기 두 줄에만 있다 — 좌우 인셋과 그룹행이 붙을 높이. 나머지 규칙은 공용. */
     .pf-tbl-1{--pf-tbl-pad:12px;--pf-grp-top:calc(var(--pf-bar-h,80px) + var(--pf-sec1-h,37px) + var(--pf-res-h,35px) + var(--pf-ch1-h,32px));}
     .pf-tbl-2{--pf-tbl-pad:var(--pf-sec-pad,18px);--pf-grp-top:calc(var(--pf-bar-h,80px) + var(--pf-sec2-h,54px) + var(--pf-ch2-h,32px));}
-    .pf-tbl-body{overflow-x:auto;overflow-y:visible;}
+    /* 세로 소유권은 페이지다. overflow-y:visible 은 overflow-x:auto 와 함께 쓰면 CSS 규칙상 auto 로
+       **계산되므로**(선언이 의도를 표현하지 못한다) 행 높이 서브픽셀 1px 만으로 본문이 세로 스크롤러가
+       된다 — 세로바가 뜨고, 그 위의 휠·터치 팬을 자기가 삼켜 페이지가 안 움직인다(STEP2 실측 Δ0).
+       hidden 으로 명시해 세로로 스크롤할 것 자체를 없앤다. touch-action 은 건드리지 말 것 — pan-x 는
+       '가로만 허용'이라 세로 팬을 아예 금지해 증상을 고착시킨다. */
+    .pf-tbl-body{overflow-x:auto;overflow-y:hidden;}
     .pf-colhead-vp{position:sticky;z-index:4;background:var(--bg-surface,#fff);overflow:hidden;}
     .pf-colhead-1{top:calc(var(--pf-bar-h,80px) + var(--pf-sec1-h,37px) + var(--pf-res-h,35px));}
     .pf-colhead-2{top:calc(var(--pf-bar-h,80px) + var(--pf-sec2-h,54px));}
@@ -1481,11 +1457,15 @@
     .pf-hx .pf-hold-row > :first-child{box-shadow:-8px 0 0 var(--bg-surface,#fff),8px 0 0 var(--bg-surface,#fff),11px 0 8px -6px rgba(0,0,0,0.14);}
     .pf-grp-row{background:var(--bg-surface,#fff);}
     /* 종목명은 좁아서 잘린다 — 잘린 것만 커서 올림/탭에서 풀네임을 띄운다(_tip). 표 안에 그리면
-       본문 스크롤러(overflow-x:auto → overflow-y 도 auto)가 위아래로 잘라내므로 body 에 띄운다. */
+       본문 스크롤러(overflow-y:hidden)가 위아래로 잘라내므로 body 에 띄운다. */
     .pf-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
     .pf-tip{position:fixed;z-index:100;max-width:min(76vw,420px);padding:5px 9px;border-radius:6px;background:rgba(0,0,0,0.86);color:#fff;font-size:12px;font-weight:600;line-height:1.35;pointer-events:none;box-shadow:0 4px 14px rgba(0,0,0,0.24);overflow-wrap:anywhere;}
     .pf-analysis{display:grid;grid-template-columns:250px 1fr;gap:20px;}
     .pf-num{font-variant-numeric:tabular-nums;}
+    /* 금액 가리기 — 값을 지우는 게 아니라 흐린다. 폭이 그대로라 토글해도 표가 전혀 안 흔들리고,
+       "값이 있는데 가려둔 것"으로 읽힌다(빈칸·기호는 '데이터 없음'과 헷갈린다).
+       블러 반경을 em 으로 두는 이유 — 17px 총자산과 12.5px 셀이 같은 정도로 흐려져야 한다. */
+    [data-mask="1"] .pf-money{filter:blur(0.3em);user-select:none;}
     /* ── STEP 섹션 뼈대(카드·라벨·제목·설명이 5개 섹션에 반복) ── */
     /* overflow:visible — sticky 섹션 제목이 카드 안에 갇히지 않고 페이지 기준으로 고정되게 */
     .pf-card{background:var(--bg-surface,#fff);border:1px solid var(--border-default,#dfdfe8);border-radius:10px;overflow:visible;}
@@ -1505,14 +1485,15 @@
   </style>
 </helmet>
 
-<div data-reading="{{ readingAttr }}" style="min-height:100vh;font-family:var(--font-ui,system-ui);color:var(--text-primary,#000);background:var(--bg-app,#fafafa);">
+<div data-reading="{{ readingAttr }}" data-mask="{{ maskAttr }}" style="min-height:100vh;font-family:var(--font-ui,system-ui);color:var(--text-primary,#000);background:var(--bg-app,#fafafa);">
 
   <!-- ── Header ─────────────────────────────── -->
-  <!-- 스크롤을 시작하면 :root[data-pf-cond] 가 붙어 이 바가 한 줄로 접힌다(_remeasure). 접힌 뒤에도
-       남는 것: 제목·부제·에이전트 상태·총자산 — "어느 앱의 어디에 있고 얼마인가"가 맥락이기 때문. -->
+  <!-- 상시 고정이고 **높이가 안 변한다**(≈62px). 담는 것은 화면 전체에 걸리는 것뿐 —
+       여기가 어느 앱인지(제목), 추출이 어디로 가는지(에이전트), 금액을 가릴지(눈). 포트폴리오 값
+       (총자산·평가손익)은 STEP2 로 내려갔다: 헤더에 두면 두 줄이 되고, 그걸 접으려다 점프가 생겼다. -->
   <header class="pf-header" style="z-index:20;background:var(--bg-surface,#fff);border-bottom:1px solid var(--border-default,#dfdfe8);">
     <div class="pf-header-inner" style="max-width:1060px;margin:0 auto;align-items:center;row-gap:6px;">
-      <!-- 압축 상태가 덮어야 하는 값(flex-direction·font-size·display·gap·flex-wrap)은 인라인이 아니라
+      <!-- 미디어쿼리가 덮어야 하는 값(flex-direction·font-size·display·gap·flex-wrap)은 인라인이 아니라
            클래스에 둔다 — 인라인 style 은 어떤 선택자도 못 이긴다(.pf-header 의 position 과 같은 이유). -->
       <div class="pf-title">
         <span class="pf-title-1">포트폴리오</span>
@@ -1531,14 +1512,6 @@
         </sc-if>
       </div>
       <button class="pf-tap" onclick="{{ onMask }}" title="{{ maskTitle }}" style="flex:none;border:1px solid var(--border-default,#dfdfe8);background:var(--bg-surface,#fff);border-radius:999px;width:29px;height:29px;cursor:pointer;font-size:13px;line-height:1;padding:0;" style-hover="border-color:var(--ig-blue,#1fa1ff);">{{ maskIcon }}</button>
-      <div class="pf-total">
-        <span style="font-size:11px;font-weight:500;letter-spacing:0.3px;color:var(--text-tertiary,#999);">총자산</span>
-        <span class="pf-total-v">{{ totalStr }}</span><span class="pf-total-s">{{ totalShort }}</span>
-      </div>
-      <div class="pf-pl">
-        <span style="font-size:11px;font-weight:500;letter-spacing:0.3px;color:var(--text-tertiary,#999);">평가손익</span>
-        <span style="font-size:14px;font-weight:700;color:{{ plColor }};">{{ plStr }}</span>
-      </div>
     </div>
   </header>
 
@@ -1549,6 +1522,11 @@
       <div class="pf-sec-head" data-sechead="1" style="padding:14px var(--pf-sec-pad,18px) 0;display:flex;align-items:baseline;gap:10px;">
         <span class="pf-step">STEP 1</span>
         <span class="pf-step-title">스크린샷 업로드</span>
+      </div>
+      <!-- 설명문은 고정 밴드 **밖**이다 — 안에 두면 좁은 화면에서 랩되며 밴드를 60px 로 부풀려
+           (실측: 포함 60 / 제외 37) 표를 덮는다. 한 번 읽는 안내이므로 그냥 같이 스크롤돼 사라진다.
+           스크롤 상태로 숨기는 방식은 쓰지 않는다 — 그러면 이번엔 이 밴드가 튄다(헤더와 같은 병). -->
+      <div style="padding:8px var(--pf-sec-pad,18px) 0;">
         <span class="pf-step-desc">스크린샷이 그 계좌의 현재 스냅샷 — 화면에 없는 종목은 자동 제거됩니다</span>
       </div>
       <div style="padding:14px var(--pf-sec-pad,18px) 18px;">
@@ -1609,7 +1587,7 @@
                     <span class="pf-grp-name" data-full="{{ g.broker }}" tabindex="0" style="font-size:13px;font-weight:700;color:var(--text-primary,#000);">{{ g.broker }}</span>
                     <span style="font-size:10px;font-weight:700;color:#fff;background:{{ g.atypeColor }};padding:1.5px 8px;border-radius:999px;letter-spacing:0.3px;white-space:nowrap;flex:none;">{{ g.atype }}</span>
                     <div style="flex:1;"></div>
-                    <span style="font-size:11.5px;color:var(--text-tertiary,#999);white-space:nowrap;flex:none;">합계 <b style="color:var(--text-primary,#000);font-size:12.5px;">{{ g.subtotalStr }}</b></span>
+                    <span style="font-size:11.5px;color:var(--text-tertiary,#999);white-space:nowrap;flex:none;">합계 <b class="pf-money" style="color:var(--text-primary,#000);font-size:12.5px;">{{ g.subtotalStr }}</b></span>
                   </div>
                   <div class="pf-tbl-body">
                   <sc-for list="{{ g.rows }}" as="sr" hint-placeholder-count="3">
@@ -1638,8 +1616,8 @@
                           <span style="font-size:10px;color:var(--text-tertiary,#999);flex:none;">{{ sr.cur }}</span>
                         </div>
                         <div style="display:flex;align-items:center;justify-content:flex-end;gap:4px;min-width:0;">
-                          <sc-if value="{{ sr.valueEdit }}" hint-placeholder-val="{{ false }}"><input value="{{ sr.valueInput }}" readonly="{{ sr.valueLock }}" onchange="{{ sr.onValue }}" onkeydown="{{ sr.onKeyEnter }}" class="pf-num" style="border:none;background:transparent;font-size:12.5px;font-weight:600;text-align:right;padding:3px 2px;min-width:0;flex:1;color:var(--text-primary,#000);"></sc-if>
-                          <sc-if value="{{ sr.valueRO }}" hint-placeholder-val="{{ true }}"><span class="pf-num" style="font-size:12.5px;font-weight:600;text-align:right;flex:1;">{{ sr.valueStr }}</span></sc-if>
+                          <sc-if value="{{ sr.valueEdit }}" hint-placeholder-val="{{ false }}"><input value="{{ sr.valueInput }}" disabled="{{ sr.valueLock }}" onchange="{{ sr.onValue }}" onkeydown="{{ sr.onKeyEnter }}" class="pf-num pf-money" style="border:none;background:transparent;font-size:12.5px;font-weight:600;text-align:right;padding:3px 2px;min-width:0;flex:1;color:var(--text-primary,#000);"></sc-if>
+                          <sc-if value="{{ sr.valueRO }}" hint-placeholder-val="{{ true }}"><span class="pf-num pf-money" style="font-size:12.5px;font-weight:600;text-align:right;flex:1;">{{ sr.valueStr }}</span></sc-if>
                           <sc-if value="{{ sr.corrected }}" hint-placeholder-val="{{ false }}"><span class="pf-tap" data-tip="{{ sr.correctedTitle }}" tabindex="0" style="font-size:9px;font-weight:700;color:#2e7d32;background:#e7f4e8;border:1px solid #b6dcb9;padding:0 4px;border-radius:3px;flex:none;cursor:pointer;">✓ 보정</span></sc-if>
                         </div>
                         <span class="pf-num" style="font-size:12.5px;text-align:right;color:var(--text-secondary,#6e6e6e);">{{ sr.weightStr }}</span>
@@ -1691,9 +1669,14 @@
       <div class="pf-sec-head" data-sechead="2" style="padding:14px var(--pf-sec-pad,18px) 10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
         <span class="pf-step">STEP 2</span>
         <span class="pf-step-title">통합 보유 현황</span>
+        <!-- 총자산은 계좌칩과 같은 문법으로 그 줄 맨 앞에 둔다(색만 반전) — 고정 밴드라 표를 스크롤하는
+             내내 보인다. 평가손익 '금액'은 칩을 한 줄로 유지하려고 data-tip 으로 뺀다(_tip 재사용). -->
+        <span class="pf-tap" data-tip="{{ plTip }}" tabindex="0" style="display:inline-flex;align-items:baseline;gap:6px;background:var(--text-primary,#000);border-radius:999px;padding:4px 11px;font-size:11.5px;color:#fff;cursor:pointer;">
+          <span style="opacity:0.6;">총자산</span><b class="pf-money pf-num">{{ totalStr }}</b><span style="font-weight:700;color:{{ plChipColor }};">{{ plPct }}</span>
+        </span>
         <sc-for list="{{ acctChips }}" as="c" hint-placeholder-count="2">
           <span style="display:inline-flex;align-items:baseline;gap:5px;background:var(--bg-secondary,#efefef);border-radius:999px;padding:4px 10px;font-size:11.5px;">
-            <b>{{ c.label }}</b><span style="color:var(--text-secondary,#6e6e6e);">{{ c.value }}</span>
+            <b>{{ c.label }}</b><span class="pf-money" style="color:var(--text-secondary,#6e6e6e);">{{ c.value }}</span>
           </span>
         </sc-for>
       </div>
@@ -1739,7 +1722,7 @@
               <span class="pf-grp-name" data-full="{{ g.broker }}" tabindex="0" style="font-size:13px;font-weight:700;color:var(--text-primary,#000);">{{ g.broker }}</span>
               <span style="font-size:10px;font-weight:700;color:#fff;background:{{ g.atypeColor }};padding:1.5px 8px;border-radius:999px;letter-spacing:0.3px;white-space:nowrap;flex:none;">{{ g.atype }}</span>
               <div style="flex:1;"></div>
-              <span style="font-size:11.5px;color:var(--text-tertiary,#999);white-space:nowrap;flex:none;">합계 <b style="color:var(--text-primary,#000);font-size:12.5px;">{{ g.subtotalStr }}</b></span>
+              <span style="font-size:11.5px;color:var(--text-tertiary,#999);white-space:nowrap;flex:none;">합계 <b class="pf-money" style="color:var(--text-primary,#000);font-size:12.5px;">{{ g.subtotalStr }}</b></span>
             </div>
             <div class="pf-tbl-body">
             <sc-for list="{{ g.rows }}" as="r" hint-placeholder-count="6">
@@ -1765,8 +1748,8 @@
                   <span style="font-size:10px;color:var(--text-tertiary,#999);flex:none;">{{ r.cur }}</span>
                 </div>
                 <div style="display:flex;align-items:center;justify-content:flex-end;gap:3px;min-width:0;">
-                  <sc-if value="{{ r.valueRO }}" hint-placeholder-val="{{ true }}"><span class="pf-num" style="font-size:12.5px;font-weight:600;text-align:right;flex:1;">{{ r.valueStr }}</span></sc-if>
-                  <sc-if value="{{ r.valueEdit }}" hint-placeholder-val="{{ false }}"><input value="{{ r.valueInput }}" readonly="{{ r.valueLock }}" onchange="{{ r.onValue }}" onkeydown="{{ r.onKeyEnter }}" class="pf-num" style="border:none;background:transparent;font-size:12.5px;font-weight:600;text-align:right;padding:3px 2px;min-width:0;flex:1;color:var(--text-primary,#000);"></sc-if>
+                  <sc-if value="{{ r.valueRO }}" hint-placeholder-val="{{ true }}"><span class="pf-num pf-money" style="font-size:12.5px;font-weight:600;text-align:right;flex:1;">{{ r.valueStr }}</span></sc-if>
+                  <sc-if value="{{ r.valueEdit }}" hint-placeholder-val="{{ false }}"><input value="{{ r.valueInput }}" disabled="{{ r.valueLock }}" onchange="{{ r.onValue }}" onkeydown="{{ r.onKeyEnter }}" class="pf-num pf-money" style="border:none;background:transparent;font-size:12.5px;font-weight:600;text-align:right;padding:3px 2px;min-width:0;flex:1;color:var(--text-primary,#000);"></sc-if>
                   <sc-if value="{{ r.valueReview }}" hint-placeholder-val="{{ false }}"><span class="pf-tap" data-tip="{{ r.valueTitle }}" tabindex="0" style="font-size:9px;font-weight:700;color:#b8860b;background:#fff3cd;border:1px solid #f0d48a;padding:0 3px;border-radius:3px;flex:none;cursor:pointer;">⚠</span></sc-if>
                 </div>
                 <span class="pf-num" style="font-size:12.5px;text-align:right;color:var(--text-secondary,#6e6e6e);">{{ r.weightStr }}</span>
@@ -1795,7 +1778,7 @@
               </span>
             </sc-if>
           </div>
-          <span style="white-space:nowrap;">합계 <b class="pf-num" style="color:var(--text-primary,#000);font-size:12.5px;">{{ totalStr }}</b></span>
+          <span style="white-space:nowrap;">합계 <b class="pf-num pf-money" style="color:var(--text-primary,#000);font-size:12.5px;">{{ totalStr }}</b></span>
         </div>
     </section>
 
@@ -1844,7 +1827,7 @@
             </svg>
             <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;pointer-events:none;">
               <span style="font-size:10.5px;font-weight:600;letter-spacing:0.5px;color:var(--text-tertiary,#999);">현재 배분</span>
-              <span class="pf-step-title">{{ totalShort }}</span>
+              <span class="pf-step-title pf-money">{{ totalShort }}</span>
             </div>
           </div>
           <div style="display:flex;flex-wrap:wrap;gap:6px 12px;justify-content:center;">
@@ -1897,7 +1880,7 @@
               <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
                 <span style="font-size:11px;font-weight:700;letter-spacing:0.5px;padding:3px 8px;border-radius:4px;background:{{ a.dirBg }};color:#fff;">{{ a.dirLabel }}</span>
                 <span style="font-size:14px;font-weight:700;">{{ a.title }}</span>
-                <span style="font-size:12px;color:var(--text-tertiary,#999);">약 {{ a.amt }} 규모</span>
+                <span style="font-size:12px;color:var(--text-tertiary,#999);">약 <span class="pf-money">{{ a.amt }}</span> 규모</span>
               </div>
               <span style="font-size:12.5px;color:var(--text-secondary,#6e6e6e);">{{ a.sub }}</span>
             </div>
@@ -2018,11 +2001,7 @@ class Component extends DCLogic {
       Object.keys(HEADS).forEach(k => {
         const el = document.querySelector(HEADS[k]);
         if (!el) return;                                  // 없는 단(프리뷰 미표시)은 마지막 값 유지
-        // 상단바가 좁은 화면에서 고정 해제(position:static)되면 위로 흘러가 사라지므로, 아래 단은
-        // 그 높이만큼 오프셋을 두면 안 된다(유령 여백). 실측 높이 대신 0 을 발행한다(브레이크포인트 단일 출처=CSS).
-        const pos = k === '--pf-bar-h' ? getComputedStyle(el).position : '';
-        const v = (pos === 'static' || pos === 'relative')
-          ? '0px' : el.getBoundingClientRect().height.toFixed(1) + 'px';
+        const v = el.getBoundingClientRect().height.toFixed(1) + 'px';
         if (r.getPropertyValue(k) !== v) r.setProperty(k, v);   // 같은 값 재기입 = 불필요한 스타일 무효화
       });
     };
@@ -2056,21 +2035,11 @@ class Component extends DCLogic {
       if (low) low.classList.add('pf-scrim');
     };
     this._setScrim();
-    // 상단바 압축 — 맨 위에선 전체, 스크롤을 시작하면 한 줄. 켜고 끄는 임계값을 벌려(12/4) 경계에서
-    // 떨리지 않게 한다: 접히면 페이지가 짧아지고, 그게 다시 스크롤 위치를 건드리면 왕복하기 때문.
-    // 노드가 아니라 :root 에 표시하는 이유 — 리렌더가 헤더 노드를 갈아치우면 노드에 건 클래스는 날아간다.
-    this._setCond = () => {
-      const y = window.scrollY || window.pageYOffset || 0;
-      const on = this._cond ? y > 4 : y > 12;
-      if (on === this._cond) return;
-      this._cond = on;
-      const r = document.documentElement;
-      if (on) r.setAttribute('data-pf-cond', '1'); else r.removeAttribute('data-pf-cond');
-    };
-    this._setCond();
+    // 스크롤할 때 하는 일은 **재는 것뿐**이다 — 스크롤 위치로 무엇을 접거나 펴지 않는다.
+    // 접으면 그 요소가 flow 안에 있는 한 아래 내용이 그만큼 튀고, 스크롤 중 리레이아웃까지 걸린다.
     this._remeasure = () => {
       if (this._raf) return;
-      this._raf = requestAnimationFrame(() => { this._raf = 0; this._setCond(); this._setSticky(); this._setScrim(); });
+      this._raf = requestAnimationFrame(() => { this._raf = 0; this._setSticky(); this._setScrim(); });
     };
     window.addEventListener('scroll', this._remeasure, { passive: true });
     const main = document.querySelector('.pf-main');
@@ -2138,7 +2107,7 @@ class Component extends DCLogic {
     document.addEventListener('pointercancel', this._grpUp);
     document.addEventListener('wheel', this._grpWheel, { passive: false });
     // 종목명 툴팁 — 열이 좁아 잘린 이름만 풀네임을 띄운다(안 잘렸으면 띄울 이유가 없다).
-    // 표 안에 그리면 본문 스크롤러(overflow-x:auto → overflow-y 도 auto)가 잘라내므로 body 에 붙인다.
+    // 표 안에 그리면 본문 스크롤러(overflow-y:hidden)가 잘라내므로 body 에 붙인다.
     this._tipHide = () => { if (this._tipEl) { this._tipEl.remove(); this._tipEl = null; this._tipFor = null; } };
     this._tipShow = (el) => {
       // data-tip = 명시 설명(탭하면 뜸, 잘림과 무관) · data-full = 잘린 이름(잘렸을 때만)
@@ -2286,15 +2255,13 @@ class Component extends DCLogic {
     return this.costKrw(h);
   }
   // 원화 금액 표시의 단일 출처 — 총자산·손익·그룹합계·계좌칩·평가금액·도넛·액션이 전부 이 둘을 지난다.
-  // 그래서 '금액 가리기'도 여기 한 곳에서 끝난다. 수량·비중·손익%는 fmtNum 이라 가려지지 않는다
-  // (숫자가 아니라 **금액**을 가리는 기능이고, 가려도 리밸런싱 판단은 계속 할 수 있어야 한다).
+  // '금액 가리기'는 여기서 하지 않는다: 문자열을 갈아끼우면 폭이 변해 표가 흔들리고, 마스크 상태에서
+  // 편집·복사되면 가짜 값이 커밋된다. 가리기는 표시층(.pf-money + [data-mask])이 맡는다.
   fmtW(n) {
     if (n == null || isNaN(n)) return '—';
-    if (this.state.maskMoney) return '₩●●●';
     return '₩' + Math.round(n).toLocaleString('ko-KR');
   }
   fmtShort(n) {
-    if (this.state.maskMoney) return '₩●●●';
     if (n >= 1e8) return '₩' + (n / 1e8).toFixed(2) + '억';
     return '₩' + Math.round(n / 10000).toLocaleString('ko-KR') + '만';
   }
@@ -2579,9 +2546,11 @@ class Component extends DCLogic {
           qtyInput: h.qty == null ? '' : this.fmtNum(h.qty),
           priceInput: h.price == null ? '' : this.fmtNum(h.price),
           avgInput: h.avgCost == null ? '' : this.fmtNum(h.avgCost),
-          // 가리는 중엔 평가금액 입력칸을 읽기전용 마스크로. 마스킹된 채 편집 가능하면 onchange 가
-          // '●●●' 를 값으로 커밋한다 — 규칙 하나로 그 경로를 없앤다(수량·단가는 금액이 아니라 그대로).
-          valueInput: mask ? '●●●' : (h.value == null ? '' : this.fmtNum(h.value)),
+          // 값은 항상 진짜다(가리는 건 CSS 블러). 다만 흐린 칸을 눈감고 고치는 건 막는다.
+          // 잠금은 disabled 로 건다 — readonly 는 이 런타임에서 **동작하지 않는다**: React 가 아는
+          // 이름은 readOnly 인데 마크업은 camelCase 를 낼 수 없고(HTML 파서가 속성명을 소문자화),
+          // 소문자 readonly 는 React 가 경고하고 버린다. disabled 는 소문자가 정식 이름이라 통한다.
+          valueInput: h.value == null ? '' : this.fmtNum(h.value),
           valueLock: mask,
           // 수동 편집은 '확인'으로 간주 — 해당 필드의 확인필요 신호를 함께 해제한다(단일 출처 규칙).
           onName:  ed ? (e => O.update(id, { name: e.target.value, symbol_note: '' })) : null,
@@ -3053,7 +3022,8 @@ class Component extends DCLogic {
       onAgentUrl: e => this.onAgentUrl(e),
       connStatus: S.connStatus, connColor: S.connColor,
       agentOpen: S.agentOpen, onAgentToggle: () => this.setState({ agentOpen: !S.agentOpen }),
-      // 금액 가리기 — 표시는 fmtW/fmtShort 가 처리하고, 여기선 토글과 입력칸 잠금만 정한다
+      // 금액 가리기 — 가리는 일은 CSS 가 한다([data-mask="1"] .pf-money). 여기선 그 스위치만 낸다.
+      maskAttr: S.maskMoney ? '1' : '',
       maskMoney: S.maskMoney, maskIcon: S.maskMoney ? '🙈' : '👁',
       maskTitle: S.maskMoney ? '금액 표시' : '금액 가리기',
       onMask: () => this.set({ maskMoney: !S.maskMoney }),
@@ -3096,8 +3066,12 @@ class Component extends DCLogic {
       hasInfo: !!S.extractInfo, extractInfo: S.extractInfo,
       totalStr: this.fmtW(total),
       totalShort: this.fmtShort(total),
-      plStr: hasBasis ? ((plSum >= 0 ? '+' : '') + this.fmtW(plSum).replace('₩-', '-₩') + ' (' + (plPct >= 0 ? '+' : '') + plPct.toFixed(1) + '%)') : '—',
-      plColor: hasBasis ? (plSum >= 0 ? '#ed4956' : '#3897f0') : '#999',
+      // 손익률과 손익금액을 한 문자열로 합치지 않는다 — 가리는 건 금액뿐이고 %는 그대로 보여야 한다.
+      // 툴팁은 body 에 그려져 .pf-money 밖이라 CSS 가 못 가린다 → 누수 경로를 여기서 닫는다.
+      plPct: hasBasis ? ((plPct >= 0 ? '+' : '') + plPct.toFixed(1) + '%') : '—',
+      plChipColor: hasBasis ? (plSum >= 0 ? '#ff8f9a' : '#8ec9ff') : 'rgba(255,255,255,0.55)',
+      plTip: !hasBasis ? '평균단가가 없어 평가손익을 계산할 수 없어요'
+        : '평가손익 ' + (S.maskMoney ? '(금액 가림)' : (plSum >= 0 ? '+' : '') + this.fmtW(plSum).replace('₩-', '-₩')),
       acctChips,
       extracting: S.extracting, notExtracting: !S.extracting,
       extractStatus: S.extractStatus,
