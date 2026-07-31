@@ -12,6 +12,10 @@ TAG = os.environ.get("OUT_TAG", "")  # 결과 디렉토리 접미사 (프롬프�
 NUM_CTX = int(os.environ.get("NUM_CTX", "8192"))   # 컨텍스트 — 조밀·긴 화면은 이미지 토큰이 크다
 OLLAMA = os.environ.get("OLLAMA", "http://127.0.0.1:11434") + "/api/generate"
 NP = int(os.environ.get("NP", "1"))                # 동시 요청 수 — ollama의 OLLAMA_NUM_PARALLEL과 일치시킬 것
+# NUM_GPU=0 → GPU 오프로드 0층 = CPU 추론. 폰(가속기 없는 Termux ollama) 상한을 이 Orin에서
+# 재기 위한 스위치다. Orin CPU는 S23의 **낙관적** 상한이다(대역폭 204GB/s vs ~68GB/s, 코어도 많다)
+# — 여기서 이미 느리면 폰은 확정적으로 더 느리다.
+NUM_GPU = os.environ.get("NUM_GPU")
 # SYSTEM_MODE=1: 지시문을 system으로 보내 템플릿상 이미지보다 앞에 배치 → 슬롯 KV prefix 재사용(E2)
 SYSTEM_MODE = os.environ.get("SYSTEM_MODE", "") == "1"
 
@@ -21,6 +25,8 @@ def call(model, img_path):
         "model": model, "prompt": PROMPT, "images": [b64],
         "stream": False, "keep_alive": -1, "options": {"temperature": 0, "num_ctx": NUM_CTX},
     }
+    if NUM_GPU is not None:
+        payload["options"]["num_gpu"] = int(NUM_GPU)
     if SYSTEM_MODE:
         # 빈 prompt는 ollama의 '모델 로드 핑' 특수 케이스라 즉시 빈 응답 — 최소 지시문 필수.
         # 지시문 본문은 system으로 → 템플릿상 이미지보다 앞 = 요청 간 KV prefix 재사용.
