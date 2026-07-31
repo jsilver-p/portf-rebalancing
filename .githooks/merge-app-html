@@ -1,0 +1,95 @@
+#!/usr/bin/env python3
+"""index.html 전용 3-way 머지 드라이버 — 파생 산출물을 '텍스트'가 아니라 '내용'으로 머지한다.
+
+왜 필요한가
+  index.html:193 은 앱 문서(HTML 전체)를 JSON 문자열 하나로 인라인한 117KB **한 줄**이다.
+  두 브랜치가 프론트를 조금이라도 건드리면 그 한 줄이 양쪽에서 바뀌므로 git 의 줄 단위 머지는
+  **반드시** 충돌한다. 내용은 안 겹치는데 표현이 한 줄이라서 충돌하는 것 — 잘못된 층에서 머지하고 있다.
+
+무엇을 하나
+  193행을 디코드해 사람이 읽는 앱 문서로 되돌린 뒤 그 문서를 3-way 머지하고, 결과를 다시 심는다.
+  나머지 줄(번들 셸·런타임 블롭 매니페스트)도 따로 3-way 머지한다 — 통째로 '우리 것'을 택하면
+  저쪽의 정당한 변경이 조용히 사라진다.
+
+  design-source/app.current.html 은 임베드 문서와 바이트 동일이 강제되므로(pre-commit 게이트),
+  두 파일은 **같은 3-way 입력**을 받아 **같은 알고리즘**으로 머지된다 → 결과도 같다. 동기화 유지.
+
+  내용이 실제로 겹쳐 충돌하면 exit 1 로 git 에 넘긴다. 그땐 design-source 쪽 충돌을 풀고
+  `python3 agent/repack_app.py embed design-source/app.current.html` 로 재생성하면 된다.
+
+등록(로컬 1회, .git/config 는 커밋되지 않으므로 클론마다 필요):
+  git config merge.pf-app.name  "index.html 임베드 앱 문서 3-way 머지"
+  git config merge.pf-app.driver ".githooks/merge-app-html %O %A %B %L"
+  (.gitattributes 의 `index.html merge=pf-app` 가 이 드라이버를 부른다)
+"""
+import json, os, subprocess, sys, tempfile
+
+DOC_LINE = 192          # 0-indexed — repack_app.DOC_LINE 과 같은 값(단일 출처는 repack_app)
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(ROOT, "agent"))
+import repack_app                                          # noqa: E402  (경로 세팅 후 import)
+
+
+def split(path):
+    """index.html → (셸 줄들[193행은 자리표시자], 디코드된 앱 문서). 없는 쪽은 (None, None)."""
+    if not path or not os.path.exists(path):
+        return None, None
+    lines = open(path, encoding="utf-8").read().split("\n")
+    if len(lines) <= DOC_LINE:
+        return None, None
+    try:
+        doc = json.loads(lines[DOC_LINE])
+    except ValueError:
+        return None, None                                  # 임베드 줄이 아니면 이 드라이버가 다룰 파일이 아니다
+    lines[DOC_LINE] = "@@PF_APP_DOC@@"
+    return lines, doc
+
+
+def merge3(base, ours, theirs, marker, tmp):
+    """git merge-file 로 3-way. (성공?, 결과문자열). base 가 없으면 2-way 로 떨어진다."""
+    p = {}
+    for name, text in (("base", base), ("ours", ours), ("theirs", theirs)):
+        p[name] = os.path.join(tmp, name)
+        open(p[name], "w", encoding="utf-8").write(text if text is not None else "")
+    r = subprocess.run(["git", "merge-file", "--marker-size=%d" % marker,
+                        "-L", "ours", "-L", "base", "-L", "theirs",
+                        p["ours"], p["base"], p["theirs"]],
+                       capture_output=True)
+    return r.returncode == 0, open(p["ours"], encoding="utf-8").read()
+
+
+def main():
+    if len(sys.argv) < 4:
+        return 1
+    o, a, b = sys.argv[1], sys.argv[2], sys.argv[3]
+    marker = int(sys.argv[4]) if len(sys.argv) > 4 and sys.argv[4].isdigit() else 7
+
+    shell_o, doc_o = split(o)
+    shell_a, doc_a = split(a)
+    shell_b, doc_b = split(b)
+    # 어느 한쪽이라도 우리가 아는 모양이 아니면 손대지 않는다 — git 의 기본 충돌로 넘긴다.
+    if doc_a is None or doc_b is None:
+        return 1
+
+    with tempfile.TemporaryDirectory() as tmp:
+        ok_doc, doc = merge3(doc_o, doc_a, doc_b, marker, tmp)
+        ok_shell, shell = merge3(
+            "\n".join(shell_o) if shell_o else None,
+            "\n".join(shell_a), "\n".join(shell_b), marker, tmp)
+
+    if not (ok_doc and ok_shell):
+        return 1        # 진짜 내용 충돌 — %A 는 '우리 것' 그대로 두고 git 이 표시하게 한다
+
+    lines = shell.split("\n")
+    if lines.count("@@PF_APP_DOC@@") != 1:
+        return 1        # 자리표시자가 흔들렸으면(셸 머지가 이상함) 안전하게 충돌 처리
+    lines[lines.index("@@PF_APP_DOC@@")] = repack_app._encode(doc)
+    open(a, "w", encoding="utf-8").write("\n".join(lines))
+
+    if repack_app.extract(a) != doc:      # 왕복 검증 — 깨진 파일을 성공으로 넘기지 않는다
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
