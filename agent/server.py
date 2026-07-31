@@ -25,6 +25,11 @@ OLLAMA = os.environ.get("OLLAMA", "http://127.0.0.1:11434") + "/api/generate"
 NP = int(os.environ.get("NP", "2"))            # 동시 비전 요청 수 — ollama의 OLLAMA_NUM_PARALLEL과 일치시킬 것
 PROMPT_FILE = os.environ.get("PROMPT_FILE", os.path.join(ROOT, "eval/harness/prompt4f.txt"))
 PROMPT = open(PROMPT_FILE).read().strip()      # prompt4f = prompt4e + broker 정의 단일화(계좌라벨 제거)·시장지수 제외·자릿수 — Phase2 3b-ft3
+# 추출 백엔드: vlm(기본, 라이브 유지) | ocr(엣지 — OCR+기하, 신경망 LLM 0개).
+# 기본을 바꾸지 않는 이유: 이 파일은 라이브 에이전트와 공유된다. 엣지는 기동 스크립트에서 켠다.
+EXTRACT = os.environ.get("EXTRACT", "vlm")
+# 앱(index.html)을 에이전트가 직접 서빙 → 단일 오리진. 터널·CORS·혼합 컨텐츠가 사라진다.
+INDEX_PATH = os.environ.get("INDEX_PATH", os.path.join(ROOT, "index.html"))
 
 # 시세: 서버 전용 데이터(레포 밖). 결정론적 페치 — LLM 무관.
 DATA_DIR = os.environ.get("DATA_DIR", os.path.expanduser("~/portf-agent/data"))
@@ -659,8 +664,20 @@ def extract(b64, capture_dt):
             "model": MODEL, "raw": raw, "captureDateTime": capture_dt.isoformat()}
 
 
+def _ocr_bind(b64):
+    """OCR+기하 경로 — 비전 LLM 자리를 그대로 대체한다. 반환은 같은 계약(원문 텍스트)이라
+    parse_rows·finalize·enrich가 한 줄도 바뀌지 않는다."""
+    import base64 as _b64
+    sys.path.insert(0, HERE)
+    import ocr, bind
+    boxes = ocr.recognize(_b64.b64decode(b64))
+    return json.dumps(bind.bind(boxes), ensure_ascii=False)
+
+
 def _vision(b64):
-    """이미지 1장 → 비전 원문 텍스트. 배치·단건 공용."""
+    """이미지 1장 → 추출 원문 텍스트. 배치·단건 공용. EXTRACT로 백엔드 선택."""
+    if EXTRACT == "ocr":
+        return _ocr_bind(b64)
     body = json.dumps({"model": MODEL, "prompt": PROMPT, "images": [resample_half_b64(b64)],
                        "stream": False, "keep_alive": -1, "options": {"temperature": 0, "num_ctx": 8192}}).encode()
     req = urllib.request.Request(OLLAMA, data=body, headers={"Content-Type": "application/json"})
@@ -817,8 +834,35 @@ class H(BaseHTTPRequestHandler):
         self.send_response(204); self._cors(); self.end_headers()
     def do_GET(self):
         if self.path.split("?")[0] in ("/", "/index.html"):
+            # 앱 본체. 같은 오리진에서 API도 나가므로 앱은 pf_agent_url 없이도 붙는다.
+            try:
+                b = open(INDEX_PATH, "rb").read()
+            except Exception:
+                b = PAGE.encode()          # index.html이 없으면 기존 MVP 페이지로 폴백
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8"); self._cors()
+            self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b)
+        elif self.path.split("?")[0] == "/mvp":
             b = PAGE.encode(); self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8"); self._cors()
+            self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b)
+        elif self.path.split("?")[0] == "/manifest.webmanifest":
+            # 홈화면 설치(PWA) — 아이콘 탭으로 앱이 열린다. 서비스워커는 두지 않는다:
+            # 앱을 서빙하는 주체가 이 에이전트라 서버가 꺼지면 어차피 못 쓴다(오프라인 캐시가
+            # 주는 이득이 없고, 낡은 번들을 물고 있을 위험만 생긴다).
+            b = json.dumps({
+                "name": "포트폴리오 리밸런서", "short_name": "리밸런서",
+                "start_url": "/", "scope": "/", "display": "standalone",
+                "background_color": "#ffffff", "theme_color": "#4f5bd5",
+                "icons": [{"src": "data:image/svg+xml,"
+                           "%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E"
+                           "%3Crect width='64' height='64' rx='12' fill='%234f5bd5'/%3E"
+                           "%3Ctext x='32' y='44' font-size='36' text-anchor='middle'%3E%F0%9F%93%8A"
+                           "%3C/text%3E%3C/svg%3E",
+                           "sizes": "any", "type": "image/svg+xml", "purpose": "any"}],
+            }, ensure_ascii=False).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/manifest+json; charset=utf-8"); self._cors()
             self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b)
         elif self.path == "/health":
             self.send_response(200); self._cors(); self.end_headers(); self.wfile.write(b'{"ok":true}')
