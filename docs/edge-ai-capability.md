@@ -261,13 +261,35 @@ aarch64 드라이버 문제로, 엣지 경로와 무관한 기존 툴링 이슈�
 | 자원 | 라이브 | 스파이크 |
 |---|---|---|
 | 작업트리 | `main` @ `1abdca6` | worktree `spike/edge-ocr` |
-| 포트 | `:8899` (pid 30490) | `PORT=8898` (미기동) |
+| 포트 | `:8899` (pid 30490) | `PORT=8898` |
 | 데이터 | `~/portf-agent/data` | `DATA_DIR=~/portf-agent/data-spike` |
+| **업로드 백업** | `~/portf-agent/captures` | **`CAPTURES_DIR=~/portf-agent/captures-spike`** |
 | ollama | `:11434` 워밍업 `3b-ft3-q8` 100% GPU | **미사용**(Track A는 ollama 불필요) |
 | 파이썬 | 시스템 | `/home/omr/workspaces/edge-ocr-venv` |
 
 `run-agent.sh`는 `fuser -k "$PORT/tcp"`로 포트를 회수하므로 **기본 PORT로 스파이크를 돌리면
 라이브 서버가 죽는다** — `PORT=8898` 고정이 이 때문이다.
+
+### 스파이크 기동 (이 명령을 쓴다 — 손으로 조립하지 말 것)
+
+```bash
+PORT=8898 DATA_DIR=$HOME/portf-agent/data-spike \
+EXTRACT=ocr OCR_ENGINE=rapidocr \
+SAVE_CAPTURES=1 CAPTURES_DIR=$HOME/portf-agent/captures-spike \
+  /home/omr/workspaces/edge-ocr-venv/bin/python agent/server.py
+```
+
+**사고 기록(2026-07-31):** 스파이크 서버를 손으로 띄우면서 `SAVE_CAPTURES`를 빠뜨려
+**하루치 업로드가 백업 없이 사라졌다**(복구 불가 — `save_capture_batch`가 유일한 저장 지점).
+원인은 단순 누락이 아니라 **기동 경로가 이 플래그를 소유하지 않았던 것**이다:
+`run-agent.sh`가 `MODEL`·`DATA_DIR`·`PORT`·`NP`·`EXTRACT`만 export하고
+`SAVE_CAPTURES`는 넘기지 않아, 외부에서 안 주면 조용히 꺼졌다.
+→ `run-agent.sh`에 `SAVE_CAPTURES` 기본값 1을 넣어 기동 경로가 소유하게 했다.
+
+**남은 함정:** `CAPTURES_DIR` 기본값은 `DATA_DIR/../captures`라 **`DATA_DIR`을 바꿔도
+경로가 그대로다** → 스파이크와 라이브 백업이 한 폴더에 섞인다. 그래서 위 명령은
+`CAPTURES_DIR`을 명시한다. 기본값 자체를 고치면 라이브의 기존 백업 경로가 움직이므로
+건드리지 않았다(승인 사항).
 
 주의(선반영 상태, 이 작업과 무관): 시스템 `numpy`가 이미 깨져 있다 —
 `/usr/lib/python3.10/dist-packages/numpy`가 `__init__.py` 없는 2023년 잔해이고 dpkg는
