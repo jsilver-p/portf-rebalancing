@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  평문(cleartext) 통신을 **127.0.0.1로만** 허용한다.
+  앱 자신의 서버에 WebView가 붙는 경로 하나뿐이고, 그 외 모든 통신은 HTTPS여야 한다.
+  이 파일이 프라이버시 주장의 검증 지점 중 하나다 — "믿어달라"가 아니라 매니페스트로 확인된다.
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">127.0.0.1</domain>
+    </domain-config>
+    <base-config cleartextTrafficPermitted="false" />
+</network-security-config>

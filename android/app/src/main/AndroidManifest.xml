@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- 왜 INTERNET이 필요한가(제3자가 검증할 수 있어야 하므로 여기 적는다):
+         (1) WebView가 127.0.0.1의 자체 서버에 붙는다 — Android는 루프백에도 이 권한을 요구한다.
+         (2) 심볼 조회·시세·환율. **스크린샷과 금액은 나가지 않는다.**
+         추출 경로(ML Kit → bind.py → finalize 게이트)에는 네트워크 호출이 없다. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- 스크린샷은 photo picker로 받는다 → READ_MEDIA_IMAGES 같은 저장소 권한이 필요 없다. -->
+
+    <application
+        android:label="@string/app_name"
+        android:allowBackup="false"
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:theme="@style/Theme.AppCompat.NoActionBar">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

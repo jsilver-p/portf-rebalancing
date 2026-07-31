@@ -26,11 +26,14 @@ PORT = int(os.environ.get("PORT", "8899"))
 BIND = os.environ.get("BIND", "0.0.0.0")
 OLLAMA = os.environ.get("OLLAMA", "http://127.0.0.1:11434") + "/api/generate"
 NP = int(os.environ.get("NP", "2"))            # 동시 비전 요청 수 — ollama의 OLLAMA_NUM_PARALLEL과 일치시킬 것
-PROMPT_FILE = os.environ.get("PROMPT_FILE", os.path.join(ROOT, "eval/harness/prompt4f.txt"))
-PROMPT = open(PROMPT_FILE).read().strip()      # prompt4f = prompt4e + broker 정의 단일화(계좌라벨 제거)·시장지수 제외·자릿수 — Phase2 3b-ft3
 # 추출 백엔드: vlm(기본, 라이브 유지) | ocr(엣지 — OCR+기하, 신경망 LLM 0개).
 # 기본을 바꾸지 않는 이유: 이 파일은 라이브 에이전트와 공유된다. 엣지는 기동 스크립트에서 켠다.
 EXTRACT = os.environ.get("EXTRACT", "vlm")
+PROMPT_FILE = os.environ.get("PROMPT_FILE", os.path.join(ROOT, "eval/harness/prompt4f.txt"))
+# prompt4f = prompt4e + broker 정의 단일화(계좌라벨 제거)·시장지수 제외·자릿수 — Phase2 3b-ft3
+# OCR 경로는 프롬프트를 쓰지 않는다. APK에는 eval/ 트리가 없으므로 읽지도 않는다
+# (임포트 시점에 죽지 않게. VLM 경로에서는 없으면 여전히 즉시 실패한다).
+PROMPT = open(PROMPT_FILE).read().strip() if EXTRACT != "ocr" else ""
 # 앱(index.html)을 에이전트가 직접 서빙 → 단일 오리진. 터널·CORS·혼합 컨텐츠가 사라진다.
 INDEX_PATH = os.environ.get("INDEX_PATH", os.path.join(ROOT, "index.html"))
 
