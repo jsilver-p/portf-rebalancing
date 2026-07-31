@@ -21,6 +21,7 @@ import os, re, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import finalize as F                                    # noqa: E402  COMPACT_COLUMNS 단일 출처
+import resolve_broker as RB                              # noqa: E402  증권사 정규명 어휘(단일 출처)
 
 # ── 어휘 (전부 프롬프트에 이미 적혀 있던 것을 코드로 옮긴 것 — 화면별 하드코딩 아님) ──────
 H_NAME = ("종목명", "상품명", "종목")
@@ -49,6 +50,9 @@ ASSET_RULES = ((("나스닥", "S&P", "성장", "테크", "AI", "반도체", "휴
 NUM_RE = re.compile(r"^[+\-]?[\d,]+(?:\.\d+)?$")
 PCT_RE = re.compile(r"[+\-]?[\d,.]+\s*%")
 QTY_RE = re.compile(r"^([\d,]+)\s*주$")
+# 외화 예수금 — 프롬프트 규칙 (8): qty=외화 금액, value=원화 환산액.
+# '6,923.28 USD'는 숫자도 'N주'도 아니라 그냥 무시됐다(측정 160229: qty 유실).
+FX_QTY_RE = re.compile(r"^([\d,]+(?:\.\d+)?)\s*(USD|JPY|EUR|CNY|HKD)$")
 
 
 def _cy(b):
@@ -322,6 +326,14 @@ def rows_from_list(lines, width=1080):
         nq = _nearest_label(q)
         if nq is not None:
             qty_by_label.setdefault(id(nq), q)
+    fx_by_label = {}
+    for b in boxes:                                     # 외화 잔액('6,923.28 USD') → qty + 통화
+        m = FX_QTY_RE.match(b["text"].strip())
+        if not m or float(m.group(1).replace(",", "")) == 0:   # 잔액 0 행은 제외(규칙 8)
+            continue
+        nb = _nearest_label(b)
+        if nb is not None:
+            fx_by_label.setdefault(id(nb), m)
     rows = []
     for key, (near, amts) in sorted(buckets.items(), key=lambda kv: _cy(kv[1][0])):
         amts.sort(key=_cy)
@@ -330,7 +342,48 @@ def rows_from_list(lines, width=1080):
             row["pnl"] = amts[1]["text"]
         if key in qty_by_label:
             row["qty"] = qty_by_label[key]["text"]
+        if key in fx_by_label:
+            m = fx_by_label[key]
+            row["qty"], row["currency"] = m.group(1), m.group(2)
         rows.append(row)
+    return rows
+
+
+FIELD_LABEL_EXTRA = ("출금가능", "총자산", "총 자산", "신용", "대출", "예상금액")
+
+
+def _is_field_label(name):
+    """행 이름이 **필드 라벨**인가('평가금액'·'평가손익'·'출금가능금액'). 이건 종목이 아니라
+    화면 합계의 이름이라 보유행이 되면 안 된다(프롬프트 규칙 2의 '합계·헤더 행 제외').
+    단 카테고리('원화예수금'·'국내주식')는 요약화면의 **정당한 행**이므로 보호한다."""
+    n = (name or "").strip()
+    if F.is_category(n):
+        return False
+    # **부분일치는 못 쓴다** — H_VALUE의 '잔고'가 정당한 종목명 '현금잔고(예수금)'에 걸려
+    # 그 행을 통째로 지웠다(그 결과 파리티에서 다른 현금행과 오매칭돼 값·재현율이 연쇄로 깨졌다).
+    # 필드 라벨은 그 자체가 이름인 경우만 잡는다(괄호주석 제거 후 완전일치).
+    bare = re.sub(r"\(.*?\)", "", n).strip()
+    if bare in HEADER_VOCAB:
+        return True
+    return any(v in n for v in FIELD_LABEL_EXTRA)
+
+
+def _coherent(rows):
+    """**화면 내 일관성 필터** — 한 화면의 행들은 같은 종류다.
+
+    계좌목록 화면이면 행마다 계좌토큰이 있고, 상품요약이면 행마다 카테고리다. UI 라벨이 최근접
+    분할에서 금액을 훔쳐 만든 가짜 행은 그 성질이 없다. 다수결로 화면 성격을 정하고 벗어난 행을
+    버린다 — `finalize.classify`의 account_summary 판정이 **모든** 행에 계좌토큰을 요구하므로
+    (`all(keys)`) 가짜 행 하나가 화면 유형을 통째로 뒤집는다(측정: 160333이 detail로 오분류).
+    판정 어휘는 finalize의 것을 그대로 쓴다(단일 출처)."""
+    if len(rows) < 2:
+        return rows
+    accts = [r for r in rows if F.acct_tokens(r.get("name") or "")]
+    cats = [r for r in rows if F.is_category((r.get("name") or "").strip())]
+    if len(accts) >= 2 and len(accts) >= len(rows) * 0.5:
+        return accts
+    if len(cats) >= 2 and len(cats) >= len(rows) * 0.5:
+        return cats
     return rows
 
 
@@ -357,7 +410,12 @@ def bind(boxes, width=1080, height=None):
     # 한다(정규명 직채택 / 브랜드→검색 / 계좌번호·별칭→같은 계좌 요약행 상속). 대괄호 안이
     # 브랜드인 화면('[Super365] 1234-5678-01')도 있고 상품명인 화면
     # ('1234567891-29[퇴직연금(다이렉트IRP)(비대면)]')도 있어, 여기서 고르면 단일 출처가 깨진다.
-    broker = label.strip() or None
+    # 화면 어딘가에 증권사 **정규명**이 떠 있으면(계좌목록 상단의 '삼성증권' 등) 라벨에 붙여준다.
+    # finalize는 행 텍스트만 보고 `canonical_in`을 돌리는데, 그 정규명은 금액이 없는 라벨이라
+    # 행이 되지 못해 finalize까지 도달하지 못한다 → 계좌목록의 broker가 비고, 그 계좌를 상속받는
+    # 상세화면들까지 연쇄로 미해석된다(측정: ISA·IRP 화면 broker 26/30).
+    canon = RB.canonical_in(" ".join(b["text"] for ln in lines for b in ln))
+    broker = (f"{canon} {label}".strip() if canon else label.strip()) or None
 
     header = find_header(lines)
     if header:
@@ -371,10 +429,13 @@ def bind(boxes, width=1080, height=None):
     else:
         raw_rows = rows_from_list(lines, width)
 
+    raw_rows = _coherent(raw_rows)
     out = []
     for r in raw_rows:
         name = (r.get("name") or "").strip()
         if not name or len(name) < 2:
+            continue
+        if _is_field_label(name):
             continue
         qty = None
         mq = QTY_RE.match(name.split()[-1]) if name.split() else None
@@ -384,7 +445,7 @@ def bind(boxes, width=1080, height=None):
                 qty = _clean_num(mq2.group(1)) if mq2 else _clean_num(r[key])
         row = {
             "broker": broker, "accountType": atype, "name": name,
-            "assetClass": asset_class(name), "currency": None,
+            "assetClass": asset_class(name), "currency": r.get("currency"),
             "qty": qty, "price": _clean_num(r.get("price")) if r.get("price") else None,
             "value": _clean_num(r.get("value")) if r.get("value") else None,
             "cost": _clean_num(r.get("cost")) if r.get("cost") else None,

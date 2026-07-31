@@ -426,6 +426,32 @@ def enrich(rows, capture_dt, mode="extract"):
                     break
     rows[:] = [h for h in rows if not h.pop("_drop", False)]
 
+    # [엣지 스파이크] 심볼 검증을 **수량 게이트보다 먼저** 돌린다. 순서가 반대면 아직
+    # 검증되지 않은 심볼의 참가격으로 화면 수량을 기각하게 된다 — 오독된 티커가 실재하는
+    # 다른 종목으로 해석되면(측정: 'IVV'→'IWV', VV와 W가 같은 글꼴에서 사실상 동일)
+    # 화면에 멀쩡히 적힌 수량(33주)이 버려지고 엉뚱한 심볼 시세로 58주가 유도된다.
+    # 심볼을 먼저 기각하면 symbol이 사라져 수량 게이트가 그 행을 건너뛰고 화면값을 지킨다.
+    # 심볼 검증 게이트 — 이름 검색은 엉뚱한 종목을 집을 수 있다('메타 플랫폼스'→국내 메타랩스).
+    # 화면 단가(평가금액/수량)가 그 심볼의 캡처시점 참가격으로 설명되지 않으면 **채택하지 않는다**.
+    # 조용한 오매칭이 잘못된 수량·주가로 번지는 것을 막는다(틀린 값보다 빈칸이 낫다).
+    for h in rows:
+        if not h.get("symbol") or not h.get("qty") or not h.get("value") or _is_cash(h):
+            continue
+        close, _ = close_of(h, h.get("currency"))
+        fx = get_fx()
+        if not close:
+            continue
+        per = h["value"] / h["qty"]
+        e_native = abs(per - close) / close                       # 화면값이 네이티브 통화
+        e_krw = abs(per - close * fx) / (close * fx) if fx else 9  # 화면값이 원화(해외주식 원화표기)
+        if min(e_native, e_krw) > SYMBOL_TOL:
+            h["symbol_note"] = (f"심볼 불일치 — {h['symbol']} 캡처일 종가로 화면 단가({per:,.0f})가 "
+                                f"설명되지 않음(오해석 의심)")
+            h.pop("symbol", None); h.pop("market", None)
+            h["_native_usd"] = False
+            continue
+        h["_value_krw"] = e_krw < e_native   # 화면 평가금액의 통화를 측정으로 판정(추측 아님)
+
     # 화면 수량 게이트 — **화면에 명시된 정수 수량은 신뢰한다.** 다만 모델이 수량 없는 화면에서
     # 다른 열(평가손익)이나 이름 속 숫자('나스닥100'→qty 100)를 수량 칸에 넣는 열-오매핑만 걸러낸다.
     # 캡처시점 참가격(price_at)으로 계산한 기대 수량과 **배수/자릿수급(>QTY_GROSS_TOL) 어긋날 때만** 기각 —
@@ -447,27 +473,6 @@ def enrich(rows, capture_dt, mode="extract"):
             h["qty"] = None
             h.pop("qty_src", None); h.pop("confidence", None)
             h["price"] = None; h.pop("price_src", None)         # 같은 행의 주가도 신뢰 불가
-
-    # 심볼 검증 게이트 — 이름 검색은 엉뚱한 종목을 집을 수 있다('메타 플랫폼스'→국내 메타랩스).
-    # 화면 단가(평가금액/수량)가 그 심볼의 캡처시점 참가격으로 설명되지 않으면 **채택하지 않는다**.
-    # 조용한 오매칭이 잘못된 수량·주가로 번지는 것을 막는다(틀린 값보다 빈칸이 낫다).
-    for h in rows:
-        if not h.get("symbol") or not h.get("qty") or not h.get("value") or _is_cash(h):
-            continue
-        close, _ = close_of(h, h.get("currency"))
-        fx = get_fx()
-        if not close:
-            continue
-        per = h["value"] / h["qty"]
-        e_native = abs(per - close) / close                       # 화면값이 네이티브 통화
-        e_krw = abs(per - close * fx) / (close * fx) if fx else 9  # 화면값이 원화(해외주식 원화표기)
-        if min(e_native, e_krw) > SYMBOL_TOL:
-            h["symbol_note"] = (f"심볼 불일치 — {h['symbol']} 캡처일 종가로 화면 단가({per:,.0f})가 "
-                                f"설명되지 않음(오해석 의심)")
-            h.pop("symbol", None); h.pop("market", None)
-            h["_native_usd"] = False
-            continue
-        h["_value_krw"] = e_krw < e_native   # 화면 평가금액의 통화를 측정으로 판정(추측 아님)
 
     # T2 — 주가(네이티브 통화). 원화 평가금액이면 FX로 나눈다.
     for h in rows:
