@@ -21,6 +21,9 @@ import finalize as finalize_mod              # noqa: E402  종합(게이트·bro
 ROOT = os.path.dirname(HERE)
 MODEL = os.environ.get("MODEL", "qwen2.5vl:3b-ft3-q8")
 PORT = int(os.environ.get("PORT", "8899"))
+# 바인드 주소. 기본은 LAN 노출(폰 브라우저에서 Orin에 붙는 기존 사용법 유지).
+# **APK는 127.0.0.1로 고정한다** — 앱이 스크린샷 API를 같은 Wi-Fi에 열어두면 안 된다.
+BIND = os.environ.get("BIND", "0.0.0.0")
 OLLAMA = os.environ.get("OLLAMA", "http://127.0.0.1:11434") + "/api/generate"
 NP = int(os.environ.get("NP", "2"))            # 동시 비전 요청 수 — ollama의 OLLAMA_NUM_PARALLEL과 일치시킬 것
 PROMPT_FILE = os.environ.get("PROMPT_FILE", os.path.join(ROOT, "eval/harness/prompt4f.txt"))
@@ -921,8 +924,13 @@ class H(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b)
     def log_message(self, *a): pass
 
-if __name__ == "__main__":
-    print(f"에이전트 서버 → http://0.0.0.0:{PORT}  (모델 {MODEL})")
+def serve():
+    """기동 진입점. `__main__`과 APK(android_main)가 **같은 경로**를 쓴다."""
+    print(f"에이전트 서버 → http://{BIND}:{PORT}  (모델 {MODEL})")
     print(f"· 시세 데이터 {DATA_DIR}  갱신시각(UTC) {FETCH_TIMES_UTC}")
     threading.Thread(target=scheduler, daemon=True).start()
-    ThreadingHTTPServer(("0.0.0.0", PORT), H).serve_forever()
+    ThreadingHTTPServer((BIND, PORT), H).serve_forever()
+
+
+if __name__ == "__main__":
+    serve()

@@ -92,6 +92,19 @@ def _recognize_tesseract(img):
             os.unlink(tmp.name)
 
 
+def _recognize_mlkit(img):
+    """APK 경로 — Chaquopy로 Kotlin의 MlKitOcr를 부른다(계약 JSON을 그대로 받는다).
+
+    ML Kit은 Block > Line > Element 계층이고 RapidOCR의 구절 박스에 가장 가까운 건 Line이다.
+    이 **박스 단위 차이가 엔진 스왑의 유일한 실질 위험**이라 노브로 둔다(기기에서 재서 고정).
+    """
+    from java import jarray, jbyte, jclass          # Chaquopy 런타임에만 존재
+    data = img if isinstance(img, bytes) else open(img, "rb").read()
+    gran = os.environ.get("OCR_MLKIT_GRANULARITY", "line")
+    raw = jclass("com.portfrebalance.edge.MlKitOcr").recognize(jarray(jbyte)(data), gran)
+    return json.loads(str(raw))
+
+
 def recognize(img, engine=None):
     """img: 파일 경로(str) · 이미지 바이트 · numpy 배열. → 계약 리스트."""
     eng = engine or ENGINE
@@ -99,6 +112,8 @@ def recognize(img, engine=None):
         return _recognize_rapidocr(img)
     if eng == "tesseract":
         return _recognize_tesseract(img)
+    if eng == "mlkit":
+        return _recognize_mlkit(img)
     raise ValueError(f"알 수 없는 OCR_ENGINE: {eng}")
 
 
