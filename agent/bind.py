@@ -293,6 +293,13 @@ def rows_from_list(lines, width=1080):
     seen = {}
     for b in labels:
         seen[b["text"].strip()] = seen.get(b["text"].strip(), 0) + 1
+    # **반복되는데 계좌토큰을 가진 라벨은 크롬이 아니라 '행 그룹의 머리'다.**
+    # '전체계좌' 화면은 종목마다 그 위에 계좌 라벨을 다시 찍는다
+    # (측정 20260731T085311Z img1: '1234-5678-01(Super365)'가 380px 간격으로 10회,
+    #  각 라벨 바로 아래에 종목명·수량·평가금액·손익 한 블록).
+    # 위 규칙("반복 = 행 이름 아님")은 맞지만 **버리면 안 된다** — 이게 그 행의 broker 근거다.
+    # 버렸을 때의 결과: 값은 전부 정확한데 broker가 통째로 None이 된다(실측 15/15).
+    seps = [b for b in labels if seen[b["text"].strip()] > 1 and F.acct_tokens(b["text"])]
     labels = [b for b in labels if seen[b["text"].strip()] == 1]
     amounts = [b for b in boxes if _is_amount(b["text"]) and _right(b) > width * 0.45]
     if not labels or not amounts:
@@ -334,10 +341,20 @@ def rows_from_list(lines, width=1080):
         nb = _nearest_label(b)
         if nb is not None:
             fx_by_label.setdefault(id(nb), m)
+    def _sep_above(cy):
+        """이 행을 덮는 계좌 구분자 = **바로 위**의 구분자. 화면이 계좌별로 쪼개져 있으면
+        행마다 다른 계좌가 잡힌다(사용자 지적: '각 계좌로 나눌 수 있으면 되는 거야').
+        위에 아무것도 없으면 None — 지어내지 않는다."""
+        above = [s for s in seps if _cy(s) <= cy]
+        return max(above, key=_cy)["text"].strip() if above else None
+
     rows = []
     for key, (near, amts) in sorted(buckets.items(), key=lambda kv: _cy(kv[1][0])):
         amts.sort(key=_cy)
         row = {"name": near["text"].strip(), "value": amts[0]["text"]}
+        sep = _sep_above(_cy(near))
+        if sep:
+            row["broker"] = sep          # 정규화는 resolve_broker가 한다(여기서 판정 안 함)
         if len(amts) > 1:
             row["pnl"] = amts[1]["text"]
         if key in qty_by_label:
@@ -443,8 +460,13 @@ def bind(boxes, width=1080, height=None):
             if r.get(key):
                 mq2 = QTY_RE.match(str(r[key]).strip())
                 qty = _clean_num(mq2.group(1)) if mq2 else _clean_num(r[key])
+        # 행마다 계좌 구분자가 붙은 화면(전체계좌 목록)에서는 **그 행의 구분자가 화면 라벨을
+        # 이긴다** — 한 화면에 여러 계좌가 섞여 있을 수 있고, 화면 상단 라벨은 그중 하나거나 없다.
+        r_broker = r.get("broker")
         row = {
-            "broker": broker, "accountType": atype, "name": name,
+            "broker": r_broker or broker,
+            "accountType": (account_type(r_broker) if r_broker else None) or atype,
+            "name": name,
             "assetClass": asset_class(name), "currency": r.get("currency"),
             "qty": qty, "price": _clean_num(r.get("price")) if r.get("price") else None,
             "value": _clean_num(r.get("value")) if r.get("value") else None,
