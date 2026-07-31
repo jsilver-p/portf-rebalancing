@@ -225,8 +225,15 @@ aarch64 드라이버 문제로, 엣지 경로와 무관한 기존 툴링 이슈�
 - **A1 완료 ✅** — 파리티 PASS
 - **A2 완료 ✅** — 단일 오리진·OCR 백엔드·Termux 셋업. 실기기(S23) 투입만 남음
 - **Track B — 역량 축 완료 ✅**: T2 1B/4B(§4.1), T3 범용 VLM(§4.2), T3' CPU 상한(§4.3)
-- **A3 진행 중**: Chaquopy+ML Kit 서명 APK → **제3자 기기 설치**(합격선).
-  전제 충족: JDK 17 ✅ / adb 1.0.41 ✅ (2026-07-31 사용자 설치). 남은 것: Android SDK, keystore, 실기기 2대
+- **A3 진행 중**: Chaquopy+ML Kit 서명 APK → **제3자 기기 설치**(합격선). 상세는 `android/README.md`.
+  - 전제 충족: JDK 17 ✅ / adb ✅ / amd64 에뮬레이션 등록 ✅
+  - **착수 전 측정에서 나온 제약**: 이 호스트는 aarch64인데 Android build-tools의 `aapt2`·
+    `zipalign`이 **x86-64 ELF**다(`Exec format error`). Google은 Linux/aarch64용을 배포하지
+    않는다. → qemu-x86_64 binfmt 등록 후 amd64 컨테이너에서 빌드(`android/build-in-docker.sh`).
+  - 남은 것: 빌드 완주, keystore, **실기기 2대**(개발용 + 제3자용)
+  - **미검증 위험**: ML Kit의 박스 단위(Block/Line/Element)가 RapidOCR의 구절 박스와 달라
+    `bind.py`의 전제(금액+수익률이 한 박스)를 깨뜨릴 수 있다. 기기 없이는 확인 불가 —
+    `OCR_MLKIT_GRANULARITY` 노브로 재서 고정한다. **여기서 A1 파리티를 다시 받아야 한다.**
 - **의도적 미측정**: ft3-q4(1.80GB 양자화 완료) parity — 통과하더라도 §1의 가속기 제약과
   §4.3의 500배 지연이 그대로라 **판정을 바꾸지 않는다**. 필요해지면 재료는 남아 있다.
 - **미측정(툴체인 필요)**: T2 **런타임** — LiteRT-LM에서의 S23 실지연·메모리. §4.1 수치는

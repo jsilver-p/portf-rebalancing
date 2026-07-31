@@ -33,7 +33,7 @@ REPO_DIR="$(dirname "$ANDROID_DIR")"
 # 호스트에 남겨 재사용하는 캐시(컨테이너는 매번 버린다) — 레포 밖.
 SDK_DIR="${PF_ANDROID_SDK:-$HOME/android-sdk-x86}"
 GRADLE_DIR="${PF_GRADLE_HOME:-$HOME/.gradle-x86}"
-IMAGE="eclipse-temurin:17-jdk"
+IMAGE="portf-android-build:1"
 
 COMPILE_SDK=35
 BUILD_TOOLS=35.0.0
@@ -45,6 +45,12 @@ if [ ! -e /proc/sys/fs/binfmt_misc/qemu-x86_64 ]; then
   echo "❌ amd64 에뮬레이션이 등록돼 있지 않다. 먼저:"
   echo "   docker run --privileged --rm --network host tonistiigi/binfmt --install amd64"
   exit 1
+fi
+
+# 빌드 이미지 — 없을 때만 만든다(에뮬레이션에서 apt는 비싸므로 한 번만).
+if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
+  echo "== 빌드 이미지 생성 $IMAGE (최초 1회, 수 분 소요)"
+  docker build --network host --platform linux/amd64 -t "$IMAGE" "$ANDROID_DIR"
 fi
 
 echo "== amd64 컨테이너에서 빌드  (task=$TASK)"
@@ -62,12 +68,9 @@ exec docker run --rm --network host --platform linux/amd64 \
   -e PF_KEY_PASSWORD="${PF_KEY_PASSWORD:-}" \
   -w /repo/android \
   "$IMAGE" bash -eu -c "
-    export DEBIAN_FRONTEND=noninteractive
-    # buildPython: Chaquopy가 pip(Pillow)를 돌릴 때 **빌드 머신의** 파이썬을 쓴다.
-    if ! command -v python3 >/dev/null; then
-      apt-get update -qq && apt-get install -y -qq --no-install-recommends \
-        unzip curl python3 python3-pip >/dev/null
-    fi
+    # buildPython 확인 — Chaquopy는 타깃과 **같은 마이너 버전**의 파이썬을 빌드 머신에서 찾는다.
+    # 안 맞으면 :app:installDebugPythonRequirements 에서 죽는다(이미지가 이걸 보장한다).
+    echo \"== buildPython \$(python3 -V)\"
 
     # Android SDK — 마운트된 /sdk에 남아 다음 실행에서 재사용된다.
     if [ ! -x /sdk/cmdline-tools/latest/bin/sdkmanager ]; then

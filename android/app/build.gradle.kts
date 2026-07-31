@@ -28,7 +28,9 @@ android {
     signingConfigs {
         // 서명은 **로컬 keystore로만** 한다. 값은 환경변수로 받고 레포에 넣지 않는다.
         // (없으면 이 설정 자체를 만들지 않아 debug 빌드는 그대로 된다.)
-        if (System.getenv("PF_KEYSTORE") != null) {
+        // isNullOrEmpty로 보는 이유: docker -e PF_KEYSTORE="" 는 **빈 문자열**을 넘긴다.
+        // null 검사만 하면 통과해 `file("")`에서 죽는다.
+        if (!System.getenv("PF_KEYSTORE").isNullOrEmpty()) {
             create("release") {
                 storeFile = file(System.getenv("PF_KEYSTORE"))
                 storePassword = System.getenv("PF_KEYSTORE_PASSWORD")

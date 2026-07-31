@@ -22,3 +22,10 @@ eval/speed3/
 
 # 실계좌 스크린샷 진단용 (커밋 금지)
 test-asset/
+
+# Android 빌드 산출물 (컨테이너가 root로 쓴다 — 삭제하려면 sudo 필요할 수 있음)
+android/.gradle/
+android/.kotlin/
+android/app/build/
+android/build/
+android/local.properties
