@@ -263,7 +263,7 @@ aarch64 드라이버 문제로, 엣지 경로와 무관한 기존 툴링 이슈�
 | 작업트리 | `main` @ `1abdca6` | worktree `spike/edge-ocr` |
 | 포트 | `:8899` (pid 30490) | `PORT=8898` |
 | 데이터 | `~/portf-agent/data` | `DATA_DIR=~/portf-agent/data-spike` |
-| **업로드 백업** | `~/portf-agent/captures` | **`CAPTURES_DIR=~/portf-agent/captures-spike`** |
+| **업로드 백업** | `~/portf-agent/captures` | **같은 폴더 공용**(의도적 — 실제 업로드를 한 곳에 모은다) |
 | ollama | `:11434` 워밍업 `3b-ft3-q8` 100% GPU | **미사용**(Track A는 ollama 불필요) |
 | 파이썬 | 시스템 | `/home/omr/workspaces/edge-ocr-venv` |
 
@@ -274,10 +274,15 @@ aarch64 드라이버 문제로, 엣지 경로와 무관한 기존 툴링 이슈�
 
 ```bash
 PORT=8898 DATA_DIR=$HOME/portf-agent/data-spike \
-EXTRACT=ocr OCR_ENGINE=rapidocr \
-SAVE_CAPTURES=1 CAPTURES_DIR=$HOME/portf-agent/captures-spike \
+EXTRACT=ocr OCR_ENGINE=rapidocr SAVE_CAPTURES=1 \
   /home/omr/workspaces/edge-ocr-venv/bin/python agent/server.py
 ```
+
+`CAPTURES_DIR`은 **일부러 지정하지 않는다.** 기본값이 `DATA_DIR/../captures`라
+`DATA_DIR`을 바꿔도 `~/portf-agent/captures`로 수렴한다 — 라이브와 스파이크 업로드가
+한 폴더에 모인다. **이건 의도된 동작이다**(사용자 결정, 2026-07-31): 백업의 목적이
+실제 업로드를 진단용으로 모으는 것이라 스트림을 쪼갤 이유가 없다. 어느 경로로 들어온
+캡처인지는 `result.json`의 내용(OCR vs VLM 원문)으로 구분된다.
 
 **사고 기록(2026-07-31):** 스파이크 서버를 손으로 띄우면서 `SAVE_CAPTURES`를 빠뜨려
 **하루치 업로드가 백업 없이 사라졌다**(복구 불가 — `save_capture_batch`가 유일한 저장 지점).
@@ -285,11 +290,7 @@ SAVE_CAPTURES=1 CAPTURES_DIR=$HOME/portf-agent/captures-spike \
 `run-agent.sh`가 `MODEL`·`DATA_DIR`·`PORT`·`NP`·`EXTRACT`만 export하고
 `SAVE_CAPTURES`는 넘기지 않아, 외부에서 안 주면 조용히 꺼졌다.
 → `run-agent.sh`에 `SAVE_CAPTURES` 기본값 1을 넣어 기동 경로가 소유하게 했다.
-
-**남은 함정:** `CAPTURES_DIR` 기본값은 `DATA_DIR/../captures`라 **`DATA_DIR`을 바꿔도
-경로가 그대로다** → 스파이크와 라이브 백업이 한 폴더에 섞인다. 그래서 위 명령은
-`CAPTURES_DIR`을 명시한다. 기본값 자체를 고치면 라이브의 기존 백업 경로가 움직이므로
-건드리지 않았다(승인 사항).
+관측 도구는 **기본이 켬**이고 끄는 쪽이 명시적이어야 한다.
 
 주의(선반영 상태, 이 작업과 무관): 시스템 `numpy`가 이미 깨져 있다 —
 `/usr/lib/python3.10/dist-packages/numpy`가 `__init__.py` 없는 2023년 잔해이고 dpkg는

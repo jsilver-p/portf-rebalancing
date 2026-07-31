@@ -13,10 +13,10 @@ export NP="${NP:-2}"                     # 동시 비전 요청 수 = OLLAMA_NUM
 export EXTRACT="${EXTRACT:-vlm}"         # vlm(기본·라이브) | ocr(엣지 — 모델·ollama 불필요)
 # 업로드 원본 백업 — **기동 경로가 소유한다.** 예전엔 이 스크립트가 넘기지 않아서 외부에서
 # 안 주면 조용히 꺼졌다(실측: 스파이크 서버를 직접 띄웠더니 하루치 업로드가 백업 없이 날아감).
-# 개발 기간 기본값은 켬. CAPTURES_DIR을 안 주면 server.py가 DATA_DIR/../captures 로 잡는데,
-# **DATA_DIR을 바꿔도 이 경로는 그대로라** 라이브와 섞인다 → DATA_DIR이 기본이 아니면 반드시 지정.
+# 관측 도구는 기본이 켬이고 끄는 쪽이 명시적이어야 한다.
+# CAPTURES_DIR은 기본값(DATA_DIR/../captures)이 어느 DATA_DIR에서도 ~/portf-agent/captures로
+# 수렴한다 — 라이브·스파이크 업로드가 한 폴더에 모이는 건 **의도된 동작**이다(진단용 수집).
 export SAVE_CAPTURES="${SAVE_CAPTURES:-1}"
-[ -n "${CAPTURES_DIR:-}" ] && export CAPTURES_DIR
 TUNNEL="${TUNNEL:-1}"                    # 0이면 공개 터널을 열지 않는다(엣지: 폰 안에서 자체완결)
 CF_BIN=/usr/local/bin/cloudflared
 ollama_up(){ curl -fsS http://127.0.0.1:11434/api/tags >/dev/null 2>&1; }
