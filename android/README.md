@@ -61,14 +61,40 @@ PF_KEY_ALIAS=portf PF_KEY_PASSWORD=… \
 
 | 항목 | 기준 | 상태 |
 |---|---|---|
-| 크기 | Play base 모듈 압축 **200MB** / 총 설치 **4GB** | ML Kit 한국어 + Python 런타임 — **측정 필요** |
+| 크기 | Play base 모듈 압축 **200MB** / 총 설치 **4GB** | **36.0MB 실측** ✅ 여유 큼 |
 | 가속기 | 플랫폼 API 경유 | ML Kit Text Recognition v2 ✅ |
 | 권한 | 스크린샷 접근 | **photo picker** — 저장소 권한 0개 ✅ |
 | 프라이버시 검증가능성 | 제3자가 **확인할 수 있어야** 한다 | 아래 참조 ✅ |
 | Play Data Safety | 수집·전송 신고 | "수집 없음, 기기 내 처리"가 **코드로 참** |
-| 서명 | keystore, versionCode | 절차 준비됨 — 실행 대기 |
+| 서명 | keystore, versionCode | **완료** ✅ RSA 4096, APK Signature Scheme v2 검증됨 |
 | 법·표기 | 금융 조언 아님, OSS 라이선스(ML Kit) | **미작성** |
 | **실기기 설치·동작** | 개발 기기가 **아닌** 폰에서 8장 추출 완주 | ❌ **미검증 — 기기 필요** |
+| **ML Kit 파리티** | A1과 같은 채점기로 31/31 | ❌ **미검증 — 기기 필요** |
+
+### 실측 — APK 구성 (release 36.0MB)
+
+| 구성 | 크기 |
+|---|---|
+| ML Kit OCR 파이프라인 `.so` | 11.1MB |
+| `classes.dex` | 9.3MB |
+| libpython3.11 + stdlib | 11.7MB |
+| ML Kit 한국어 모델 | 0.8MB |
+| **`app.imy`(우리 파이썬 전부)** | **105KB** |
+| `assets/index.html` | 563KB |
+
+`lib/`는 `arm64-v8a` 하나. 신경망은 ML Kit 하나뿐이고 비전 LLM은 없다.
+사다리에 놓으면 — T1 **36MB** ✅ / T2 3.3GB ⚠ / T3' 4.63GB ❌.
+**정확도와 배포가능성을 동시에 갖는 칸은 T1뿐**이라는 게 숫자로 확인된다.
+
+### 빌드에서 실제로 막힌 것들 (다음에 다시 밟지 않도록)
+
+| 단계 | 증상 | 원인·수정 |
+|---|---|---|
+| configure | `path may not be null or empty` | `docker -e PF_KEYSTORE=""`가 **빈 문자열**을 넘겨 `!= null`을 통과 → `isNullOrEmpty` |
+| `installDebugPythonRequirements` | `Couldn't find Python 3.11` | Chaquopy는 buildPython이 타깃과 **같은 마이너 버전**이어야 한다. temurin엔 3.14뿐 → `debian:bookworm`(python3=3.11) 전용 이미지 |
+| `compileDebugKotlin` | `does not hold the state lock for root project` | Kotlin 플러그인 ↔ `org.gradle.parallel` → `parallel=false`(단일 모듈이라 손해 없음) |
+| `generateReleaseLintVitalReportModel` | `uses this output ... without declaring a dependency` | `assets.srcDir`에 **경로 대신 태스크**를 넘겨 Gradle이 소비자를 가리지 않고 추론하게 |
+| `validateSigningRelease` | `Keystore file not found` | 호스트 경로를 컨테이너에 그대로 넘김 → 읽기 전용 마운트 후 컨테이너 경로로 치환 |
 
 ### 프라이버시 주장을 어떻게 검증하나
 

@@ -77,9 +77,12 @@ val copyIndexHtml by tasks.registering(Copy::class) {
     from(File(repoRoot, "index.html"))
     into(layout.buildDirectory.dir("generated/assets"))
 }
-android.sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/assets"))
-tasks.matching { it.name.startsWith("merge") && it.name.endsWith("Assets") }
-    .configureEach { dependsOn(copyIndexHtml) }
+// srcDir에 **경로가 아니라 태스크를** 넘긴다. 경로만 넘기면 소비자가 늘어날 때마다
+// dependsOn을 달아야 하는데 그건 취약하다 — 실측: merge*Assets만 걸어두니 release에서
+// :app:generateReleaseLintVitalReportModel 이 "uses this output ... without declaring
+// an explicit or implicit dependency" 로 실패했다. 태스크를 넘기면 Gradle이 소비자를
+// 가리지 않고 의존성을 추론한다.
+android.sourceSets.getByName("main").assets.srcDir(copyIndexHtml)
 
 dependencies {
     implementation("androidx.appcompat:appcompat:1.7.0")

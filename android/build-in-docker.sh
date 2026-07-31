@@ -53,16 +53,29 @@ if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
   docker build --network host --platform linux/amd64 -t "$IMAGE" "$ANDROID_DIR"
 fi
 
+# keystore는 **컨테이너 안으로 마운트**해야 한다. 호스트 경로를 그대로 넘기면
+# :app:validateSigningRelease 가 "Keystore file ... not found"로 죽는다(실측).
+# 읽기 전용으로 붙이고 컨테이너 경로로 바꿔서 넘긴다 — 레포에는 들어가지 않는다.
+KS_MOUNT=()
+KS_IN_CONTAINER=""
+if [ -n "${PF_KEYSTORE:-}" ]; then
+  [ -f "$PF_KEYSTORE" ] || { echo "❌ keystore 없음: $PF_KEYSTORE"; exit 1; }
+  KS_MOUNT=(-v "$(readlink -f "$PF_KEYSTORE"):/keystore.jks:ro")
+  KS_IN_CONTAINER=/keystore.jks
+fi
+
 echo "== amd64 컨테이너에서 빌드  (task=$TASK)"
 echo "·  SDK    $SDK_DIR"
 echo "·  gradle $GRADLE_DIR"
+[ -n "$KS_IN_CONTAINER" ] && echo "·  서명   $PF_KEYSTORE → $KS_IN_CONTAINER"
 
 exec docker run --rm --network host --platform linux/amd64 \
   -v "$REPO_DIR:/repo" \
   -v "$SDK_DIR:/sdk" \
   -v "$GRADLE_DIR:/gradle" \
+  "${KS_MOUNT[@]}" \
   -e ANDROID_HOME=/sdk -e ANDROID_SDK_ROOT=/sdk -e GRADLE_USER_HOME=/gradle \
-  -e PF_KEYSTORE="${PF_KEYSTORE:-}" \
+  -e PF_KEYSTORE="$KS_IN_CONTAINER" \
   -e PF_KEYSTORE_PASSWORD="${PF_KEYSTORE_PASSWORD:-}" \
   -e PF_KEY_ALIAS="${PF_KEY_ALIAS:-}" \
   -e PF_KEY_PASSWORD="${PF_KEY_PASSWORD:-}" \
