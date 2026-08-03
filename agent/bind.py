@@ -117,15 +117,70 @@ def account_type(text):
 
 
 # ── 1) 크롬 제거 ──────────────────────────────────────────────────────────────
-def strip_chrome(boxes, height):
+def metrics(boxes):
+    """화면이 스스로 내는 단위 — **절대 픽셀 대신 이걸 쓴다.**
+
+    기기마다 해상도·폭·글꼴 크기가 다르고, 스크롤 스티칭 화면은 세로로 무한히 길어진다.
+    기기별 분기로 대응하면 기기 목록을 영원히 쫓아야 한다. 대신 두 값을 화면 자신에게서 뽑는다:
+
+      h    글자 높이(중앙값) — 해상도·글꼴 크기와 **함께 움직이는 유일한 세로 단위**.
+           이미지 높이는 못 쓴다: 스티칭되면 종목 수에 따라 늘어나 같은 배율이 아니다.
+      x0·x1·span  내용의 가로 범위 — 이미지 폭이 아니라 **글자가 실제로 놓인 범위**라
+           여백·기기 폭과 무관하고, 호출부가 이미지 크기를 알 필요도 없다.
+
+    실측 근거(§4.10): 이 단위를 쓰기 전 bind.py에는 절대 픽셀 90·120·70과 `width=1080`
+    기본값이 있었고, 균일 확대 1.333배(=1440폭 기기)에서 재현율 31/31 → 27/31로 무너졌다.
+    세 상수는 픽스처 8장에서 각각 1.7·2.2·1.3 × 글자높이로 **일정했다** — 애초에 글자 높이를
+    절대 픽셀로 적어둔 것이었다.
+    """
+    hs = sorted(b["h"] for b in boxes)
+    x0 = min(b["x"] for b in boxes)
+    x1 = max(b["x"] + b["w"] for b in boxes)
+    return {"h": hs[len(hs) // 2] or 1, "x0": x0, "x1": x1, "span": max(1, x1 - x0)}
+
+
+def _large_mode(vals, min_ratio=1.8, min_frac=0.25):
+    """정렬된 값들이 **이봉**이면 큰 쪽 무리만 돌려준다. 아니면 전부.
+
+    쓰는 곳: 금액들의 세로 간격에는 '한 행 안의 평가금액↔손익 간격'과 '행 사이 간격'이
+    섞여 있다. 둘을 갈라야 행 피치를 얻는데, 예전엔 `> 글자높이 × 2`로 갈랐다. 그건 두
+    간격의 비가 레이아웃마다 다르다는 걸 무시한 것이라, 촘촘한 화면(피치/글자높이 = 1.50)
+    에서 **행 간격을 1.5배만 늘려도 11행이 1행으로 무너졌다**(§4.10).
+
+    경계를 **비율이 뛰는 자리**에서 찾으면 상수가 무차원이 된다 — 해상도·폭·행 간격 어느
+    것이 바뀌어도 같은 자리를 찾는다. `min_ratio`는 '무리가 갈리는가'만 판정하므로 거리
+    단위가 없다.
+
+    **가장 큰 도약이 아니라 첫 도약을 쓴다.** 무리는 둘이 아닐 수 있다: 계좌 구분자가 있는
+    화면은 `행 안 | 행 사이 | 블록 사이`로 셋이고, 가장 큰 도약을 고르면 블록 경계를 집어
+    **한 블록이 통째로 한 행이 된다**(측정 §4.10: 헤더 화면 복제 ×8에서 72행 대신 8행).
+    작은 쪽에서 첫 도약을 고르면 '행 안'만 떨어져 나가고 나머지는 전부 행 경계로 남는다.
+
+    또 하나: **큰 무리가 극소수면 무리가 아니라 이상치다.** 표본의 일부(min_frac)를 넘지
+    못하는 꼬리에서 갈랐다가는 그 몇 개가 행 피치를 통째로 정한다(측정: 간격 33개 중 큰
+    값 3개(9%)에서 갈려 피치가 113 → 968로 뛰고 화면이 0행이 됐다). 이것도 비율 조건이라
+    거리 단위가 없다."""
+    if len(vals) < 2:
+        return vals
+    for i in range(1, len(vals)):
+        if vals[i] / max(vals[i - 1], 1e-9) >= min_ratio and (len(vals) - i) >= len(vals) * min_frac:
+            return vals[i:]
+    return vals
+
+
+def strip_chrome(boxes, m):
     """상태바(시계+배터리) · 내비바 · 시장지수 줄을 뺀다. 위치 비율이 아니라 **내용**으로 판정한다
-    (스크롤 스티칭된 4928px 화면에서 비율 규칙은 무너진다)."""
+    (스크롤 스티칭된 4928px 화면에서 비율 규칙은 무너진다).
+
+    상단 경계도 이미지 높이 비율이 아니라 **글자 높이**로 잡는다 — 비율로 잡으면 긴 화면일수록
+    경계가 아래로 내려가 본문을 먹는다(4928px면 148px, 2340px면 70px로 제각각이다)."""
+    top = min(b["y"] for b in boxes) + m["h"] * 2.5 if boxes else 0
     out = []
     for b in boxes:
         t = b["text"].strip()
         # 상태바: 화면 최상단 줄의 시계/배터리/통신 아이콘 텍스트
-        if b["y"] < height * 0.03 and (re.match(r"^\d{1,2}[:.]\d{2}", t) or "%" in t
-                                       or len(t) <= 6):
+        if b["y"] < top and (re.match(r"^\d{1,2}[:.]\d{2}", t) or "%" in t
+                             or len(t) <= 6):
             continue
         out.append(b)
     return out
@@ -184,7 +239,7 @@ def _kind_of(text):
     return None
 
 
-def columns_from_header(header):
+def columns_from_header(header, m):
     """헤더 박스 → [{kinds:[의미,...], x0, x1}] — kinds는 **밴드 내 y 순서**(=데이터 스택 순서).
     금액 열은 우측 정렬이라 오른쪽 끝(right)으로 밴드를 만든다."""
     marks = []
@@ -193,18 +248,19 @@ def columns_from_header(header):
         if k:
             marks.append({"kind": k, "y": _cy(b), "x0": b["x"], "x1": _right(b),
                           "anchor": _right(b)})
-    marks.sort(key=lambda m: m["anchor"])
+    marks.sort(key=lambda mk: mk["anchor"])
     bands = []
-    for m in marks:
-        if bands and abs(m["anchor"] - bands[-1]["anchor"]) < 90:   # 같은 열의 스택된 헤더
-            bands[-1]["marks"].append(m)
-            bands[-1]["x0"] = min(bands[-1]["x0"], m["x0"])
-            bands[-1]["x1"] = max(bands[-1]["x1"], m["x1"])
+    for mk in marks:
+        if bands and abs(mk["anchor"] - bands[-1]["anchor"]) < m["h"] * 1.7:  # 같은 열의 스택된 헤더
+            bands[-1]["marks"].append(mk)
+            bands[-1]["x0"] = min(bands[-1]["x0"], mk["x0"])
+            bands[-1]["x1"] = max(bands[-1]["x1"], mk["x1"])
         else:
-            bands.append({"marks": [m], "x0": m["x0"], "x1": m["x1"], "anchor": m["anchor"]})
+            bands.append({"marks": [mk], "x0": mk["x0"], "x1": mk["x1"],
+                          "anchor": mk["anchor"]})
     for b in bands:
-        b["marks"].sort(key=lambda m: m["y"])           # 위→아래 = 데이터 스택 순서
-        b["kinds"] = [m["kind"] for m in b["marks"]]
+        b["marks"].sort(key=lambda mk: mk["y"])          # 위→아래 = 데이터 스택 순서
+        b["kinds"] = [mk["kind"] for mk in b["marks"]]
     return bands
 
 
@@ -224,28 +280,61 @@ def _assign_band(cells, kinds):
     return out
 
 
-def rows_from_headered(lines, bands, name_x1):
+def _nearest_band(b, anchors):
+    """박스의 오른쪽 끝이 가장 가까운 열 밴드 — **허용치 상수 없이** 열을 정한다.
+
+    예전엔 `abs(right - anchor) < 2.2 × 글자높이`였는데, 이 편차는 글자 크기가 아니라
+    **레이아웃 거리**다: 데이터 박스가 헤더 박스보다 넓어 오른쪽 끝이 60~65px 어긋난다
+    (밴드 간격 348~381px의 0.18배). 화면이 넓어지면 이 어긋남도 같이 커지는데 허용치는
+    글자높이에 묶여 있어 폭 2배에서 **모든 금액이 탈락하고 헤더 화면이 0행이 됐다**(§4.10).
+    최근접 분할은 배율에 불변이고 상수가 없다 — `rows_from_list`가 이미 쓰는 방식이다."""
+    r = _right(b)
+    return min(range(len(anchors)), key=lambda i: abs(r - anchors[i]))
+
+
+def rows_from_headered(lines, bands, name_x1, m):
     """헤더가 있는 표: 금액 앵커 열(가장 오른쪽 밴드)의 셀 묶음이 행을 정의한다."""
     anchor = bands[-1]
+    anchors = [bd["anchor"] for bd in bands]
+    ai = len(bands) - 1
     depth = max(1, len(anchor["kinds"]))
     amounts = [b for ln in lines for b in ln
-               if _is_amount(b["text"]) and abs(_right(b) - anchor["anchor"]) < 120]
+               if _is_amount(b["text"]) and _nearest_band(b, anchors) == ai]
     amounts.sort(key=_cy)
-    groups = [amounts[i:i + depth] for i in range(0, len(amounts), depth)]
+    # 행 경계는 **간격이 벌어지는 곳**이지 개수가 아니다. 예전엔 `depth`개씩 잘랐는데, 그러면
+    # 한 행에서 금액이 하나만 더 잡히거나 빠져도 **그 뒤 모든 행이 통째로 밀린다**(측정 §4.10:
+    # 행 간격을 10%만 좁혀도 재현율은 31/31인데 value 22/31 — 값이 이웃 행에서 온다).
+    # 앵커 열 금액의 세로 간격은 '행 안(평가금액↔손익)'과 '행 사이'로 이봉이므로, 큰 쪽 무리의
+    # 최솟값을 경계로 쓰면 개수 가정 없이 행이 갈린다. 이봉이 아니면 옛 방식으로 물러난다.
+    a_gaps = sorted(_cy(b) - _cy(a) for a, b in zip(amounts, amounts[1:]))
+    big = _large_mode(a_gaps)
+    thr = big[0] if len(big) < len(a_gaps) else None
+    if thr is None:
+        groups = [amounts[i:i + depth] for i in range(0, len(amounts), depth)]
+    else:
+        groups, cur = [], [amounts[0]] if amounts else []
+        for prev, b in zip(amounts, amounts[1:]):
+            if _cy(b) - _cy(prev) >= thr:
+                groups.append(cur)
+                cur = [b]
+            else:
+                cur.append(b)
+        if cur:
+            groups.append(cur)
     rows = []
     for g in groups:
         if not g:
             continue
         y0, y1 = _cy(g[0]), _cy(g[-1])
-        lo, hi = y0 - 70, y1 + 70                       # 이름이 두 줄 사이에 중앙정렬될 수 있다
+        lo, hi = y0 - m["h"] * 1.3, y1 + m["h"] * 1.3   # 이름이 두 줄 사이에 중앙정렬될 수 있다
         row = {}
-        for band in bands:
+        for bi, band in enumerate(bands):
             if band["kinds"] == ["name"]:
                 continue
             # 앵커(우측 정렬 끝)로 판정한다 — 데이터 박스는 헤더 박스보다 넓어서 헤더의
             # x1로 자르면 몇 px 차이로 전부 탈락한다(측정: 헤더 right=1002, 데이터 right=1064).
             cells = [b for ln in lines for b in ln
-                     if lo <= _cy(b) <= hi and abs(_right(b) - band["anchor"]) < 120
+                     if lo <= _cy(b) <= hi and _nearest_band(b, anchors) == bi
                      and (_is_amount(b["text"]) or "%" in b["text"])]
             if cells:
                 row.update(_assign_band(cells, band["kinds"]))
@@ -271,7 +360,7 @@ def rows_from_headered(lines, bands, name_x1):
     return rows
 
 
-def rows_from_list(lines, width=1080):
+def rows_from_list(lines, m):
     """헤더 없는 목록형(상품별 총액·계좌 잔고·예수금 상세): 왼쪽 라벨 + 오른쪽 금액.
 
     라벨이 자기 금액과 **같은 줄에 없다** — 금액 두 개(평가금액·손익) 사이에 세로 중앙정렬되기
@@ -284,7 +373,8 @@ def rows_from_list(lines, width=1080):
     # '6주' cy=1280 vs 금액 cy=1279.5) 진짜 종목명('SK하이닉스' cy=1200)을 이기고 name을 뺏는다.
     qtys = [b for b in boxes if QTY_RE.match(b["text"].strip())]
     labels = [b for b in boxes
-              if not _is_amount(b["text"]) and "%" not in b["text"] and b["x"] < width * 0.5
+              if not _is_amount(b["text"]) and "%" not in b["text"]
+              and b["x"] < m["x0"] + m["span"] * 0.5
               and not QTY_RE.match(b["text"].strip())]
     # 한 화면에서 **똑같은 문구가 반복되면 UI 크롬**이다(계좌마다 붙는 '이체'·'거래내역'·'주식주문').
     # 행 이름은 화면에서 유일하다('한 자산 = 한 행' 불변식). 안 걸러내면 이 크롬이 최근접 분할에서
@@ -293,7 +383,8 @@ def rows_from_list(lines, width=1080):
     seen = {}
     for b in labels:
         seen[b["text"].strip()] = seen.get(b["text"].strip(), 0) + 1
-    amounts = [b for b in boxes if _is_amount(b["text"]) and _right(b) > width * 0.45]
+    amounts = [b for b in boxes
+               if _is_amount(b["text"]) and _right(b) > m["x0"] + m["span"] * 0.45]
     if not labels or not amounts:
         return []
     # **라벨이 행을 정의하고, 각 금액은 cy가 가장 가까운 라벨에 붙는다** — 거리 상한 없음.
@@ -305,10 +396,11 @@ def rows_from_list(lines, width=1080):
     # 허용 거리는 **행 간 피치**로 정한다. 연속 금액 간격에는 같은 행 안의 value↔pnl 간격(~70px)과
     # 행 사이 간격(~430px)이 섞여 있어, 전체 중앙값을 쓰면 pnl을 잡는 순간 상한이 스스로 붕괴한다
     # (측정: 160333 상한 225→70으로 무너져 전 행 탈락). 글리프 높이의 2배를 넘는 간격만 = 행 간.
-    med_h = sorted(b["h"] for b in boxes)[len(boxes) // 2]
+    med_h = m["h"]
     acy = sorted(_cy(a) for a in amounts)
-    inter = [b - a for a, b in zip(acy, acy[1:]) if (b - a) > med_h * 2]
-    pitch = sorted(inter)[len(inter) // 2] if inter else med_h * 4
+    gaps = sorted(b - a for a, b in zip(acy, acy[1:]))
+    inter = _large_mode(gaps)
+    pitch = inter[len(inter) // 2] if inter else med_h * 4
     limit = max(med_h * 1.6, pitch * 0.60)
 
     # ── 계좌 구분자 분리 ─────────────────────────────────────────────────────
@@ -446,10 +538,16 @@ def screen_label(lines):
     return ""
 
 
-def bind(boxes, width=1080, height=None):
-    """OCR 박스 → 11칸 배열 리스트(finalize.parse_rows 입력 형식)."""
-    height = height or (max((b["y"] + b["h"]) for b in boxes) if boxes else 0)
-    boxes = strip_chrome(boxes, height)
+def bind(boxes):
+    """OCR 박스 → 11칸 배열 리스트(finalize.parse_rows 입력 형식).
+
+    **이미지 크기를 인자로 받지 않는다.** 예전엔 `width=1080` 기본값이 있었고 호출부는 아무도
+    폭을 넘기지 않아, 어떤 기기의 화면이든 1080폭으로 간주됐다. 단위는 `metrics()`가 화면
+    자신에게서 뽑는다(단일 출처)."""
+    if not boxes:
+        return []
+    m = metrics(boxes)
+    boxes = strip_chrome(boxes, m)
     lines = [ln for ln in group_lines(boxes) if not is_index_line([b["text"] for b in ln])]
     label = screen_label(lines)
     atype = account_type(label) or account_type(" ".join(
@@ -467,15 +565,15 @@ def bind(boxes, width=1080, height=None):
 
     header = find_header(lines)
     if header:
-        bands = columns_from_header(header)
+        bands = columns_from_header(header, m)
         name_x1 = max([b["x"] + b["w"] for b in header if _kind_of(b["text"]) == "name"]
-                      + [int(width * 0.42)])
+                      + [int(m["x0"] + m["span"] * 0.42)])
         hdr_y = max(_cy(b) for b in header)
         body = [[b for b in ln if _cy(b) > hdr_y] for ln in lines]
         body = [ln for ln in body if ln]
-        raw_rows = rows_from_headered(body, bands, name_x1) if bands else []
+        raw_rows = rows_from_headered(body, bands, name_x1, m) if bands else []
     else:
-        raw_rows = rows_from_list(lines, width)
+        raw_rows = rows_from_list(lines, m)
 
     raw_rows = _coherent(raw_rows)
     out = []

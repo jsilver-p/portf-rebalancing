@@ -19,6 +19,10 @@ import bind                                             # noqa: E402
 SHOTS = os.environ.get("SHOTS", os.path.join(ROOT, "test-fixtures", "screenshots"))
 TAG = os.environ.get("OUT_TAG", "")
 SIM = os.environ.get("MLKIT_SIM", "")     # 'element' | 'line:R' — mlkit_sim.py 참조
+# 기기 다양성 프로브 — 변환 규칙은 device_sim.py(정렬·줄구조 보존이 까다롭다)
+SCALE = float(os.environ.get("BOX_SCALE", "1"))     # 해상도(DPI)
+SPREAD = float(os.environ.get("BOX_WIDER", "1"))    # 화면 폭
+YSPREAD = float(os.environ.get("BOX_LOOSER", "1"))  # 행 간격
 
 
 def main():
@@ -37,6 +41,9 @@ def main():
             if SIM:                                     # ML Kit 박스 단위 시뮬레이션(§4.8)
                 import mlkit_sim
                 boxes = mlkit_sim.apply(SIM, boxes)
+            if (SCALE, SPREAD, YSPREAD) != (1.0, 1.0, 1.0):
+                import device_sim
+                boxes = device_sim.apply(boxes, SCALE, SPREAD, YSPREAD)
             rows = bind.bind(boxes)
             raw = json.dumps(rows, ensure_ascii=False)
             err = None
