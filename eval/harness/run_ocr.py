@@ -18,6 +18,8 @@ import bind                                             # noqa: E402
 
 SHOTS = os.environ.get("SHOTS", os.path.join(ROOT, "test-fixtures", "screenshots"))
 TAG = os.environ.get("OUT_TAG", "")
+# 입력 리사이즈 — OCR **엔진**의 비용/품질을 잰다(bind는 §4.10 이후 배율 불변이라 그대로 받는다)
+IMG = float(os.environ.get("IMG_SCALE", "1"))
 SIM = os.environ.get("MLKIT_SIM", "")     # 'element' | 'line:R' — mlkit_sim.py 참조
 # 기기 다양성 프로브 — 변환 규칙은 device_sim.py(정렬·줄구조 보존이 까다롭다)
 SCALE = float(os.environ.get("BOX_SCALE", "1"))     # 해상도(DPI)
@@ -37,7 +39,14 @@ def main():
     for f in imgs:
         t0 = time.time()
         try:
-            boxes = ocr.recognize(os.path.join(SHOTS, f))
+            src = os.path.join(SHOTS, f)
+            if IMG != 1.0:
+                from PIL import Image
+                im = Image.open(src).convert("RGB")
+                im = im.resize((round(im.width * IMG), round(im.height * IMG)), Image.LANCZOS)
+                import numpy as np
+                src = np.array(im)
+            boxes = ocr.recognize(src)
             if SIM:                                     # ML Kit 박스 단위 시뮬레이션(§4.8)
                 import mlkit_sim
                 boxes = mlkit_sim.apply(SIM, boxes)
