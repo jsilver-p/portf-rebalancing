@@ -92,27 +92,15 @@ def _recognize_tesseract(img):
             os.unlink(tmp.name)
 
 
-def _cy(b):
-    return b["y"] + b["h"] / 2.0
-
-
 def _rows_of(boxes):
-    """y중심을 줄 대표값에 대고 묶는다.
+    """줄 묶기 — **`bind.group_lines` 하나만 쓴다.**
 
-    이웃끼리 이어 붙이는 방식(transitive chaining)은 쓰지 않는다 — 한 칸씩 밀리며 서로
-    다른 줄이 한 줄로 이어지고, 그러면 x가 겹쳐 간격이 음수가 되어 임계값과 무관하게
-    무조건 병합된다(시뮬레이터 측정 중 실제로 발생했다). 대표값 기준이면 안 생긴다.
+    여기 사본을 두었더니 같은 결함(이웃끼리 이어 붙이다 서로 다른 줄이 한 줄로 이어지는
+    chaining drift)을 세 곳에서 각각 만났다. 줄 묶기는 기하이므로 바인더가 진실의 출처다.
+    지연 임포트인 이유: `ocr.py`는 어댑터 계층이라 모듈 로드 시점에 바인더를 끌고 오지 않는다.
     """
-    rows = []
-    for b in sorted(boxes, key=lambda b: (_cy(b), b["x"])):
-        for r in rows:
-            if abs(_cy(b) - r["cy"]) <= 0.5 * min(b["h"], r["h"]):
-                r["items"].append(b)
-                r["cy"] = sum(_cy(m) for m in r["items"]) / len(r["items"])
-                break
-        else:
-            rows.append({"cy": _cy(b), "h": b["h"], "items": [b]})
-    return [r["items"] for r in rows]
+    import bind
+    return bind.group_lines(boxes)
 
 
 def merge_lines(boxes, ratio):

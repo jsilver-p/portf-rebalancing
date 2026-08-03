@@ -188,20 +188,28 @@ def strip_chrome(boxes, m):
 
 # ── 2) 줄 그룹핑 ──────────────────────────────────────────────────────────────
 def group_lines(boxes, tol=0.6):
-    """y 중심이 서로 (평균 높이 × tol) 안이면 같은 줄. 표의 한 행은 보통 2줄로 이뤄진다."""
+    """y 중심이 줄 대표값과 (글자높이 × tol) 안이면 같은 줄. 표의 한 행은 보통 2줄로 이뤄진다.
+
+    **직전 박스와 비교하지 않는다.** 예전엔 `abs(_cy(b) - _cy(cur[-1])) <= med_h*tol`로 이어
+    붙였는데, 그러면 한 칸씩 조금씩 밀리며 **서로 다른 줄이 한 줄로 이어진다**(chaining drift).
+    실측(§4.11): 픽스처 8장 중 2장에서 한 '줄'의 세로 폭이 **112px(글자높이 53의 2.1배)** 까지
+    벌어졌다. 대표값(누적 평균) 기준으로 바꾸면 전 화면에서 30px 이하로 잡힌다.
+
+    같은 결함을 `ocr.merge_lines`와 ML Kit 시뮬레이터에서도 한 번씩 만났다 — 그래서 줄
+    묶기는 여기 하나만 두고 나머지가 가져다 쓴다(단일 출처)."""
     if not boxes:
         return []
-    bs = sorted(boxes, key=_cy)
-    med_h = sorted(b["h"] for b in bs)[len(bs) // 2]
-    lines, cur = [], [bs[0]]
-    for b in bs[1:]:
-        if abs(_cy(b) - _cy(cur[-1])) <= med_h * tol:
-            cur.append(b)
+    med_h = sorted(b["h"] for b in boxes)[len(boxes) // 2] or 1
+    rows = []
+    for b in sorted(boxes, key=_cy):
+        for r in rows:
+            if abs(_cy(b) - r["cy"]) <= med_h * tol:
+                r["items"].append(b)
+                r["cy"] = sum(_cy(x) for x in r["items"]) / len(r["items"])
+                break
         else:
-            lines.append(sorted(cur, key=lambda x: x["x"]))
-            cur = [b]
-    lines.append(sorted(cur, key=lambda x: x["x"]))
-    return lines
+            rows.append({"cy": _cy(b), "items": [b]})
+    return [sorted(r["items"], key=lambda x: x["x"]) for r in rows]
 
 
 # ── 3) 헤더 → 열 정의 ────────────────────────────────────────────────────────
@@ -321,12 +329,18 @@ def rows_from_headered(lines, bands, name_x1, m):
                 cur.append(b)
         if cur:
             groups.append(cur)
+    # 행에 딸린 조각(종목명·수량)을 걷을 세로 창. 이름이 두 금액 사이에 중앙정렬될 수 있어
+    # 행의 금액 범위보다 넓어야 하지만, **이웃 행을 넘보면 안 된다.** 글자높이로 잡으면
+    # (예전 `1.3 × h`) 행이 촘촘한 레이아웃에서 옆 행 조각을 빨아들여 수량이 유실된다
+    # (측정 §4.11: 행 간격 0.85배에서 qty 29/31 — 가장 촘촘한 화면 두 행). 행 경계 간격의
+    # **절반**으로 잡으면 정의상 이웃 행에 닿을 수 없고, 레이아웃 밀도를 따라 같이 움직인다.
+    win = thr * 0.5 if thr else m["h"] * 1.3
     rows = []
     for g in groups:
         if not g:
             continue
         y0, y1 = _cy(g[0]), _cy(g[-1])
-        lo, hi = y0 - m["h"] * 1.3, y1 + m["h"] * 1.3   # 이름이 두 줄 사이에 중앙정렬될 수 있다
+        lo, hi = y0 - win, y1 + win
         row = {}
         for bi, band in enumerate(bands):
             if band["kinds"] == ["name"]:
