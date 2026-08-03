@@ -92,17 +92,73 @@ def _recognize_tesseract(img):
             os.unlink(tmp.name)
 
 
+def _cy(b):
+    return b["y"] + b["h"] / 2.0
+
+
+def _rows_of(boxes):
+    """y중심을 줄 대표값에 대고 묶는다.
+
+    이웃끼리 이어 붙이는 방식(transitive chaining)은 쓰지 않는다 — 한 칸씩 밀리며 서로
+    다른 줄이 한 줄로 이어지고, 그러면 x가 겹쳐 간격이 음수가 되어 임계값과 무관하게
+    무조건 병합된다(시뮬레이터 측정 중 실제로 발생했다). 대표값 기준이면 안 생긴다.
+    """
+    rows = []
+    for b in sorted(boxes, key=lambda b: (_cy(b), b["x"])):
+        for r in rows:
+            if abs(_cy(b) - r["cy"]) <= 0.5 * min(b["h"], r["h"]):
+                r["items"].append(b)
+                r["cy"] = sum(_cy(m) for m in r["items"]) / len(r["items"])
+                break
+        else:
+            rows.append({"cy": _cy(b), "h": b["h"], "items": [b]})
+    return [r["items"] for r in rows]
+
+
+def merge_lines(boxes, ratio):
+    """같은 줄에서 가로 간격 ≤ ratio × 글자높이인 이웃을 합친다 — 낱말 → 구절.
+
+    **박스 단위의 단일 출처.** bind.py는 구절 박스를 전제하는데(`_amount_of`: 금액과
+    수익률이 한 박스), 엔진마다 박스 경계가 다르다. 엔진의 그룹핑에 걸지 않고 여기서
+    직접 만든다 — 그래야 임계값이 우리 손에 있고 측정한 봉투 안에 있음을 보증할 수 있다.
+    """
+    out = []
+    for r in _rows_of(boxes):
+        r.sort(key=lambda b: b["x"])
+        cur = dict(r[0])
+        for b in r[1:]:
+            gap = b["x"] - (cur["x"] + cur["w"])
+            if -0.2 * b["h"] <= gap <= ratio * max(cur["h"], b["h"]):
+                x0, y0 = min(cur["x"], b["x"]), min(cur["y"], b["y"])
+                x1 = max(cur["x"] + cur["w"], b["x"] + b["w"])
+                y1 = max(cur["y"] + cur["h"], b["y"] + b["h"])
+                cur = {"text": f'{cur["text"]} {b["text"]}', "x": x0, "y": y0,
+                       "w": x1 - x0, "h": y1 - y0,
+                       "conf": min(cur["conf"], b["conf"])}
+            else:
+                out.append(cur)
+                cur = dict(b)
+        out.append(cur)
+    return out
+
+
 def _recognize_mlkit(img):
     """APK 경로 — Chaquopy로 Kotlin의 MlKitOcr를 부른다(계약 JSON을 그대로 받는다).
 
-    ML Kit은 Block > Line > Element 계층이고 RapidOCR의 구절 박스에 가장 가까운 건 Line이다.
-    이 **박스 단위 차이가 엔진 스왑의 유일한 실질 위험**이라 노브로 둔다(기기에서 재서 고정).
+    ML Kit은 Block > Line > Element 계층이다. **Line을 쓰지 않고 Element를 받아 우리가
+    합친다.** 이유는 실측이다(`eval/harness/mlkit_sim.py`, docs §4.8): bind.py가 견디는
+    병합 임계값은 R∈[0.6, 1.8]이고 그 밖은 양쪽 다 FAIL이다(과소병합=열 소실,
+    과대병합=열 융합). ML Kit의 Line 그룹핑이 이 봉투 안에 드는지는 **우리가 정할 수
+    없는 값**이라, 봉투 안에 있음을 보증할 수 있는 쪽 — 우리 임계값 — 으로 옮긴다.
     """
     from java import jarray, jbyte, jclass          # Chaquopy 런타임에만 존재
     data = img if isinstance(img, bytes) else open(img, "rb").read()
-    gran = os.environ.get("OCR_MLKIT_GRANULARITY", "line")
+    gran = os.environ.get("OCR_MLKIT_GRANULARITY", "element")
     raw = jclass("com.portfrebalance.edge.MlKitOcr").recognize(jarray(jbyte)(data), gran)
-    return json.loads(str(raw))
+    boxes = json.loads(str(raw))
+    if gran == "element":
+        boxes = merge_lines(boxes, float(os.environ.get("OCR_LINE_MERGE", "1.0")))
+    return boxes
 
 
 def recognize(img, engine=None):

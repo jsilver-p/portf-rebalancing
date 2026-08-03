@@ -7,6 +7,7 @@
 
 사용:  python3 eval/harness/run_ocr.py [이미지명 필터...]
 환경:  SHOTS(기본 test-fixtures/screenshots) · OUT_TAG · OCR_ENGINE(rapidocr|tesseract)
+       MLKIT_SIM=element|line:R — ML Kit 박스 단위 시뮬레이션(`mlkit_sim.py`)
 """
 import json, os, sys, time
 
@@ -17,6 +18,7 @@ import bind                                             # noqa: E402
 
 SHOTS = os.environ.get("SHOTS", os.path.join(ROOT, "test-fixtures", "screenshots"))
 TAG = os.environ.get("OUT_TAG", "")
+SIM = os.environ.get("MLKIT_SIM", "")     # 'element' | 'line:R' — mlkit_sim.py 참조
 
 
 def main():
@@ -32,6 +34,9 @@ def main():
         t0 = time.time()
         try:
             boxes = ocr.recognize(os.path.join(SHOTS, f))
+            if SIM:                                     # ML Kit 박스 단위 시뮬레이션(§4.8)
+                import mlkit_sim
+                boxes = mlkit_sim.apply(SIM, boxes)
             rows = bind.bind(boxes)
             raw = json.dumps(rows, ensure_ascii=False)
             err = None

@@ -696,25 +696,41 @@ def extract(b64, capture_dt):
             "model": MODEL, "raw": raw, "captureDateTime": capture_dt.isoformat()}
 
 
-def _ocr_bind(b64):
-    """OCR+기하 경로 — 비전 LLM 자리를 그대로 대체한다. 반환은 같은 계약(원문 텍스트)이라
-    parse_rows·finalize·enrich가 한 줄도 바뀌지 않는다."""
+def _ocr_boxes(b64):
     import base64 as _b64
     sys.path.insert(0, HERE)
-    import ocr, bind
-    boxes = ocr.recognize(_b64.b64decode(b64))
-    return json.dumps(bind.bind(boxes), ensure_ascii=False)
+    import ocr
+    return ocr.recognize(_b64.b64decode(b64))
+
+
+def _evidence_text(boxes):
+    """화면 원문 텍스트 — finalize의 broker 심판용(읽기순 = y, x)."""
+    return " ".join(str(b["text"]) for b in sorted(boxes, key=lambda b: (b["y"], b["x"])))
 
 
 def _vision(b64):
-    """이미지 1장 → 추출 원문 텍스트. 배치·단건 공용. EXTRACT로 백엔드 선택."""
+    """이미지 1장 → (추출 원문 텍스트, 화면 OCR 텍스트). 배치·단건 공용.
+
+    두 번째 값(evidence)은 **비전 모델과 독립인 심판**이다. 값에는 총액 대조가 있지만
+    라벨에는 심판이 없어 모델이 증권사명을 지어내면 게이트가 침묵했다 —
+    OCR 텍스트가 그 자리를 메운다(finalize._label_supported).
+    """
     if EXTRACT == "ocr":
-        return _ocr_bind(b64)
+        sys.path.insert(0, HERE)
+        import bind
+        boxes = _ocr_boxes(b64)                     # OCR은 한 번만 — 추출과 심판이 같은 박스에서 나온다
+        return json.dumps(bind.bind(boxes), ensure_ascii=False), _evidence_text(boxes)
     body = json.dumps({"model": MODEL, "prompt": PROMPT, "images": [resample_half_b64(b64)],
                        "stream": False, "keep_alive": -1, "options": {"temperature": 0, "num_ctx": 8192}}).encode()
     req = urllib.request.Request(OLLAMA, data=body, headers={"Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=1800) as r:
-        return json.loads(r.read()).get("response", "")
+        raw = json.loads(r.read()).get("response", "")
+    try:                                            # 심판은 있으면 좋은 것 — 실패해도 추출을 막지 않는다
+        evidence = _evidence_text(_ocr_boxes(b64))
+    except Exception as e:
+        log(f"evidence OCR 실패(심판 없이 진행): {type(e).__name__}: {e}")
+        evidence = None
+    return raw, evidence
 
 
 def extract_batch(images, capture_dt, on_screen=None, on_stage=None):
@@ -732,8 +748,9 @@ def extract_batch(images, capture_dt, on_screen=None, on_stage=None):
             store_capture(dt); capture_dt = dt; exif_found = True
     n = len(images)
     raws = [None] * n                             # 입력 순서 보존(행→화면 귀속 불변) — as_completed여도 자리에 채움
-    def _done(i, raw):
-        raws[i] = raw
+    evid = [None] * n                             # 화면별 OCR 원문 — broker 라벨의 독립 심판
+    def _done(i, res):
+        raw, raws[i], evid[i] = res[0], res[0], res[1]
         if on_screen:                             # 화면 하나 끝날 때마다 그 화면의 원시 행을 흘려보낸다(라이브)
             try:
                 rows = finalize_mod.parse_rows(raw) or []   # 단일 파서 재사용 — 게이트 전 원시값
@@ -751,7 +768,8 @@ def extract_batch(images, capture_dt, on_screen=None, on_stage=None):
             _done(i, _vision(b64))
     if on_stage:                                  # 비전추출 끝 → 종합·검증 단계로(라이브 상태 전환)
         on_stage("finalizing")
-    screens = [{"file": f"img{i + 1}", "raw": raw} for i, raw in enumerate(raws)]
+    screens = [{"file": f"img{i + 1}", "raw": raw, "evidence": evid[i]}
+               for i, raw in enumerate(raws)]
     fin = finalize_mod.finalize(screens)          # holdings(정규화) + gate(대조 리포트)
     rows = enrich(fin["holdings"], capture_dt)    # 심볼 해석 + 수량 사다리 + 가격(_file은 화면단위 게이트에 필요)
     for h in rows:

@@ -183,8 +183,56 @@ def acct_tokens(text):
     return toks
 
 
+_NUMTOK = re.compile(r"^[\d,.\-+%원₩$()]+$")
+
+
+def _norm_ev(s):
+    """근거 대조용 정규화 — 공백·괄호·구두점 제거, 소문자."""
+    return re.sub(r"[\s\[\]()·\-_.,:/]", "", str(s or "")).lower()
+
+
+def _ev_forms(evidence):
+    """근거 텍스트의 두 형태 — 원본과 **숫자 토큰을 뺀 것**.
+
+    화면은 좁아서 라벨이 줄바꿈된다: `현금성자산(삼성증` … `3,065,859` `0` … `권)`.
+    읽기순으로 이으면 '삼성증권'이 끊겨 실재하는 값이 '근거 없음'으로 오판된다(실측 false
+    positive). 끼어든 것은 **다른 열의 금액**이지 텍스트가 아니므로, 숫자 토큰을 빼면
+    조각이 다시 붙는다. 두 형태 중 하나라도 맞으면 근거로 인정한다.
+    """
+    toks = str(evidence or "").split()
+    return (_norm_ev(evidence),
+            _norm_ev("".join(t for t in toks if not _NUMTOK.match(t))))
+
+
+def _label_supported(label, screen_text, broker, evidence):
+    """모델이 내놓은 증권사명이 **화면에 실재하는가** — 라벨의 독립 심판.
+
+    값에는 '총액'이라는 독립 심판이 있어서 틀리면 게이트가 운다. **라벨에는 없었다.**
+    그래서 비전 모델이 `한국투자증권`을 지어내도 금액만 맞으면 총액 대조를 통과하고
+    게이트는 침묵했다(측정: 프로덕션 VLM, 3행. `main`에서도 재현).
+
+    `evidence`는 같은 이미지의 OCR 원문 텍스트다 — **비전 모델과 독립**이므로 심판이 된다.
+    근거가 없으면 지어낸 것으로 보고 비운다(§4.7의 '근거 없으면 비우고 경고'와 같은 규칙을
+    우리 폴백이 아니라 **모델 출력**에 적용한다).
+
+    evidence가 없으면(구 호출부·OCR 텍스트 미가용) 판정하지 않는다 — 무판정이지 통과가 아니다.
+    OCR 추출 경로에서는 broker가 화면 텍스트에서 나오므로 이 심판이 항상 통과한다(자기점검).
+    """
+    if not evidence:
+        return True
+    forms = _ev_forms(evidence)
+    for cand in (RB.brand_token(label), RB.canonical_in(label),
+                 RB.canonical_in(screen_text), broker, label):
+        c = _norm_ev(cand)
+        if c and any(c in ev for ev in forms):
+            return True
+    return False
+
+
 def finalize(screens, use_llm=True, broker_cache=None):
-    """screens: [{"file":str,"raw":str}]. 반환 {holdings, gate}."""
+    """screens: [{"file":str,"raw":str,"evidence":str|None}]. 반환 {holdings, gate}.
+
+    evidence = 그 화면의 OCR 원문 텍스트(선택). 있으면 broker 라벨의 독립 심판으로 쓴다."""
     if broker_cache is None:
         broker_cache = RB.load_cache()
     parsed = []
@@ -195,7 +243,8 @@ def finalize(screens, use_llm=True, broker_cache=None):
             r["cost"] = _num(r.get("cost"))
             r["qty"] = _num(r.get("qty"))
             r["pnl"] = _num(r.get("pnl"))
-        parsed.append({"file": sc.get("file"), "rows": rows, "type": classify(rows)})
+        parsed.append({"file": sc.get("file"), "rows": rows, "type": classify(rows),
+                       "evidence": sc.get("evidence")})   # 화면 원문 텍스트(있으면 심판)
 
     # 1) 요약화면에서 totals + 계좌 목록(계좌 → 증권사·유형) 수집
     product_totals = {}     # 카테고리 → 총액
@@ -260,6 +309,7 @@ def finalize(screens, use_llm=True, broker_cache=None):
 
     # 2) 상세화면 홀딩만 수집 + broker 정규화 + 화면별 그룹(게이트용)
     holdings, groups = [], []
+    fabricated = []                      # 모델이 지어낸 증권사명(아래 _label_supported가 잡는다)
     for p in parsed:
         if p["type"] != "detail":
             continue
@@ -273,6 +323,10 @@ def finalize(screens, use_llm=True, broker_cache=None):
         broker = RB.resolve_broker(label, broker_cache, use_llm=use_llm)   # 정규명·브랜드(검색)
         if not broker:
             broker = RB.canonical_in(screen_text)   # 화면 어딘가의 정규명(예: '현금성자산(삼성증권)')
+        if broker and not _label_supported(label, screen_text, broker, p.get("evidence")):
+            fabricated.append(f"{p['file']}: 증권사 '{broker}' — 화면 텍스트에 근거 없음"
+                              f"(추출 모델이 지어낸 값으로 판단해 비움)")
+            broker = None
         inh_broker, inh_atype = inherit(screen_text)
         broker = broker or inh_broker               # 계좌번호·별칭뿐이면 같은 계좌의 요약에서 상속
         grp, seen_vals = [], {}
@@ -357,7 +411,7 @@ def finalize(screens, use_llm=True, broker_cache=None):
     no_broker = sorted({h.get("_file") or "?" for h in holdings if not h.get("broker")})
     unknown = [f"{f}: 증권사 미상 — 화면에 근거 없음(계좌요약 화면을 함께 올리면 해결)"
                for f in no_broker]
-    gate["warnings"] = bad_totals + repairs + unknown + gate["warnings"]
+    gate["warnings"] = bad_totals + repairs + fabricated + unknown + gate["warnings"]
     for p in parsed:                     # 빈 화면 = 추출 실패. 조용히 넘기지 않는다.
         if p["type"] == "empty":
             gate["warnings"].insert(0, f"{p['file']}: 추출 0행 — 화면 유실(파싱 실패·미인식) 의심")
