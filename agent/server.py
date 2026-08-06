@@ -728,7 +728,10 @@ def _vision(b64):
     try:                                            # 심판은 있으면 좋은 것 — 실패해도 추출을 막지 않는다
         evidence = _evidence_text(_ocr_boxes(b64))
     except Exception as e:
-        log(f"evidence OCR 실패(심판 없이 진행): {type(e).__name__}: {e}")
+        # 이 경로는 **실제로 밟힌다**: VLM 서버는 OCR 없이도 도는 게 정상이라 인터프리터에
+        # rapidocr가 없을 수 있다(실측: 라이브의 시스템 python3). 그때 심판은 무판정으로
+        # 물러나고 추출은 계속돼야 한다 — 여기서 죽으면 추출 전체가 죽는다(실측 사고).
+        print(f"· evidence OCR 없음 — broker 심판 생략({type(e).__name__}: {e})")
         evidence = None
     return raw, evidence
 
