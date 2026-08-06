@@ -10,8 +10,19 @@ export MODEL="${MODEL:-qwen2.5vl:3b-ft3-q8}"
 export DATA_DIR="${DATA_DIR:-$HOME/portf-agent/data}"
 export PORT="${PORT:-8899}"
 export NP="${NP:-2}"                     # 동시 비전 요청 수 = OLLAMA_NUM_PARALLEL
+export EXTRACT="${EXTRACT:-vlm}"         # vlm(기본·라이브) | ocr(엣지 — 모델·ollama 불필요)
+# 업로드 원본 백업 — **기동 경로가 소유한다.** 예전엔 이 스크립트가 넘기지 않아서 외부에서
+# 안 주면 조용히 꺼졌다(실측: 스파이크 서버를 직접 띄웠더니 하루치 업로드가 백업 없이 날아감).
+# 관측 도구는 기본이 켬이고 끄는 쪽이 명시적이어야 한다.
+# CAPTURES_DIR은 기본값(DATA_DIR/../captures)이 어느 DATA_DIR에서도 ~/portf-agent/captures로
+# 수렴한다 — 라이브·스파이크 업로드가 한 폴더에 모이는 건 **의도된 동작**이다(진단용 수집).
+export SAVE_CAPTURES="${SAVE_CAPTURES:-1}"
+TUNNEL="${TUNNEL:-1}"                    # 0이면 공개 터널을 열지 않는다(엣지: 폰 안에서 자체완결)
 CF_BIN=/usr/local/bin/cloudflared
 ollama_up(){ curl -fsS http://127.0.0.1:11434/api/tags >/dev/null 2>&1; }
+
+# EXTRACT=ocr 이면 ollama·모델이 통째로 필요 없다 — 엣지 경로엔 신경망 LLM이 0개다.
+if [ "$EXTRACT" != "ocr" ]; then
 
 # 0) ollama 살아있는지 -------------------------------------------------------
 # 디코드 배칭(NUM_PARALLEL)·상시 로드(KEEP_ALIVE)는 서버 env라 systemd 유닛엔 drop-in 필요:
@@ -30,6 +41,10 @@ echo "· 모델 워밍업($MODEL)…"
 curl -s http://127.0.0.1:11434/api/generate \
   -d "{\"model\":\"$MODEL\",\"prompt\":\"1\",\"stream\":false,\"keep_alive\":-1,\"options\":{\"num_ctx\":8192}}" \
   >/dev/null && echo "· 모델 적재 완료(상시 유지)" || echo "⚠ 워밍업 실패 — 첫 추출이 느릴 수 있음"
+
+else
+  echo "· EXTRACT=ocr — ollama/모델 건너뜀(OCR 12.9MB만 사용)"
+fi
 
 # 0.7) 포트 선점 정리 — 이전 실행 잔여 프로세스가 $PORT를 물고 있으면 죽인다 ------
 # (Ctrl-C 못 받고 죽거나 터널만 살아 서버 좀비가 남은 경우 "address already in use" 방지)
@@ -50,6 +65,19 @@ fi
 echo "· 서버 pid $SRV  →  http://0.0.0.0:$PORT   (log: /tmp/agent-server.log)"
 
 # 2) 터널 --------------------------------------------------------------------
+if [ "$TUNNEL" = "0" ]; then
+  # 엣지: 앱과 API가 같은 기기·같은 오리진이라 공개 터널이 필요 없다(= 노출면 0).
+  echo
+  echo "🔒 터널 없음(TUNNEL=0). 이 기기에서 바로 열어라:"
+  echo "   http://localhost:$PORT/"
+  echo "   (같은 Wi-Fi의 다른 기기: http://$(hostname -i 2>/dev/null | awk '{print $1}'):$PORT/)"
+  echo
+  cleanup(){ echo; echo "정리 중…"; kill "$SRV" 2>/dev/null || true; }
+  trap cleanup EXIT INT TERM
+  echo "실행 중. 종료하려면 Ctrl-C."
+  wait "$SRV"
+  exit 0
+fi
 echo "· cloudflared 터널 여는 중…"
 "$CF_BIN" tunnel --url "http://localhost:$PORT" >/tmp/cf.log 2>&1 &
 CF=$!

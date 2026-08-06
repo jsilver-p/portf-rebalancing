@@ -54,13 +54,36 @@ def src_kind(s):
     return s
 
 
+_EV_CACHE = os.path.join(ROOT, "eval/results/_evidence.json")
+
+
+def _evidence(image):
+    """화면 OCR 원문 — broker 라벨의 독립 심판(finalize._label_supported).
+
+    서버는 같은 이미지를 OCR해서 넘긴다(server._vision). 채점기도 같은 근거를 줘야
+    **같은 게이트를 재는 것**이 된다. 8장 × 1.4s라 디스크에 캐시한다.
+    EVIDENCE=0이면 끈다 — 심판 없는 옛 동작과의 A/B용.
+    """
+    if os.environ.get("EVIDENCE") == "0":
+        return None
+    cache = json.load(open(_EV_CACHE)) if os.path.exists(_EV_CACHE) else {}
+    if image not in cache:
+        sys.path.insert(0, os.path.join(ROOT, "agent"))
+        import ocr
+        boxes = ocr.recognize(os.path.join(SHOTS, image))
+        cache[image] = " ".join(str(b["text"])
+                                for b in sorted(boxes, key=lambda b: (b["y"], b["x"])))
+        json.dump(cache, open(_EV_CACHE, "w"), ensure_ascii=False)
+    return cache[image]
+
+
 def load_screens(d):
     out = []
     for f in sorted(os.listdir(d)):
         if not f.endswith(".json"):
             continue
         j = json.load(open(os.path.join(d, f)))
-        out.append({"file": j["image"], "raw": j["raw"]})
+        out.append({"file": j["image"], "raw": j["raw"], "evidence": _evidence(j["image"])})
     return out
 
 

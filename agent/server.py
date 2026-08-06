@@ -21,10 +21,21 @@ import finalize as finalize_mod              # noqa: E402  종합(게이트·bro
 ROOT = os.path.dirname(HERE)
 MODEL = os.environ.get("MODEL", "qwen2.5vl:3b-ft3-q8")
 PORT = int(os.environ.get("PORT", "8899"))
+# 바인드 주소. 기본은 LAN 노출(폰 브라우저에서 Orin에 붙는 기존 사용법 유지).
+# **APK는 127.0.0.1로 고정한다** — 앱이 스크린샷 API를 같은 Wi-Fi에 열어두면 안 된다.
+BIND = os.environ.get("BIND", "0.0.0.0")
 OLLAMA = os.environ.get("OLLAMA", "http://127.0.0.1:11434") + "/api/generate"
 NP = int(os.environ.get("NP", "2"))            # 동시 비전 요청 수 — ollama의 OLLAMA_NUM_PARALLEL과 일치시킬 것
+# 추출 백엔드: vlm(기본, 라이브 유지) | ocr(엣지 — OCR+기하, 신경망 LLM 0개).
+# 기본을 바꾸지 않는 이유: 이 파일은 라이브 에이전트와 공유된다. 엣지는 기동 스크립트에서 켠다.
+EXTRACT = os.environ.get("EXTRACT", "vlm")
 PROMPT_FILE = os.environ.get("PROMPT_FILE", os.path.join(ROOT, "eval/harness/prompt4f.txt"))
-PROMPT = open(PROMPT_FILE).read().strip()      # prompt4f = prompt4e + broker 정의 단일화(계좌라벨 제거)·시장지수 제외·자릿수 — Phase2 3b-ft3
+# prompt4f = prompt4e + broker 정의 단일화(계좌라벨 제거)·시장지수 제외·자릿수 — Phase2 3b-ft3
+# OCR 경로는 프롬프트를 쓰지 않는다. APK에는 eval/ 트리가 없으므로 읽지도 않는다
+# (임포트 시점에 죽지 않게. VLM 경로에서는 없으면 여전히 즉시 실패한다).
+PROMPT = open(PROMPT_FILE).read().strip() if EXTRACT != "ocr" else ""
+# 앱(index.html)을 에이전트가 직접 서빙 → 단일 오리진. 터널·CORS·혼합 컨텐츠가 사라진다.
+INDEX_PATH = os.environ.get("INDEX_PATH", os.path.join(ROOT, "index.html"))
 
 # 시세: 서버 전용 데이터(레포 밖). 결정론적 페치 — LLM 무관.
 DATA_DIR = os.environ.get("DATA_DIR", os.path.expanduser("~/portf-agent/data"))
@@ -329,6 +340,20 @@ def _round_qty(value, denom):
     return q, resid, ("conf" if resid < CONF_MARGIN else "low")
 
 
+def _qty_from_name(h):
+    """화면 수량이 **종목명 속 숫자**와 같은가 — 열 오매핑의 대표 실패 모드다
+    ('TIGER 미국나스닥100' → qty 100, 'KODEX 미국S&P500' → qty 500).
+
+    이 판정은 **심볼·시세를 전혀 쓰지 않는다.** 그래서 심볼 게이트와 수량 게이트의 순환
+    의존(심볼 검증엔 수량이, 수량 검증엔 심볼이 필요하다)을 끊는 지점이 된다.
+    검증: 픽스처 31행 중 이름에 숫자가 있는 4행 모두 정답 수량이 그 숫자와 다르다
+    (KODEX S&P500→115·312, TIGER 나스닥100→30, TIME 나스닥100…50→223) — 오탐 0."""
+    q = h.get("qty")
+    if q is None or float(q) != int(q):
+        return False
+    return int(q) in {int(x) for x in re.findall(r"\d+", str(h.get("name") or ""))}
+
+
 def _is_cash(h):
     n = str(h.get("name") or "")
     return h.get("assetClass") == "현금" or any(k in n for k in ("예수금", "현금", "달러", "CMA"))
@@ -426,6 +451,44 @@ def enrich(rows, capture_dt, mode="extract"):
                     break
     rows[:] = [h for h in rows if not h.pop("_drop", False)]
 
+    # 심볼 검증 게이트 — 이름 검색은 엉뚱한 종목을 집을 수 있다('메타 플랫폼스'→국내 메타랩스).
+    # 화면 단가(평가금액/수량)가 그 심볼의 캡처시점 참가격으로 설명되지 않으면 **채택하지 않는다**.
+    # 조용한 오매칭이 잘못된 수량·주가로 번지는 것을 막는다(틀린 값보다 빈칸이 낫다).
+    #
+    # ── 순환 의존을 끊는다 ──────────────────────────────────────────────────
+    # 이 게이트는 `value/qty`를 쓰므로 **수량이 맞아야** 하고, 아래 수량 게이트는 심볼의
+    # 참가격을 쓰므로 **심볼이 맞아야** 한다. 순서만 바꾸면 어느 쪽이 깨질지가 바뀔 뿐이다:
+    #   심볼 먼저 → 'TIGER 미국나스닥100'의 이름숫자 혼입(qty=100)이 심볼을 떨구고,
+    #               수량 게이트가 symbol 없는 행을 건너뛰어 오독 수량이 살아남는다(실측 회귀).
+    #   수량 먼저 → 오독 티커('IVV'→'IWV')의 엉뚱한 시세로 멀쩡한 화면 수량이 기각된다.
+    # 그래서 이 게이트는 **수량이 신뢰할 수 없을 때 판정을 포기한다** — 근거가 오염된 상태로
+    # 심볼을 기각하느니 아래 수량 게이트에 넘긴다. 오염 여부는 `_qty_from_name`이 **심볼과
+    # 무관하게** 판정하므로 순환이 끊기고 순서가 무의미해진다.
+    #
+    # 참고 — 폐기한 대안: '`value/참종가`가 정수면 심볼이 맞다'는 2차 증거를 넣어봤는데
+    # **분별력이 없었다**. 실측: 오독 티커 `IWV`가 58.02주(잔차 0.02)를 내서 정답 `IVV`의
+    # 33.06주(잔차 0.06)보다 오히려 더 정수에 가까웠다. 수량이 크면 시세가 0.4%만 움직여도
+    # 소수부가 한 바퀴 돌기 때문에 애초에 심볼 판별에 쓸 수 있는 신호가 아니다.
+    for h in rows:
+        if not h.get("symbol") or not h.get("qty") or not h.get("value") or _is_cash(h):
+            continue
+        if _qty_from_name(h):
+            continue          # 이 수량으로는 심볼을 판정하지 않는다(아래 수량 게이트가 잡는다)
+        close, _ = close_of(h, h.get("currency"))
+        fx = get_fx()
+        if not close:
+            continue
+        per = h["value"] / h["qty"]
+        e_native = abs(per - close) / close                       # 화면값이 네이티브 통화
+        e_krw = abs(per - close * fx) / (close * fx) if fx else 9  # 화면값이 원화(해외주식 원화표기)
+        if min(e_native, e_krw) > SYMBOL_TOL:
+            h["symbol_note"] = (f"심볼 불일치 — {h['symbol']} 캡처일 종가로 화면 단가({per:,.0f})가 "
+                                f"설명되지 않음(오해석 의심)")
+            h.pop("symbol", None); h.pop("market", None)
+            h["_native_usd"] = False
+            continue
+        h["_value_krw"] = e_krw < e_native   # 화면 평가금액의 통화를 측정으로 판정(추측 아님)
+
     # 화면 수량 게이트 — **화면에 명시된 정수 수량은 신뢰한다.** 다만 모델이 수량 없는 화면에서
     # 다른 열(평가손익)이나 이름 속 숫자('나스닥100'→qty 100)를 수량 칸에 넣는 열-오매핑만 걸러낸다.
     # 캡처시점 참가격(price_at)으로 계산한 기대 수량과 **배수/자릿수급(>QTY_GROSS_TOL) 어긋날 때만** 기각 —
@@ -447,27 +510,6 @@ def enrich(rows, capture_dt, mode="extract"):
             h["qty"] = None
             h.pop("qty_src", None); h.pop("confidence", None)
             h["price"] = None; h.pop("price_src", None)         # 같은 행의 주가도 신뢰 불가
-
-    # 심볼 검증 게이트 — 이름 검색은 엉뚱한 종목을 집을 수 있다('메타 플랫폼스'→국내 메타랩스).
-    # 화면 단가(평가금액/수량)가 그 심볼의 캡처시점 참가격으로 설명되지 않으면 **채택하지 않는다**.
-    # 조용한 오매칭이 잘못된 수량·주가로 번지는 것을 막는다(틀린 값보다 빈칸이 낫다).
-    for h in rows:
-        if not h.get("symbol") or not h.get("qty") or not h.get("value") or _is_cash(h):
-            continue
-        close, _ = close_of(h, h.get("currency"))
-        fx = get_fx()
-        if not close:
-            continue
-        per = h["value"] / h["qty"]
-        e_native = abs(per - close) / close                       # 화면값이 네이티브 통화
-        e_krw = abs(per - close * fx) / (close * fx) if fx else 9  # 화면값이 원화(해외주식 원화표기)
-        if min(e_native, e_krw) > SYMBOL_TOL:
-            h["symbol_note"] = (f"심볼 불일치 — {h['symbol']} 캡처일 종가로 화면 단가({per:,.0f})가 "
-                                f"설명되지 않음(오해석 의심)")
-            h.pop("symbol", None); h.pop("market", None)
-            h["_native_usd"] = False
-            continue
-        h["_value_krw"] = e_krw < e_native   # 화면 평가금액의 통화를 측정으로 판정(추측 아님)
 
     # T2 — 주가(네이티브 통화). 원화 평가금액이면 FX로 나눈다.
     for h in rows:
@@ -654,13 +696,41 @@ def extract(b64, capture_dt):
             "model": MODEL, "raw": raw, "captureDateTime": capture_dt.isoformat()}
 
 
+def _ocr_boxes(b64):
+    import base64 as _b64
+    sys.path.insert(0, HERE)
+    import ocr
+    return ocr.recognize(_b64.b64decode(b64))
+
+
+def _evidence_text(boxes):
+    """화면 원문 텍스트 — finalize의 broker 심판용(읽기순 = y, x)."""
+    return " ".join(str(b["text"]) for b in sorted(boxes, key=lambda b: (b["y"], b["x"])))
+
+
 def _vision(b64):
-    """이미지 1장 → 비전 원문 텍스트. 배치·단건 공용."""
+    """이미지 1장 → (추출 원문 텍스트, 화면 OCR 텍스트). 배치·단건 공용.
+
+    두 번째 값(evidence)은 **비전 모델과 독립인 심판**이다. 값에는 총액 대조가 있지만
+    라벨에는 심판이 없어 모델이 증권사명을 지어내면 게이트가 침묵했다 —
+    OCR 텍스트가 그 자리를 메운다(finalize._label_supported).
+    """
+    if EXTRACT == "ocr":
+        sys.path.insert(0, HERE)
+        import bind
+        boxes = _ocr_boxes(b64)                     # OCR은 한 번만 — 추출과 심판이 같은 박스에서 나온다
+        return json.dumps(bind.bind(boxes), ensure_ascii=False), _evidence_text(boxes)
     body = json.dumps({"model": MODEL, "prompt": PROMPT, "images": [resample_half_b64(b64)],
                        "stream": False, "keep_alive": -1, "options": {"temperature": 0, "num_ctx": 8192}}).encode()
     req = urllib.request.Request(OLLAMA, data=body, headers={"Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=1800) as r:
-        return json.loads(r.read()).get("response", "")
+        raw = json.loads(r.read()).get("response", "")
+    try:                                            # 심판은 있으면 좋은 것 — 실패해도 추출을 막지 않는다
+        evidence = _evidence_text(_ocr_boxes(b64))
+    except Exception as e:
+        log(f"evidence OCR 실패(심판 없이 진행): {type(e).__name__}: {e}")
+        evidence = None
+    return raw, evidence
 
 
 def extract_batch(images, capture_dt, on_screen=None, on_stage=None):
@@ -678,8 +748,9 @@ def extract_batch(images, capture_dt, on_screen=None, on_stage=None):
             store_capture(dt); capture_dt = dt; exif_found = True
     n = len(images)
     raws = [None] * n                             # 입력 순서 보존(행→화면 귀속 불변) — as_completed여도 자리에 채움
-    def _done(i, raw):
-        raws[i] = raw
+    evid = [None] * n                             # 화면별 OCR 원문 — broker 라벨의 독립 심판
+    def _done(i, res):
+        raw, raws[i], evid[i] = res[0], res[0], res[1]
         if on_screen:                             # 화면 하나 끝날 때마다 그 화면의 원시 행을 흘려보낸다(라이브)
             try:
                 rows = finalize_mod.parse_rows(raw) or []   # 단일 파서 재사용 — 게이트 전 원시값
@@ -697,7 +768,8 @@ def extract_batch(images, capture_dt, on_screen=None, on_stage=None):
             _done(i, _vision(b64))
     if on_stage:                                  # 비전추출 끝 → 종합·검증 단계로(라이브 상태 전환)
         on_stage("finalizing")
-    screens = [{"file": f"img{i + 1}", "raw": raw} for i, raw in enumerate(raws)]
+    screens = [{"file": f"img{i + 1}", "raw": raw, "evidence": evid[i]}
+               for i, raw in enumerate(raws)]
     fin = finalize_mod.finalize(screens)          # holdings(정규화) + gate(대조 리포트)
     rows = enrich(fin["holdings"], capture_dt)    # 심볼 해석 + 수량 사다리 + 가격(_file은 화면단위 게이트에 필요)
     for h in rows:
@@ -812,8 +884,35 @@ class H(BaseHTTPRequestHandler):
         self.send_response(204); self._cors(); self.end_headers()
     def do_GET(self):
         if self.path.split("?")[0] in ("/", "/index.html"):
+            # 앱 본체. 같은 오리진에서 API도 나가므로 앱은 pf_agent_url 없이도 붙는다.
+            try:
+                b = open(INDEX_PATH, "rb").read()
+            except Exception:
+                b = PAGE.encode()          # index.html이 없으면 기존 MVP 페이지로 폴백
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8"); self._cors()
+            self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b)
+        elif self.path.split("?")[0] == "/mvp":
             b = PAGE.encode(); self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8"); self._cors()
+            self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b)
+        elif self.path.split("?")[0] == "/manifest.webmanifest":
+            # 홈화면 설치(PWA) — 아이콘 탭으로 앱이 열린다. 서비스워커는 두지 않는다:
+            # 앱을 서빙하는 주체가 이 에이전트라 서버가 꺼지면 어차피 못 쓴다(오프라인 캐시가
+            # 주는 이득이 없고, 낡은 번들을 물고 있을 위험만 생긴다).
+            b = json.dumps({
+                "name": "포트폴리오 리밸런서", "short_name": "리밸런서",
+                "start_url": "/", "scope": "/", "display": "standalone",
+                "background_color": "#ffffff", "theme_color": "#4f5bd5",
+                "icons": [{"src": "data:image/svg+xml,"
+                           "%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E"
+                           "%3Crect width='64' height='64' rx='12' fill='%234f5bd5'/%3E"
+                           "%3Ctext x='32' y='44' font-size='36' text-anchor='middle'%3E%F0%9F%93%8A"
+                           "%3C/text%3E%3C/svg%3E",
+                           "sizes": "any", "type": "image/svg+xml", "purpose": "any"}],
+            }, ensure_ascii=False).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/manifest+json; charset=utf-8"); self._cors()
             self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b)
         elif self.path == "/health":
             self.send_response(200); self._cors(); self.end_headers(); self.wfile.write(b'{"ok":true}')
@@ -872,8 +971,13 @@ class H(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b)
     def log_message(self, *a): pass
 
-if __name__ == "__main__":
-    print(f"에이전트 서버 → http://0.0.0.0:{PORT}  (모델 {MODEL})")
+def serve():
+    """기동 진입점. `__main__`과 APK(android_main)가 **같은 경로**를 쓴다."""
+    print(f"에이전트 서버 → http://{BIND}:{PORT}  (모델 {MODEL})")
     print(f"· 시세 데이터 {DATA_DIR}  갱신시각(UTC) {FETCH_TIMES_UTC}")
     threading.Thread(target=scheduler, daemon=True).start()
-    ThreadingHTTPServer(("0.0.0.0", PORT), H).serve_forever()
+    ThreadingHTTPServer((BIND, PORT), H).serve_forever()
+
+
+if __name__ == "__main__":
+    serve()

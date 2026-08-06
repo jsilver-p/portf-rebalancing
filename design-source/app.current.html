@@ -2,6 +2,7 @@
 <html><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="manifest" href="/manifest.webmanifest">
 <script src="679ba045-83ca-4b8d-9742-2a29c683b29a"></script>
 </head>
 <body>
@@ -1984,6 +1985,18 @@ class Component extends DCLogic {
       this.setState({ maskMoney: mask, loaded: true });
     }
     this.fetchFx();
+    // 같은 오리진 자동 채택 — 에이전트가 이 페이지를 직접 서빙하면(엣지: 폰 안의 :8899)
+    // 사용자가 URL을 손으로 넣을 필요가 없다. 에이전트 URL의 단일 출처는 계속 localStorage이고
+    // 판정은 기존 /health 계약을 그대로 쓴다. GitHub Pages에선 /health가 404라 아무것도 채택되지
+    // 않고 기존 폴백이 보존된다 — 양쪽에서 동시에 맞는 한 줄 규칙.
+    if (!this.agentUrl()) {
+      fetch(location.origin + '/health').then(r => {
+        if (r && r.ok) { try { localStorage.setItem('pf_agent_url', location.origin); } catch (e) {} }
+      }).catch(() => {}).then(() => {
+        this.setState({ agentUrlInput: this.agentUrl() });
+        this.pingHealth();
+      });
+    }
     // 에이전트 연결 상태(헤더) — 저장된 URL 반영 + 주기 핑
     this.setState({ agentUrlInput: this.agentUrl() });
     this.pingHealth();

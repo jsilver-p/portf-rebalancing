@@ -51,6 +51,13 @@ def _sanitize(frag):
 COMPACT_COLUMNS = ["broker", "accountType", "name", "assetClass", "currency",
                    "qty", "price", "value", "cost", "pnl", "confidence"]
 
+# 예약 이름 — '이 행은 보유종목이 아니라 **이 화면 자신의 평가금액 총액**이다'.
+# 계좌요약 화면이 함께 올라오지 않는 화면(전체계좌 폼 등)에서는 이것이 게이트가 대조할
+# **유일한** 근거다. 없으면 게이트는 '완벽한 추출'과 '행 누락'을 구분하지 못한다
+# (측정 20260731: img1 정확·img2 한 행 누락인데 경고 문구가 동일했다).
+# 추출기가 낼 수도 안 낼 수도 있다(VLM 경로는 내지 않는다) → 없으면 기존 동작 그대로.
+SCREEN_TOTAL = "__screen_total__"
+
 
 def _row_from_list(arr):
     """positional 배열 행 → dict. 열 수가 어긋난 행은 버린다(오배정된 값을 쓰느니 비운다 —
@@ -176,8 +183,56 @@ def acct_tokens(text):
     return toks
 
 
+_NUMTOK = re.compile(r"^[\d,.\-+%원₩$()]+$")
+
+
+def _norm_ev(s):
+    """근거 대조용 정규화 — 공백·괄호·구두점 제거, 소문자."""
+    return re.sub(r"[\s\[\]()·\-_.,:/]", "", str(s or "")).lower()
+
+
+def _ev_forms(evidence):
+    """근거 텍스트의 두 형태 — 원본과 **숫자 토큰을 뺀 것**.
+
+    화면은 좁아서 라벨이 줄바꿈된다: `현금성자산(삼성증` … `3,065,859` `0` … `권)`.
+    읽기순으로 이으면 '삼성증권'이 끊겨 실재하는 값이 '근거 없음'으로 오판된다(실측 false
+    positive). 끼어든 것은 **다른 열의 금액**이지 텍스트가 아니므로, 숫자 토큰을 빼면
+    조각이 다시 붙는다. 두 형태 중 하나라도 맞으면 근거로 인정한다.
+    """
+    toks = str(evidence or "").split()
+    return (_norm_ev(evidence),
+            _norm_ev("".join(t for t in toks if not _NUMTOK.match(t))))
+
+
+def _label_supported(label, screen_text, broker, evidence):
+    """모델이 내놓은 증권사명이 **화면에 실재하는가** — 라벨의 독립 심판.
+
+    값에는 '총액'이라는 독립 심판이 있어서 틀리면 게이트가 운다. **라벨에는 없었다.**
+    그래서 비전 모델이 `한국투자증권`을 지어내도 금액만 맞으면 총액 대조를 통과하고
+    게이트는 침묵했다(측정: 프로덕션 VLM, 3행. `main`에서도 재현).
+
+    `evidence`는 같은 이미지의 OCR 원문 텍스트다 — **비전 모델과 독립**이므로 심판이 된다.
+    근거가 없으면 지어낸 것으로 보고 비운다(§4.7의 '근거 없으면 비우고 경고'와 같은 규칙을
+    우리 폴백이 아니라 **모델 출력**에 적용한다).
+
+    evidence가 없으면(구 호출부·OCR 텍스트 미가용) 판정하지 않는다 — 무판정이지 통과가 아니다.
+    OCR 추출 경로에서는 broker가 화면 텍스트에서 나오므로 이 심판이 항상 통과한다(자기점검).
+    """
+    if not evidence:
+        return True
+    forms = _ev_forms(evidence)
+    for cand in (RB.brand_token(label), RB.canonical_in(label),
+                 RB.canonical_in(screen_text), broker, label):
+        c = _norm_ev(cand)
+        if c and any(c in ev for ev in forms):
+            return True
+    return False
+
+
 def finalize(screens, use_llm=True, broker_cache=None):
-    """screens: [{"file":str,"raw":str}]. 반환 {holdings, gate}."""
+    """screens: [{"file":str,"raw":str,"evidence":str|None}]. 반환 {holdings, gate}.
+
+    evidence = 그 화면의 OCR 원문 텍스트(선택). 있으면 broker 라벨의 독립 심판으로 쓴다."""
     if broker_cache is None:
         broker_cache = RB.load_cache()
     parsed = []
@@ -188,7 +243,8 @@ def finalize(screens, use_llm=True, broker_cache=None):
             r["cost"] = _num(r.get("cost"))
             r["qty"] = _num(r.get("qty"))
             r["pnl"] = _num(r.get("pnl"))
-        parsed.append({"file": sc.get("file"), "rows": rows, "type": classify(rows)})
+        parsed.append({"file": sc.get("file"), "rows": rows, "type": classify(rows),
+                       "evidence": sc.get("evidence")})   # 화면 원문 텍스트(있으면 심판)
 
     # 1) 요약화면에서 totals + 계좌 목록(계좌 → 증권사·유형) 수집
     product_totals = {}     # 카테고리 → 총액
@@ -253,20 +309,33 @@ def finalize(screens, use_llm=True, broker_cache=None):
 
     # 2) 상세화면 홀딩만 수집 + broker 정규화 + 화면별 그룹(게이트용)
     holdings, groups = [], []
+    fabricated = []                      # 모델이 지어낸 증권사명(아래 _label_supported가 잡는다)
     for p in parsed:
         if p["type"] != "detail":
             continue
-        label = str((p["rows"][0].get("broker") if p["rows"] else "") or "")
-        screen_text = " ".join(str(r.get(k, "")) for r in p["rows"]
+        # 예약행(SCREEN_TOTAL)은 broker가 비어 있다 → 라벨·화면텍스트에서 제외한다.
+        # 안 빼면 그 행이 첫 행일 때 label이 빈 문자열이 되어 broker 해석이 통째로 실패한다
+        # (측정 20260731 실캡처: 메리츠증권 15/15 → None 15/15로 회귀).
+        real = [r for r in p["rows"] if str(r.get("name") or "").strip() != SCREEN_TOTAL]
+        label = str((real[0].get("broker") if real else "") or "")
+        screen_text = " ".join(str(r.get(k, "")) for r in real
                                for k in ("broker", "accountType", "name"))
         broker = RB.resolve_broker(label, broker_cache, use_llm=use_llm)   # 정규명·브랜드(검색)
         if not broker:
             broker = RB.canonical_in(screen_text)   # 화면 어딘가의 정규명(예: '현금성자산(삼성증권)')
+        if broker and not _label_supported(label, screen_text, broker, p.get("evidence")):
+            fabricated.append(f"{p['file']}: 증권사 '{broker}' — 화면 텍스트에 근거 없음"
+                              f"(추출 모델이 지어낸 값으로 판단해 비움)")
+            broker = None
         inh_broker, inh_atype = inherit(screen_text)
         broker = broker or inh_broker               # 계좌번호·별칭뿐이면 같은 계좌의 요약에서 상속
         grp, seen_vals = [], {}
+        screen_total = None
         for r in p["rows"]:
             v = r.get("value")
+            if str(r.get("name") or "").strip() == SCREEN_TOTAL:
+                screen_total = v            # 보유행이 아니라 이 화면의 대조 기준
+                continue
             if not v:                        # 평가금액 0/없음 = 리밸런싱 대상 아님(수표·미사용 항목 등)
                 continue
             if v in seen_vals:               # 같은 화면에 같은 금액이 반복 = 같은 자산의 다른 표기
@@ -274,7 +343,11 @@ def finalize(screens, use_llm=True, broker_cache=None):
             seen_vals[v] = True
             h = {k: r.get(k) for k in ("name", "assetClass", "currency", "qty",
                                        "price", "value", "cost", "pnl")}
-            h["broker"] = broker or label or None
+            # **`or label` 폴백을 두지 않는다.** 예전엔 해석 실패 시 화면 라벨을 그대로 넣었는데,
+            # 그 라벨은 대개 계좌번호라 `broker='1234567890-14[ISA(...)]'` 같은 값이 나왔다.
+            # 값이 아니라 **라벨을 지어내는** 것이고, 게이트는 침묵했다(측정 test-asset 07-21: 6/34행).
+            # 근거가 없으면 비운다 — 미상은 아래에서 경고로 표면화된다.
+            h["broker"] = broker or None
             atype = str(r.get("accountType") or "")
             # 유형도 계좌 단위 상속: 상세화면 라벨은 줄임말이기 쉽다('퇴직연금' ← '퇴직연금(다이렉트IRP)')
             h["accountType"] = inh_atype or norm_atype(atype or label)
@@ -283,7 +356,7 @@ def finalize(screens, use_llm=True, broker_cache=None):
         grp = _drop_total_rows(grp)          # 화면 제목·탭·소계가 종목처럼 섞여 나오는 것 제거
         holdings.extend(grp)
         groups.append({"file": p["file"], "sum": sum(x["value"] or 0 for x in grp),
-                       "n": len(grp), "rows": grp})
+                       "n": len(grp), "rows": grp, "screen_total": screen_total})
 
     # 상세화면이 없는 '현금 계좌'(CMA 등)는 잔고 자체가 보유자산이다 — 요약에만 있다고 누락시키면
     # 총자산이 어긋난다. 단 현금 계좌라고 라벨이 말할 때만(구성을 모르는 계좌를 현금으로 단정하지 않는다).
@@ -332,7 +405,13 @@ def finalize(screens, use_llm=True, broker_cache=None):
         g["sum"] = sum(x["value"] or 0 for x in g["rows"])
     gate = _cross_check(groups, product_totals, account_totals)
     gate["repairs"] = repairs
-    gate["warnings"] = bad_totals + repairs + gate["warnings"]
+    # 증권사 미상 경고 — **owner 추론까지 끝난 뒤에** 판정한다(그 전에 세면 거짓 경보가 난다).
+    # 비워두는 것 자체는 옳지만 **조용히** 비면 안 된다: 화면에 근거가 없다는 사실이
+    # 사용자에게 보여야 다음 캡처에서 계좌요약 화면을 같이 올릴 수 있다.
+    no_broker = sorted({h.get("_file") or "?" for h in holdings if not h.get("broker")})
+    unknown = [f"{f}: 증권사 미상 — 화면에 근거 없음(계좌요약 화면을 함께 올리면 해결)"
+               for f in no_broker]
+    gate["warnings"] = bad_totals + repairs + fabricated + unknown + gate["warnings"]
     for p in parsed:                     # 빈 화면 = 추출 실패. 조용히 넘기지 않는다.
         if p["type"] == "empty":
             gate["warnings"].insert(0, f"{p['file']}: 추출 0행 — 화면 유실(파싱 실패·미인식) 의심")
@@ -389,6 +468,19 @@ def _cross_check(groups, product_totals, account_totals, tol=0.02):
     for g in groups:
         if g["n"] == 0:
             continue
+        # **화면 자신의 총액이 있으면 먼저 대조한다** — 같은 화면·같은 시점·같은 스코프라
+        # 다른 화면의 총액보다 강한 근거다. 단 **대체가 아니라 추가 검사**다: 아래의 요약총액
+        # 매칭을 건너뛰면 그 총액이 소비되지 않아 '미대조 상품총액' 거짓 경보가 난다
+        # (측정: 정상 입력에 경고 3건 — 게이트 침묵이 깨졌다).
+        st = g.get("screen_total")
+        st_ok = None
+        if st:
+            st_ok = abs(g["sum"] - st) <= abs(st) * tol
+            checks.append({"file": g["file"], "scope": "화면 총액", "sum": g["sum"],
+                           "total": st, "match": st_ok})
+            if not st_ok:
+                warns.append(f"{g['file']}: 상세합 {g['sum']:,.0f} ≠ 화면 총액 {st:,.0f} "
+                             f"({g['sum'] - st:+,.0f}) — 행 누락·오추출 의심")
         best, bi = None, -1
         for i, t in enumerate(totals):
             if used[i] or not t["amt"]:
@@ -404,6 +496,11 @@ def _cross_check(groups, product_totals, account_totals, tol=0.02):
             near = f"{totals[bi]['label']}({totals[bi]['amt']:,.0f})" if bi >= 0 else "없음"
             checks.append({"file": g["file"], "scope": None,
                            "sum": g["sum"], "total": None, "match": False})
+            # 화면 자신의 총액이 있으면 이 뭉뚱그린 경고는 내지 않는다 — 성공했으면 더 강한
+            # 근거로 검증이 끝난 것이고(거짓 경보), 실패했으면 바로 위에서 **차액까지 찍어**
+            # 이미 경고했다(중복). 어느 쪽이든 여기서 덧붙일 정보가 없다.
+            if st_ok is not None:
+                continue
             warns.append(f"{g['file']}: 상세합 {g['sum']:,.0f} — 근접 총액 {near} (환각·오추출 의심)")
 
     for i, t in enumerate(totals):
