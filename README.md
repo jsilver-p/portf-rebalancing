@@ -53,13 +53,29 @@ python3 agent/repack_app.py check                                    # 두 쪽 �
 
 `index.html`을 직접 고치면 다음 `embed`에 **조용히 사라진다.** 커밋엔 항상 두 파일이 같이 오른다 — 원본 diff는 읽히고 `index.html` diff는 `193행 1줄 변경`으로만 보이는 게 정상이다.
 
-`check`는 pre-commit 훅에도 걸려 있다. 한 번 켜두면 된다:
+### 클론마다 1회 — 훅 + 머지 드라이버
 
 ```bash
-git config core.hooksPath .githooks
+bash .githooks/setup.sh
 ```
 
-훅은 작업트리가 아니라 **스테이징된 내용**을 본다. 원본만 `add`하고 `index.html`을 빠뜨리면 작업트리는 멀쩡한데 커밋만 어긋나는데, 그건 커밋될 blob을 봐야만 잡힌다.
+`.git/config`는 커밋되지 않으므로 클론할 때마다 필요하다. 두 가지를 등록한다.
+
+**① pre-commit 게이트** — `check`를 커밋 시점에 강제한다. 훅은 작업트리가 아니라 **스테이징된 내용**을 본다. 원본만 `add`하고 `index.html`을 빠뜨리면 작업트리는 멀쩡한데 커밋만 어긋나는데, 그건 커밋될 blob을 봐야만 잡힌다.
+
+**② `index.html` 머지 드라이버**(`.githooks/merge-app-html`) — 193행은 앱 문서를 통째로 인라인한 117KB **한 줄**이다. 두 브랜치가 프론트를 조금이라도 건드리면 그 한 줄이 양쪽에서 바뀌므로 줄 단위 머지는 **반드시** 충돌한다. 내용이 겹쳐서가 아니라 표현이 한 줄이라서 — 잘못된 층에서 머지하고 있는 것이다.
+
+드라이버는 193행을 디코드해 읽을 수 있는 앱 문서로 되돌린 뒤 그 문서를 3-way 머지하고 다시 심는다(나머지 줄도 따로 3-way — 통째로 '우리 것'을 택하면 저쪽의 정당한 변경이 조용히 사라진다). `app.current.html`은 임베드 문서와 바이트 동일이 강제되므로 두 파일이 **같은 입력·같은 알고리즘**을 타고 같은 결과에 도달한다 → 동기화가 유지된다.
+
+내용이 진짜로 겹치면 그땐 정상적으로 충돌한다. 원본 쪽 충돌만 풀고 재생성하면 된다:
+
+```bash
+# design-source/app.current.html 의 충돌 표시를 해결한 뒤
+python3 agent/repack_app.py embed design-source/app.current.html
+git add design-source/app.current.html index.html
+```
+
+`index.html`의 충돌 표시는 **직접 고치지 말 것** — 언제나 원본에서 재생성한다.
 
 ### 왜 이런 구조인가 — 디자인 툴 경로는 닫혀 있다
 

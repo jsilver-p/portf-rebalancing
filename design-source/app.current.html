@@ -1383,55 +1383,90 @@
     input[type=number]{-moz-appearance:textfield;appearance:textfield;}
     /* ── 표 레이아웃(단일 출처: 헤더·행이 같은 클래스를 공유) ── */
     /* 열 너비: 종목명만 가변(--pf-name-w = 최소폭), 나머지는 고정. 좁은 화면에선 종목명을 더 줄이고
-       잘린 이름은 말줄임 + 툴팁(.pf-name)으로 본다. min-width 는 '고정열 676px + gap 8×8px = 740px'
+       잘린 이름은 말줄임 + 툴팁(.pf-name)으로 본다. min-width 는 '고정열 638px + gap 8×8px = 702px'
        에 종목명 최소폭을 더한 값 — 트랙 합과 어긋나면 표가 잘리거나 빈 여백이 남으므로 같이 계산한다. */
-    .pf-hold-row{--pf-name-w:112px;display:grid;grid-template-columns:minmax(var(--pf-name-w),1fr) 118px 82px 98px 98px 134px 56px 66px 24px;gap:8px;min-width:calc(740px + var(--pf-name-w));}
+    .pf-hold-row{--pf-name-w:128px;display:grid;grid-template-columns:minmax(var(--pf-name-w),1fr) 80px 82px 98px 98px 134px 56px 66px 24px;gap:8px;min-width:calc(702px + var(--pf-name-w));}
     /* 가로: 표가 스크롤을 소유(페이지 아님) — 본문만 overflow-x:auto 로 좌우 스크롤. 세로: 페이지 스크롤.
        컬럼 헤더를 본문 스크롤러 안에 두면 세로 sticky 가 스크롤러에 갇히므로, 헤더는 스크롤러 밖
        .pf-colhead-vp(세로 sticky·가로 clip)에 두고 본문 scrollLeft 를 JS 가 헤더에 그대로 옮긴다.
        세로 고정 스택은 위에서부터 상단바 → STEP 제목 → (STEP1) 추출 결과 → 컬럼 헤더 → 증권사 그룹행.
        각 단의 top 은 '윗단들의 실측 높이 합'이고, 그 높이는 _setSticky 가 :root 변수로 발행한다(단일 출처).
        z-index 는 위 단이 아래 단을 덮도록 내림차순(6→2) — 스택 끝에서 단이 서로 지나갈 때 겹침 순서가 뒤집히지 않게. */
+    /* 상단바 고정 — 모든 폭에서 sticky, 그리고 **높이가 상수다**. 한때 스크롤하면 접었는데(110↔41px)
+       헤더는 flow 안이라 접는 순간 아래 내용 전체가 69px 튀었다 — 스크롤 12px 에 69px 점프.
+       고친 방법은 임계값·보정마진이 아니라 기구 제거다: 접기를 만든 이유였던 총자산·평가손익을
+       STEP2 계좌칩 줄로 내보내니 헤더가 애초에 한 줄(≈62px)이 되어 접을 것이 없어졌다.
+       그러니 이 아래 규칙들에 **스크롤 상태로 갈리는 값을 다시 넣지 말 것** — 점프가 그대로 돌아온다. */
+    .pf-header{position:sticky;top:0;}
+    .pf-header-inner{padding:14px 20px;display:flex;gap:16px;flex-wrap:wrap;}
+    .pf-title{display:flex;flex-direction:column;gap:2px;min-width:0;}
+    .pf-title-1{font-size:18px;font-weight:700;line-height:1.2;}
+    .pf-title-2{font-size:11px;font-weight:500;letter-spacing:0.3px;color:var(--text-tertiary,#999);text-transform:uppercase;}
+    /* 배지 범례 — 넓은 화면은 한 줄(가로), 좁은 화면은 항목별 세로 정렬(아래 미디어쿼리). */
+    .pf-legend{align-items:center;}
+    /* 각 배지+설명은 한 덩어리로 유지(중간 줄바꿈 금지) — 항목 사이에서만 접힌다. */
+    .pf-legend-item{display:inline-flex;align-items:center;gap:4px;white-space:nowrap;}
+    /* 손가락용 히트영역 확장 — 표의 열 폭(--pf-name-w·min-width 트랙 합)은 건드리지 않는다.
+       배지·삭제버튼은 9~15px 글자라 보이는 크기로는 못 누른다. 그려지는 건 그대로, 받는 영역만 넓힌다. */
+    /* z-index:1 이 없으면 확장된 히트영역이 **다음 행**에 덮여 죽는다(뒤에 그려지는 형제가 이긴다).
+       고정 1열(2)·그룹행(3)보다는 낮게 둬 표의 겹침 순서는 그대로 지킨다. */
+    .pf-tap{position:relative;z-index:1;}
+    .pf-tap::before{content:'';position:absolute;inset:-13px;}
+    /* 마지막 열(삭제 ×)만 오른쪽으로는 넓히지 않는다 — 절대배치 확장이 본문 스크롤러의 스크롤 가능
+       폭을 5px 늘려, 컬럼 헤더와 본문의 최대 scrollLeft 가 어긋난다(오른쪽 끝에서 열이 밀린다). */
+    .pf-hold-row > .pf-tap:last-child::before{right:0;}
+    /* 추출 중 업로드 영역 잠금 — data-busy 는 React 가 문자열로 내므로 "true" 를 명시해 본다. */
+    .pf-drop[data-busy="true"]{pointer-events:none;cursor:default;border-color:var(--border-default,#dfdfe8);opacity:0.9;}
+    button:disabled{opacity:0.45;cursor:default;}
     .pf-sec-head{position:sticky;top:var(--pf-bar-h,80px);z-index:6;background:var(--bg-surface,#fff);}
     .pf-res-head{position:sticky;top:calc(var(--pf-bar-h,80px) + var(--pf-sec1-h,37px));z-index:5;}
     /* 표의 좌우 인셋은 표마다 다르다(STEP1 만 12px) — 고정 밴드가 덮어야 할 폭이기도 하므로
        패딩과 밴드 확장이 같은 값을 보게 --pf-tbl-pad 하나로 둔다(단일 출처). 인셋 값은 클래스에
        두고(인라인 style 은 미디어 쿼리로 못 줄인다) 좁은 화면에서 절반으로 접는다. */
     .pf-tbl{padding:0 var(--pf-tbl-pad,0px);--pf-band:calc(-1 * var(--pf-tbl-pad,0px)) 0 0 var(--bg-surface,#fff),var(--pf-tbl-pad,0px) 0 0 var(--bg-surface,#fff);}
-    .pf-tbl-1{--pf-tbl-pad:12px;}
-    .pf-tbl-body{overflow-x:auto;overflow-y:visible;}
+    /* 표별로 다른 값은 여기 두 줄에만 있다 — 좌우 인셋과 그룹행이 붙을 높이. 나머지 규칙은 공용. */
+    .pf-tbl-1{--pf-tbl-pad:12px;--pf-grp-top:calc(var(--pf-bar-h,80px) + var(--pf-sec1-h,37px) + var(--pf-res-h,35px) + var(--pf-ch1-h,32px));}
+    .pf-tbl-2{--pf-tbl-pad:var(--pf-sec-pad,18px);--pf-grp-top:calc(var(--pf-bar-h,80px) + var(--pf-sec2-h,54px) + var(--pf-ch2-h,32px));}
+    /* 세로 소유권은 페이지다. overflow-y:visible 은 overflow-x:auto 와 함께 쓰면 CSS 규칙상 auto 로
+       **계산되므로**(선언이 의도를 표현하지 못한다) 행 높이 서브픽셀 1px 만으로 본문이 세로 스크롤러가
+       된다 — 세로바가 뜨고, 그 위의 휠·터치 팬을 자기가 삼켜 페이지가 안 움직인다(STEP2 실측 Δ0).
+       hidden 으로 명시해 세로로 스크롤할 것 자체를 없앤다. touch-action 은 건드리지 말 것 — pan-x 는
+       '가로만 허용'이라 세로 팬을 아예 금지해 증상을 고착시킨다. */
+    .pf-tbl-body{overflow-x:auto;overflow-y:hidden;}
     .pf-colhead-vp{position:sticky;z-index:4;background:var(--bg-surface,#fff);overflow:hidden;}
     .pf-colhead-1{top:calc(var(--pf-bar-h,80px) + var(--pf-sec1-h,37px) + var(--pf-res-h,35px));}
     .pf-colhead-2{top:calc(var(--pf-bar-h,80px) + var(--pf-sec2-h,54px));}
-    /* 그룹행은 가로로 고정이지만 죽은 영역은 아니다 — 그 위에서 좌우로 밀면 표가 스크롤된다(_grpPan).
+    /* 증권사 그룹행 — 두 표 공용. 그룹마다 본문 스크롤러를 따로 둬 그룹행이 스크롤러 **밖**에 있다:
+       그래야 세로 sticky 가 스크롤러가 아니라 페이지 기준으로 살아나고, 가로로는 애초에 안 움직인다.
+       고정이지만 죽은 영역은 아니다 — 그 위에서 좌우로 밀면 그 그룹 표가 스크롤된다(_grpPan).
        세로/가로 소유권은 touch-action 이 가른다: 세로 팬은 브라우저(페이지 스크롤), 가로는 핸들러. */
-    .pf-grp-1{position:sticky;top:calc(var(--pf-bar-h,80px) + var(--pf-sec1-h,37px) + var(--pf-res-h,35px) + var(--pf-ch1-h,32px));z-index:3;touch-action:pan-y;user-select:none;}
+    .pf-grp-sticky{position:sticky;top:var(--pf-grp-top);z-index:3;touch-action:pan-y;user-select:none;}
+    /* 증권사명은 길면 그룹행(flex)을 가로로 밀어낸다 — 폭을 묶고 잘린 건 탭해서 본다(.pf-name 과 같은 _tip). */
+    .pf-grp-name{max-width:clamp(96px,34vw,220px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:none;}
     /* 고정 밴드(컬럼 헤더·그룹행)는 표 좌우 여백(--pf-tbl-pad)까지 불투명하게 덮는다 —
        그 여백이 비어 있으면 뒤로 지나가는 내용이 밴드 옆으로 새어 보인다(첫 열 고정과 같은 이유). */
-    .pf-colhead-vp,.pf-grp-1{box-shadow:var(--pf-band);}
+    .pf-colhead-vp,.pf-grp-sticky{box-shadow:var(--pf-band);}
     /* 가려진 내용 신호 — 고정 스택의 **맨 아래** 단에만 얕은 그림자를 켠다(_setScrim). 그 단이 붙어 있다는 건
        바로 아래로 내용이 지나가고 있다는 뜻. ::after 띠가 아니라 box-shadow 인 이유: 컬럼 헤더 뷰포트는
        overflow:hidden 이라 자식으로 그린 띠가 잘린다. 밴드는 좌우 덮개(--pf-band)를 잃지 않게 같이 쓴다. */
     .pf-scrim{box-shadow:var(--pf-scrim);}
-    .pf-colhead-vp.pf-scrim,.pf-grp-1.pf-scrim{box-shadow:var(--pf-band),var(--pf-scrim);}
+    .pf-colhead-vp.pf-scrim,.pf-grp-sticky.pf-scrim{box-shadow:var(--pf-band),var(--pf-scrim);}
     /* 가로 스크롤 시 첫 열(종목명) 고정 — 헤더·본문 모두 각자 스크롤러(.pf-colhead-vp/.pf-tbl-body) 왼쪽에
        sticky. 스크롤 중(.pf-hx)엔 셀 좌우의 투명 여백(좌 8px 인셋·우 8px 그리드 gap)을 불투명 밴드로
        메워 뒤 내용이 새어 보이지 않게 하고, 그 바깥에 소프트 그림자로 프리즈 경계를 표시. */
     .pf-hold-row > :first-child{position:sticky;left:8px;z-index:2;background:var(--bg-surface,#fff);}
     .pf-hx .pf-hold-row > :first-child{box-shadow:-8px 0 0 var(--bg-surface,#fff),8px 0 0 var(--bg-surface,#fff),11px 0 8px -6px rgba(0,0,0,0.14);}
-    /* 증권사 그룹행(브로커·합계) — STEP2 는 아직 그룹행이 본문 스크롤러 안에 있어 가로 고정만 가능하다.
-       sc-for 래퍼 div 가 그룹행의 containing block 이라 그룹행을 직접 sticky 하면 래퍼 폭(=뷰포트)에
-       갇혀 무효 → 래퍼(:has)를 sticky 로 만들어 본문 스크롤 폭(858px) 안에서 고정되게 한다.
-       STEP1 은 그룹마다 본문 스크롤러를 따로 둬 그룹행이 스크롤러 **밖**에 있다(.pf-grp-1) —
-       그래서 세로 sticky 가 페이지 기준으로 살아나고, 가로로는 애초에 움직이지 않는다. */
-    .pf-tbl-body > div:has(> .pf-grp-row){position:sticky;left:0;z-index:3;background:var(--bg-surface,#fff);}
     .pf-grp-row{background:var(--bg-surface,#fff);}
     /* 종목명은 좁아서 잘린다 — 잘린 것만 커서 올림/탭에서 풀네임을 띄운다(_tip). 표 안에 그리면
-       본문 스크롤러(overflow-x:auto → overflow-y 도 auto)가 위아래로 잘라내므로 body 에 띄운다. */
+       본문 스크롤러(overflow-y:hidden)가 위아래로 잘라내므로 body 에 띄운다. */
     .pf-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
     .pf-tip{position:fixed;z-index:100;max-width:min(76vw,420px);padding:5px 9px;border-radius:6px;background:rgba(0,0,0,0.86);color:#fff;font-size:12px;font-weight:600;line-height:1.35;pointer-events:none;box-shadow:0 4px 14px rgba(0,0,0,0.24);overflow-wrap:anywhere;}
     .pf-analysis{display:grid;grid-template-columns:250px 1fr;gap:20px;}
     .pf-num{font-variant-numeric:tabular-nums;}
+    /* 금액 가리기 — 값을 지우는 게 아니라 흐린다. 폭이 그대로라 토글해도 표가 전혀 안 흔들리고,
+       "값이 있는데 가려둔 것"으로 읽힌다(빈칸·기호는 '데이터 없음'과 헷갈린다).
+       블러 반경을 em 으로 두는 이유 — 17px 총자산과 12.5px 셀이 같은 정도로 흐려져야 한다. */
+    [data-mask="1"] .pf-money{filter:blur(0.3em);user-select:none;}
     /* ── STEP 섹션 뼈대(카드·라벨·제목·설명이 5개 섹션에 반복) ── */
     /* overflow:visible — sticky 섹션 제목이 카드 안에 갇히지 않고 페이지 기준으로 고정되게 */
     .pf-card{background:var(--bg-surface,#fff);border:1px solid var(--border-default,#dfdfe8);border-radius:10px;overflow:visible;}
@@ -1444,44 +1479,40 @@
       .pf-analysis{grid-template-columns:1fr;}
       :root{--pf-page-pad:6px;--pf-sec-pad:8px;}
       .pf-tbl-1{--pf-tbl-pad:6px;}
-      .pf-hold-row{--pf-name-w:84px;}
+      .pf-hold-row{--pf-name-w:104px;}
+      .pf-header-inner{padding:10px 12px;gap:10px;}
+      .pf-legend{flex-direction:column;align-items:flex-start;gap:6px;}
     }
   </style>
 </helmet>
 
-<div data-reading="{{ readingAttr }}" style="min-height:100vh;font-family:var(--font-ui,system-ui);color:var(--text-primary,#000);background:var(--bg-app,#fafafa);">
+<div data-reading="{{ readingAttr }}" data-mask="{{ maskAttr }}" style="min-height:100vh;font-family:var(--font-ui,system-ui);color:var(--text-primary,#000);background:var(--bg-app,#fafafa);">
 
   <!-- ── Header ─────────────────────────────── -->
-  <header style="position:sticky;top:0;z-index:20;background:var(--bg-surface,#fff);border-bottom:1px solid var(--border-default,#dfdfe8);">
-    <div style="max-width:1060px;margin:0 auto;padding:14px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;row-gap:6px;">
-      <div style="display:flex;flex-direction:column;gap:2px;">
-        <span style="font-size:18px;font-weight:700;line-height:1.2;">포트폴리오</span>
-        <span style="font-size:11px;font-weight:500;letter-spacing:0.3px;color:var(--text-tertiary,#999);text-transform:uppercase;">Rebalancing Dashboard</span>
+  <!-- 상시 고정이고 **높이가 안 변한다**(≈62px). 담는 것은 화면 전체에 걸리는 것뿐 —
+       여기가 어느 앱인지(제목), 추출이 어디로 가는지(에이전트), 금액을 가릴지(눈). 포트폴리오 값
+       (총자산·평가손익)은 STEP2 로 내려갔다: 헤더에 두면 두 줄이 되고, 그걸 접으려다 점프가 생겼다. -->
+  <header class="pf-header" style="z-index:20;background:var(--bg-surface,#fff);border-bottom:1px solid var(--border-default,#dfdfe8);">
+    <div class="pf-header-inner" style="max-width:1060px;margin:0 auto;align-items:center;row-gap:6px;">
+      <!-- 미디어쿼리가 덮어야 하는 값(flex-direction·font-size·display·gap·flex-wrap)은 인라인이 아니라
+           클래스에 둔다 — 인라인 style 은 어떤 선택자도 못 이긴다(.pf-header 의 position 과 같은 이유). -->
+      <div class="pf-title">
+        <span class="pf-title-1">포트폴리오</span>
+        <span class="pf-title-2">Rebalancing Dashboard</span>
       </div>
       <div style="flex:1;"></div>
-      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;">
-        <div style="display:flex;align-items:center;gap:6px;">
-          <span style="font-size:11px;font-weight:500;letter-spacing:0.3px;color:var(--text-tertiary,#999);">에이전트</span>
-          <input value="{{ agentUrlInput }}" onchange="{{ onAgentUrl }}" onkeydown="{{ onKeyEnter }}" placeholder="https://…trycloudflare.com" style="width:186px;border:1px solid var(--border-default,#dfdfe8);border-radius:3px;padding:5px 8px;font-size:12px;background:var(--bg-surface,#fff);color:var(--text-primary,#000);">
-        </div>
-        <span style="font-size:10.5px;font-weight:600;color:{{ connColor }};">{{ connStatus }}</span>
+      <!-- 에이전트 — 칩에 상태만, 탭하면 URL 입력이 열린다(헤더 폭을 186px 입력칸에 상시 내주지 않는다) -->
+      <div style="position:relative;flex:none;">
+        <button onclick="{{ onAgentToggle }}" title="에이전트 연결 설정" style="display:flex;align-items:center;gap:5px;border:1px solid var(--border-default,#dfdfe8);background:var(--bg-surface,#fff);border-radius:999px;padding:5px 11px;font-size:11.5px;font-weight:600;cursor:pointer;color:{{ connColor }};white-space:nowrap;" style-hover="border-color:var(--ig-blue,#1fa1ff);"><span class="pf-chip-label" style="font-size:10px;font-weight:500;color:var(--text-tertiary,#999);">에이전트</span>{{ connStatus }}</button>
+        <sc-if value="{{ agentOpen }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;top:calc(100% + 6px);right:0;z-index:30;display:flex;flex-direction:column;gap:5px;background:var(--bg-surface,#fff);border:1px solid var(--border-default,#dfdfe8);border-radius:8px;padding:10px 12px;box-shadow:0 6px 20px rgba(0,0,0,0.14);">
+            <span style="font-size:10.5px;font-weight:600;letter-spacing:0.3px;color:var(--text-tertiary,#999);">로컬 에이전트 주소</span>
+            <input value="{{ agentUrlInput }}" onchange="{{ onAgentUrl }}" onkeydown="{{ onKeyEnter }}" placeholder="https://…trycloudflare.com" style="width:230px;border:1px solid var(--border-default,#dfdfe8);border-radius:5px;padding:6px 9px;font-size:12px;background:var(--bg-surface,#fff);color:var(--text-primary,#000);">
+            <span style="font-size:10.5px;font-weight:600;color:{{ connColor }};">{{ connStatus }}</span>
+          </div>
+        </sc-if>
       </div>
-      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;">
-        <div style="display:flex;align-items:center;gap:6px;">
-          <span style="font-size:11px;font-weight:500;letter-spacing:0.3px;color:var(--text-tertiary,#999);">USD/KRW</span>
-          <input type="number" value="{{ fx }}" onchange="{{ onFxChange }}" onkeydown="{{ onKeyEnter }}" style="width:76px;border:1px solid var(--border-default,#dfdfe8);border-radius:3px;padding:5px 8px;font-size:13px;font-weight:600;text-align:right;background:var(--bg-surface,#fff);color:var(--text-primary,#000);">
-          <button onclick="{{ onFxRefresh }}" title="환율 새로고침" style="border:1px solid var(--border-default,#dfdfe8);background:var(--bg-surface,#fff);border-radius:3px;width:27px;height:27px;cursor:pointer;font-size:13px;line-height:1;color:var(--text-secondary,#6e6e6e);" style-hover="color:var(--ig-blue,#1fa1ff);border-color:var(--ig-blue,#1fa1ff);">↻</button>
-        </div>
-        <span style="font-size:10.5px;color:{{ fxMetaColor }};">{{ fxMeta }}</span>
-      </div>
-      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:1px;">
-        <span style="font-size:11px;font-weight:500;letter-spacing:0.3px;color:var(--text-tertiary,#999);">총자산</span>
-        <span style="font-size:17px;font-weight:700;">{{ totalStr }}</span>
-      </div>
-      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:1px;">
-        <span style="font-size:11px;font-weight:500;letter-spacing:0.3px;color:var(--text-tertiary,#999);">평가손익</span>
-        <span style="font-size:14px;font-weight:700;color:{{ plColor }};">{{ plStr }}</span>
-      </div>
+      <button class="pf-tap" onclick="{{ onMask }}" title="{{ maskTitle }}" style="flex:none;border:1px solid var(--border-default,#dfdfe8);background:var(--bg-surface,#fff);border-radius:999px;width:29px;height:29px;cursor:pointer;font-size:13px;line-height:1;padding:0;" style-hover="border-color:var(--ig-blue,#1fa1ff);">{{ maskIcon }}</button>
     </div>
   </header>
 
@@ -1492,14 +1523,24 @@
       <div class="pf-sec-head" data-sechead="1" style="padding:14px var(--pf-sec-pad,18px) 0;display:flex;align-items:baseline;gap:10px;">
         <span class="pf-step">STEP 1</span>
         <span class="pf-step-title">스크린샷 업로드</span>
-        <span class="pf-step-desc">스크린샷 = 그 계좌의 현재 스냅샷 — 갱신·추가는 물론, 화면에 없는 종목은 자동 제거됩니다</span>
+      </div>
+      <!-- 설명문은 고정 밴드 **밖**이다 — 안에 두면 좁은 화면에서 랩되며 밴드를 60px 로 부풀려
+           (실측: 포함 60 / 제외 37) 표를 덮는다. 한 번 읽는 안내이므로 그냥 같이 스크롤돼 사라진다.
+           스크롤 상태로 숨기는 방식은 쓰지 않는다 — 그러면 이번엔 이 밴드가 튄다(헤더와 같은 병). -->
+      <div style="padding:8px var(--pf-sec-pad,18px) 0;">
+        <span class="pf-step-desc">스크린샷이 그 계좌의 현재 스냅샷 — 화면에 없는 종목은 자동 제거됩니다</span>
       </div>
       <div style="padding:14px var(--pf-sec-pad,18px) 18px;">
-        <label ondrop="{{ onDrop }}" ondragover="{{ onDragOver }}" style="display:flex;align-items:center;justify-content:center;gap:12px;border:1.5px dashed var(--border-strong,#c4c4c4);border-radius:8px;padding:26px 16px;cursor:pointer;background:var(--bg-app,#fafafa);" style-hover="border-color:var(--ig-blue,#1fa1ff);background:#f4faff;">
+        <!-- 추출 중엔 이 영역이 입력을 받지 않는다(pointer-events:none) — 실제 차단은 extractFiles
+             진입부 한 줄이고(파일선택·드롭·프로그램 호출이 다 거기로 모인다), 여기는 어포던스다. -->
+        <label class="pf-drop" data-busy="{{ extracting }}" ondrop="{{ onDrop }}" ondragover="{{ onDragOver }}" style="display:flex;align-items:center;justify-content:center;gap:12px;border:1.5px dashed var(--border-strong,#c4c4c4);border-radius:8px;padding:26px 16px;cursor:pointer;background:var(--bg-app,#fafafa);" style-hover="border-color:var(--ig-blue,#1fa1ff);background:#f4faff;">
           <input type="file" accept="image/*" multiple="" onchange="{{ onFiles }}" style="display:none;">
           <sc-if value="{{ extracting }}" hint-placeholder-val="{{ false }}">
             <span style="width:18px;height:18px;border:2px solid var(--ig-blue,#1fa1ff);border-top-color:transparent;border-radius:50%;animation:pfspin 0.8s linear infinite;flex:none;"></span>
-            <span style="font-size:13px;font-weight:600;color:var(--ig-blue,#1fa1ff);">{{ extractStatus }}</span>
+            <span style="display:flex;flex-direction:column;gap:2px;">
+              <span style="font-size:13px;font-weight:600;color:var(--ig-blue,#1fa1ff);">{{ extractStatus }}</span>
+              <span style="font-size:11.5px;color:var(--text-tertiary,#999);">끝나면 새 화면을 추가할 수 있어요</span>
+            </span>
           </sc-if>
           <sc-if value="{{ notExtracting }}" hint-placeholder-val="{{ true }}">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-tertiary,#999);"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><path d="M21 15l-5-5L5 21"></path></svg>
@@ -1507,13 +1548,13 @@
           </sc-if>
         </label>
         <div style="margin-top:10px;font-size:12px;line-height:1.55;color:var(--text-secondary,#6e6e6e);background:var(--bg-app,#fafafa);border:1px solid var(--border-default,#dfdfe8);border-radius:8px;padding:10px 12px;">
-          📸 <b>종목명 · 수량 · 매수금액</b>(또는 <b>평가손익</b>)이 보이는 보유목록 화면이 가장 정확합니다.
-          화면에 없는 값은 캡처 시점 시세로 <b>자동 추정</b>해 <span style="color:var(--ig-blue,#1fa1ff);font-weight:600;">‘추정’</span>으로 표시돼요(정확도가 낮으면 따로 표시하고, 정수 확정이 어려우면 비워 둡니다).
-          <span style="color:var(--text-tertiary,#999);">연금·상품별 화면은 수량이 안 보일 수 있으니, 종목별/잔고 화면이 있으면 함께 올리면 좋습니다.</span>
+          📸 <b>종목명·수량·매수금액</b>(또는 <b>평가손익</b>)이 보이는 화면이 가장 정확해요. 없는 값은 시세로 <span style="color:var(--ig-blue,#1fa1ff);font-weight:600;">자동 추정</span>합니다.
+          <span style="color:var(--text-tertiary,#999);">연금 등 수량이 안 보이는 화면은 종목별/잔고 화면을 함께 올리면 채워져요.</span>
         </div>
         <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
-          <button onclick="{{ onLoadDemo }}" style="border:1px solid var(--border-default,#dfdfe8);background:var(--bg-surface,#fff);border-radius:999px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;color:var(--text-secondary,#6e6e6e);" style-hover="border-color:var(--ig-blue,#1fa1ff);color:var(--ig-blue,#1fa1ff);">예시 데이터로 둘러보기</button>
-          <button onclick="{{ onDemoStream }}" title="에이전트 없이 라이브 추출·게이트 자릿수 보정 흐름을 예시로 재생" style="border:1px solid var(--border-default,#dfdfe8);background:var(--bg-surface,#fff);border-radius:999px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;color:var(--text-secondary,#6e6e6e);" style-hover="border-color:var(--ig-blue,#1fa1ff);color:var(--ig-blue,#1fa1ff);">▶ 라이브 추출·게이트 보정 예시</button>
+          <!-- 데모 두 개도 추출 중엔 잠근다 — 둘 다 상태를 통째로 갈아엎어 진행 중인 스트림을 깨뜨린다. -->
+          <button disabled="{{ extracting }}" onclick="{{ onLoadDemo }}" style="border:1px solid var(--border-default,#dfdfe8);background:var(--bg-surface,#fff);border-radius:999px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;color:var(--text-secondary,#6e6e6e);" style-hover="border-color:var(--ig-blue,#1fa1ff);color:var(--ig-blue,#1fa1ff);">예시 데이터로 둘러보기</button>
+          <button disabled="{{ extracting }}" onclick="{{ onDemoStream }}" title="에이전트 없이 라이브 추출·게이트 자릿수 보정 흐름을 예시로 재생" style="border:1px solid var(--border-default,#dfdfe8);background:var(--bg-surface,#fff);border-radius:999px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;color:var(--text-secondary,#6e6e6e);" style-hover="border-color:var(--ig-blue,#1fa1ff);color:var(--ig-blue,#1fa1ff);">▶ 라이브 추출·게이트 보정 예시</button>
         </div>
         <sc-if value="{{ hasError }}" hint-placeholder-val="{{ false }}">
           <div style="margin-top:10px;font-size:12.5px;color:var(--ig-red-heart,#ed4956);font-weight:600;">{{ extractError }}</div>
@@ -1543,31 +1584,42 @@
                    세로 sticky 가 페이지 기준으로 살아난다. 스크롤러들의 scrollLeft 는 _hsync 가 하나로 맞춘다. -->
               <sc-for list="{{ streamGroups }}" as="g" hint-placeholder-count="2">
                 <div>
-                  <div class="pf-grp-row pf-grp-1" style="display:flex;align-items:center;gap:8px;padding:11px 8px 5px;border-bottom:2px solid var(--border-strong,#c4c4c4);margin-top:5px;">
-                    <span style="font-size:13px;font-weight:700;color:var(--text-primary,#000);white-space:nowrap;">{{ g.broker }}</span>
-                    <span style="font-size:10px;font-weight:700;color:#fff;background:{{ g.atypeColor }};padding:1.5px 8px;border-radius:999px;letter-spacing:0.3px;white-space:nowrap;">{{ g.atype }}</span>
+                  <div class="pf-grp-row pf-grp-sticky" style="display:flex;align-items:center;gap:8px;padding:11px 8px 5px;border-bottom:2px solid var(--border-strong,#c4c4c4);margin-top:5px;">
+                    <span class="pf-grp-name" data-full="{{ g.broker }}" tabindex="0" style="font-size:13px;font-weight:700;color:var(--text-primary,#000);">{{ g.broker }}</span>
+                    <span style="font-size:10px;font-weight:700;color:#fff;background:{{ g.atypeColor }};padding:1.5px 8px;border-radius:999px;letter-spacing:0.3px;white-space:nowrap;flex:none;">{{ g.atype }}</span>
                     <div style="flex:1;"></div>
-                    <span style="font-size:11.5px;color:var(--text-tertiary,#999);white-space:nowrap;">합계 <b style="color:var(--text-primary,#000);font-size:12.5px;">{{ g.subtotalStr }}</b></span>
+                    <span style="font-size:11.5px;color:var(--text-tertiary,#999);white-space:nowrap;flex:none;">합계 <b class="pf-money" style="color:var(--text-primary,#000);font-size:12.5px;">{{ g.subtotalStr }}</b></span>
                   </div>
-                  <div class="pf-tbl-body pf-tbl-body-1">
+                  <div class="pf-tbl-body">
                   <sc-for list="{{ g.rows }}" as="sr" hint-placeholder-count="3">
                     <div>
                       <div class="pf-hold-row pf-stream-row" style="align-items:center;padding:6px 8px;border-bottom:1px solid var(--ig-gray-05,#efefef);">
                         <div style="display:flex;align-items:center;gap:4px;min-width:0;">
                           <sc-if value="{{ sr.hasImg }}" hint-placeholder-val="{{ false }}"><span title="이미지 {{ sr.imgTag }}에서 추출" style="font-size:8px;font-weight:700;color:var(--text-tertiary,#999);background:var(--bg-secondary,#efefef);padding:0.5px 4px;border-radius:3px;flex:none;">{{ sr.imgTag }}</span></sc-if>
-                          <sc-if value="{{ sr.nameReview }}" hint-placeholder-val="{{ false }}"><span data-tip="{{ sr.nameTitle }}" tabindex="0" style="font-size:9px;font-weight:700;color:#b8860b;background:#fff3cd;border:1px solid #f0d48a;padding:0 3px;border-radius:3px;flex:none;cursor:pointer;">⚠</span></sc-if>
-                          <span class="pf-name" data-full="{{ sr.name }}" tabindex="0" style="font-size:13px;font-weight:600;color:var(--text-primary,#000);">{{ sr.name }}</span>
+                          <sc-if value="{{ sr.editable }}" hint-placeholder-val="{{ false }}"><input value="{{ sr.name }}" data-full="{{ sr.name }}" onchange="{{ sr.onName }}" onkeydown="{{ sr.onKeyEnter }}" style="border:none;background:transparent;font-size:13px;font-weight:600;padding:3px 2px;min-width:0;flex:1;color:var(--text-primary,#000);"></sc-if>
+                          <sc-if value="{{ sr.readonly }}" hint-placeholder-val="{{ true }}"><span class="pf-name" data-full="{{ sr.name }}" tabindex="0" style="font-size:13px;font-weight:600;flex:1;color:var(--text-primary,#000);">{{ sr.name }}</span></sc-if>
+                          <sc-if value="{{ sr.nameReview }}" hint-placeholder-val="{{ false }}"><span class="pf-tap" data-tip="{{ sr.nameTitle }}" tabindex="0" style="font-size:9px;font-weight:700;color:#b8860b;background:#fff3cd;border:1px solid #f0d48a;padding:0 3px;border-radius:3px;flex:none;cursor:pointer;">⚠</span></sc-if>
                         </div>
-                        <span style="font-size:12px;font-weight:600;color:{{ sr.clsColor }};white-space:nowrap;">{{ sr.clsLabel }}</span>
+                        <sc-if value="{{ sr.editable }}" hint-placeholder-val="{{ false }}"><select value="{{ sr.cls }}" onchange="{{ sr.onCls }}" style="border:none;background:transparent;font-size:12px;padding:3px 0;color:{{ sr.clsColor }};font-weight:600;"><sc-for list="{{ classOpts }}" as="o" hint-placeholder-count="3"><option value="{{ o.key }}">{{ o.label }}</option></sc-for></select></sc-if>
+                        <sc-if value="{{ sr.readonly }}" hint-placeholder-val="{{ true }}"><span style="font-size:12px;font-weight:600;color:{{ sr.clsColor }};white-space:nowrap;">{{ sr.clsLabel }}</span></sc-if>
                         <div style="display:flex;align-items:center;justify-content:flex-end;gap:3px;min-width:0;">
-                          <sc-if value="{{ sr.qtyBadge }}" hint-placeholder-val="{{ false }}"><span data-tip="{{ sr.qtyExplain }}" tabindex="0" style="font-size:9px;font-weight:700;color:{{ sr.qtyBadgeC }};background:{{ sr.qtyBadgeBg }};border:1px solid {{ sr.qtyBadgeBd }};padding:0 4px;border-radius:3px;flex:none;cursor:pointer;white-space:nowrap;">{{ sr.qtyBadgeText }}</span></sc-if>
-                          <span class="pf-num" style="font-size:12.5px;text-align:right;color:var(--text-primary,#000);">{{ sr.qtyStr }}</span>
+                          <sc-if value="{{ sr.editable }}" hint-placeholder-val="{{ false }}"><input value="{{ sr.qtyInput }}" onchange="{{ sr.onQty }}" onkeydown="{{ sr.onKeyEnter }}" placeholder="—" class="pf-num" style="border:none;background:transparent;font-size:12.5px;text-align:right;padding:3px 2px;min-width:0;flex:1;color:var(--text-primary,#000);"></sc-if>
+                          <sc-if value="{{ sr.readonly }}" hint-placeholder-val="{{ true }}"><span class="pf-num" style="font-size:12.5px;text-align:right;flex:1;color:var(--text-primary,#000);">{{ sr.qtyStr }}</span></sc-if>
+                          <sc-if value="{{ sr.qtyBadge }}" hint-placeholder-val="{{ false }}"><span class="pf-tap" data-tip="{{ sr.qtyExplain }}" tabindex="0" style="font-size:9px;font-weight:700;color:{{ sr.qtyBadgeC }};background:{{ sr.qtyBadgeBg }};border:1px solid {{ sr.qtyBadgeBd }};padding:0 4px;border-radius:3px;flex:none;cursor:pointer;white-space:nowrap;">{{ sr.qtyBadgeText }}</span></sc-if>
                         </div>
-                        <span class="pf-num" style="font-size:12.5px;text-align:right;color:var(--text-primary,#000);">{{ sr.priceStr }}</span>
-                        <span class="pf-num" style="font-size:12.5px;text-align:right;color:var(--text-primary,#000);">{{ sr.avgStr }}</span>
+                        <div style="display:flex;align-items:center;justify-content:flex-end;gap:3px;min-width:0;">
+                          <sc-if value="{{ sr.editable }}" hint-placeholder-val="{{ false }}"><input value="{{ sr.priceInput }}" onchange="{{ sr.onPrice }}" onkeydown="{{ sr.onKeyEnter }}" placeholder="—" class="pf-num" style="border:none;background:transparent;font-size:12.5px;text-align:right;padding:3px 0;width:100%;min-width:0;color:var(--text-primary,#000);"></sc-if>
+                          <sc-if value="{{ sr.readonly }}" hint-placeholder-val="{{ true }}"><span class="pf-num" style="font-size:12.5px;text-align:right;color:var(--text-primary,#000);">{{ sr.priceStr }}</span></sc-if>
+                          <span style="font-size:10px;color:var(--text-tertiary,#999);flex:none;">{{ sr.cur }}</span>
+                        </div>
+                        <div style="display:flex;align-items:center;justify-content:flex-end;gap:3px;min-width:0;">
+                          <span class="pf-num" style="font-size:12.5px;text-align:right;color:var(--text-primary,#000);">{{ sr.avgStr }}</span>
+                          <span style="font-size:10px;color:var(--text-tertiary,#999);flex:none;">{{ sr.cur }}</span>
+                        </div>
                         <div style="display:flex;align-items:center;justify-content:flex-end;gap:4px;min-width:0;">
-                          <sc-if value="{{ sr.corrected }}" hint-placeholder-val="{{ false }}"><span data-tip="{{ sr.correctedTitle }}" tabindex="0" style="font-size:9px;font-weight:700;color:#2e7d32;background:#e7f4e8;border:1px solid #b6dcb9;padding:0 4px;border-radius:3px;flex:none;cursor:pointer;">✓ 보정</span></sc-if>
-                          <span class="pf-num" style="font-size:12.5px;font-weight:600;text-align:right;">{{ sr.valueStr }}</span>
+                          <sc-if value="{{ sr.valueEdit }}" hint-placeholder-val="{{ false }}"><input value="{{ sr.valueInput }}" disabled="{{ sr.valueLock }}" onchange="{{ sr.onValue }}" onkeydown="{{ sr.onKeyEnter }}" class="pf-num pf-money" style="border:none;background:transparent;font-size:12.5px;font-weight:600;text-align:right;padding:3px 2px;min-width:0;flex:1;color:var(--text-primary,#000);"></sc-if>
+                          <sc-if value="{{ sr.valueRO }}" hint-placeholder-val="{{ true }}"><span class="pf-num pf-money" style="font-size:12.5px;font-weight:600;text-align:right;flex:1;">{{ sr.valueStr }}</span></sc-if>
+                          <sc-if value="{{ sr.corrected }}" hint-placeholder-val="{{ false }}"><span class="pf-tap" data-tip="{{ sr.correctedTitle }}" tabindex="0" style="font-size:9px;font-weight:700;color:#2e7d32;background:#e7f4e8;border:1px solid #b6dcb9;padding:0 4px;border-radius:3px;flex:none;cursor:pointer;">✓ 보정</span></sc-if>
                         </div>
                         <span class="pf-num" style="font-size:12.5px;text-align:right;color:var(--text-secondary,#6e6e6e);">{{ sr.weightStr }}</span>
                         <span class="pf-num" style="font-size:12.5px;font-weight:600;text-align:right;color:{{ sr.plColor }};">{{ sr.plStr }}</span>
@@ -1579,12 +1631,22 @@
                 </div>
               </sc-for>
             </div>
+            <!-- 자동 점검 결과 — 서버 게이트가 한 일을 사람 말로. 요약 한 줄이 기본이고 상세는 펼침.
+                 각 줄을 탭하면 서버 원문이 뜬다(번역 규칙에 안 걸린 줄은 원문이 그대로 본문이다). -->
             <sc-if value="{{ hasGate }}" hint-placeholder-val="{{ false }}">
-              <div style="padding:8px 12px;border-top:1px solid var(--border-default,#dfdfe8);background:#fffdf5;display:flex;flex-direction:column;gap:3px;">
-                <span style="font-size:10px;font-weight:700;letter-spacing:0.4px;color:#b8860b;">게이트 대조</span>
-                <sc-for list="{{ gateLines }}" as="gl" hint-placeholder-count="1">
-                  <span style="font-size:11px;color:var(--text-secondary,#6e6e6e);line-height:1.5;">· {{ gl.text }}</span>
-                </sc-for>
+              <div style="padding:8px 12px;border-top:1px solid var(--border-default,#dfdfe8);background:#fffdf5;display:flex;flex-direction:column;gap:4px;">
+                <button onclick="{{ onGate }}" style="border:none;background:transparent;padding:0;display:flex;align-items:center;gap:6px;cursor:pointer;text-align:left;">
+                  <span style="font-size:10px;font-weight:700;letter-spacing:0.4px;color:#b8860b;">자동 점검 결과</span>
+                  <span style="font-size:11px;color:var(--text-secondary,#6e6e6e);">{{ gateSummary }}</span>
+                  <span style="font-size:10px;color:var(--text-tertiary,#999);">{{ gateCaret }}</span>
+                </button>
+                <sc-if value="{{ gateOpen }}" hint-placeholder-val="{{ true }}">
+                  <div style="display:flex;flex-direction:column;gap:3px;">
+                    <sc-for list="{{ gateLines }}" as="gl" hint-placeholder-count="1">
+                      <span data-tip="{{ gl.raw }}" tabindex="0" style="font-size:11.5px;color:var(--text-secondary,#6e6e6e);line-height:1.5;cursor:pointer;">{{ gl.icon }} {{ gl.text }}</span>
+                    </sc-for>
+                  </div>
+                </sc-if>
               </div>
             </sc-if>
             <sc-if value="{{ hasStreamSummary }}" hint-placeholder-val="{{ false }}">
@@ -1608,13 +1670,33 @@
       <div class="pf-sec-head" data-sechead="2" style="padding:14px var(--pf-sec-pad,18px) 10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
         <span class="pf-step">STEP 2</span>
         <span class="pf-step-title">통합 보유 현황</span>
+        <!-- 총자산은 계좌칩과 같은 문법으로 그 줄 맨 앞에 둔다(색만 반전) — 고정 밴드라 표를 스크롤하는
+             내내 보인다. 평가손익 '금액'은 칩을 한 줄로 유지하려고 data-tip 으로 뺀다(_tip 재사용). -->
+        <span class="pf-tap" data-tip="{{ plTip }}" tabindex="0" style="display:inline-flex;align-items:baseline;gap:6px;background:var(--text-primary,#000);border-radius:999px;padding:4px 11px;font-size:11.5px;color:#fff;cursor:pointer;">
+          <span style="opacity:0.6;">총자산</span><b class="pf-money pf-num">{{ totalStr }}</b><span style="font-weight:700;color:{{ plChipColor }};">{{ plPct }}</span>
+        </span>
         <sc-for list="{{ acctChips }}" as="c" hint-placeholder-count="2">
           <span style="display:inline-flex;align-items:baseline;gap:5px;background:var(--bg-secondary,#efefef);border-radius:999px;padding:4px 10px;font-size:11.5px;">
-            <b>{{ c.label }}</b><span style="color:var(--text-secondary,#6e6e6e);">{{ c.value }}</span>
+            <b>{{ c.label }}</b><span class="pf-money" style="color:var(--text-secondary,#6e6e6e);">{{ c.value }}</span>
           </span>
         </sc-for>
+      </div>
+      <!-- 툴바는 고정 밴드(.pf-sec-head) **밖**이다 — 좁은 화면에서 3~4줄로 랩되면서 고정 높이를
+           120px+ 로 부풀려 표를 덮었다. 고정되는 건 제목·계좌칩까지, 조작 줄은 같이 스크롤된다.
+           환율은 평가금액을 만드는 파라미터라 여기(평가 결과를 보는 표)가 제자리다. -->
+      <div style="padding:0 var(--pf-sec-pad,18px) 10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11.5px;">
+        <span style="display:inline-flex;align-items:center;gap:6px;">
+          <span style="font-size:11px;font-weight:500;letter-spacing:0.3px;color:var(--text-tertiary,#999);">USD/KRW</span>
+          <input type="number" value="{{ fx }}" onchange="{{ onFxChange }}" onkeydown="{{ onKeyEnter }}" style="width:76px;border:1px solid var(--border-default,#dfdfe8);border-radius:6px;padding:5px 8px;font-size:13px;font-weight:600;text-align:right;background:var(--bg-surface,#fff);color:var(--text-primary,#000);">
+          <button onclick="{{ onFxRefresh }}" title="환율 새로고침" style="border:1px solid var(--border-default,#dfdfe8);background:var(--bg-surface,#fff);border-radius:6px;width:27px;height:27px;cursor:pointer;font-size:13px;line-height:1;color:var(--text-secondary,#6e6e6e);" style-hover="color:var(--ig-blue,#1fa1ff);border-color:var(--ig-blue,#1fa1ff);">↻</button>
+          <span style="font-size:10.5px;color:{{ fxMetaColor }};">{{ fxMeta }}</span>
+        </span>
+        <span style="display:inline-flex;align-items:center;gap:5px;">
+          <span style="font-size:11px;font-weight:500;letter-spacing:0.3px;color:var(--text-tertiary,#999);">기준시점</span>
+          <input type="datetime-local" value="{{ capInput }}" onchange="{{ onCapChange }}" onkeydown="{{ onKeyEnter }}" style="border:1px solid var(--border-default,#dfdfe8);border-radius:6px;padding:4px 8px;font-size:11.5px;background:var(--bg-surface,#fff);color:var(--text-primary,#000);">
+          <span class="pf-tap" data-tip="수량을 시세로 역산할 때 쓰는 기준 시점이에요. 비우면 스크린샷의 촬영 시각(EXIF)을 자동으로 씁니다." tabindex="0" style="font-size:11px;font-weight:700;color:var(--text-tertiary,#999);border:1px solid var(--border-default,#dfdfe8);border-radius:999px;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex:none;">i</span>
+        </span>
         <div style="flex:1;"></div>
-        <input type="datetime-local" value="{{ capInput }}" onchange="{{ onCapChange }}" onkeydown="{{ onKeyEnter }}" title="수량 추정 기준 시점 (비우면 스크린샷 EXIF 자동)" style="border:1px solid var(--border-default,#dfdfe8);border-radius:6px;padding:4px 8px;font-size:11.5px;background:var(--bg-surface,#fff);color:var(--text-primary,#000);">
         <button onclick="{{ onReprice }}" title="에이전트로 현재가·환율을 다시 불러 재평가 (수량 없는 종목은 캡처시점 종가로 역산)" style="border:1px solid var(--border-strong,#c4c4c4);background:transparent;border-radius:6px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;color:var(--text-primary,#000);" style-hover="border-color:var(--ig-blue,#1fa1ff);color:var(--ig-blue,#1fa1ff);">↻ 현재가로 재평가</button>
         <button onclick="{{ onAddManual }}" style="border:1px solid var(--border-strong,#c4c4c4);background:transparent;border-radius:6px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;color:var(--text-primary,#000);" style-hover="border-color:var(--ig-blue,#1fa1ff);color:var(--ig-blue,#1fa1ff);">＋ 직접 추가 (현금·부동산 등)</button>
       </div>
@@ -1627,40 +1709,39 @@
       <sc-if value="{{ hasHoldSummary }}" hint-placeholder-val="{{ false }}">
         <div style="padding:0 var(--pf-sec-pad,18px) 8px;font-size:11.5px;color:var(--text-secondary,#6e6e6e);">{{ holdSummary }}</div>
       </sc-if>
-      <div style="padding:0 var(--pf-sec-pad,18px) 6px;">
-       <div class="pf-tbl">
+       <div class="pf-tbl pf-tbl-2">
         <div class="pf-colhead-vp pf-colhead-2">
         <div class="pf-hold-row pf-col-head-2" style="padding:7px 8px;border-bottom:1px solid var(--border-default,#dfdfe8);font-size:10.5px;font-weight:600;letter-spacing:0.4px;color:var(--text-tertiary,#999);text-transform:uppercase;">
           <span>종목명</span><span>자산군</span><span style="text-align:right;">수량</span><span style="text-align:right;">현재가</span><span style="text-align:right;">평균가</span><span style="text-align:right;">평가금액 ₩</span><span style="text-align:right;">비중</span><span style="text-align:right;">손익</span><span></span>
         </div>
         </div>
-        <div class="pf-tbl-body pf-tbl-body-2">
-        <sc-for list="{{ rows }}" as="r" hint-placeholder-count="6">
+        <!-- STEP1 프리뷰와 같은 구조 — 증권사·계좌 그룹마다 본문 스크롤러를 따로 둔다. 그룹행이
+             스크롤러 밖에 있어야 세로 sticky 가 페이지 기준으로 살아난다(_hsync 가 scrollLeft 를 맞춘다). -->
+        <sc-for list="{{ holdGroups }}" as="g" hint-placeholder-count="2">
           <div>
-            <sc-if value="{{ r.isHeader }}" hint-placeholder-val="{{ true }}">
-              <div class="pf-grp-row" style="display:flex;align-items:center;gap:8px;padding:11px 8px 5px;border-bottom:2px solid var(--border-strong,#c4c4c4);margin-top:5px;">
-                <span style="font-size:13px;font-weight:700;color:var(--text-primary,#000);white-space:nowrap;">{{ r.broker }}</span>
-                <span style="font-size:10px;font-weight:700;color:#fff;background:{{ r.atypeColor }};padding:1.5px 8px;border-radius:999px;letter-spacing:0.3px;white-space:nowrap;">{{ r.atype }}</span>
-                <div style="flex:1;"></div>
-                <span style="font-size:11.5px;color:var(--text-tertiary,#999);white-space:nowrap;">합계 <b style="color:var(--text-primary,#000);font-size:12.5px;">{{ r.subtotalStr }}</b></span>
-              </div>
-            </sc-if>
-            <sc-if value="{{ r.isHolding }}" hint-placeholder-val="{{ false }}">
+            <div class="pf-grp-row pf-grp-sticky" style="display:flex;align-items:center;gap:8px;padding:11px 8px 5px;border-bottom:2px solid var(--border-strong,#c4c4c4);margin-top:5px;">
+              <span class="pf-grp-name" data-full="{{ g.broker }}" tabindex="0" style="font-size:13px;font-weight:700;color:var(--text-primary,#000);">{{ g.broker }}</span>
+              <span style="font-size:10px;font-weight:700;color:#fff;background:{{ g.atypeColor }};padding:1.5px 8px;border-radius:999px;letter-spacing:0.3px;white-space:nowrap;flex:none;">{{ g.atype }}</span>
+              <div style="flex:1;"></div>
+              <span style="font-size:11.5px;color:var(--text-tertiary,#999);white-space:nowrap;flex:none;">합계 <b class="pf-money" style="color:var(--text-primary,#000);font-size:12.5px;">{{ g.subtotalStr }}</b></span>
+            </div>
+            <div class="pf-tbl-body">
+            <sc-for list="{{ g.rows }}" as="r" hint-placeholder-count="6">
               <div class="pf-hold-row" style="align-items:center;padding:6px 8px;border-bottom:1px solid var(--ig-gray-05,#efefef);" style-hover="background:var(--bg-app,#fafafa);">
                 <div style="display:flex;align-items:center;gap:4px;min-width:0;">
-                  <sc-if value="{{ r.nameReview }}" hint-placeholder-val="{{ false }}"><span data-tip="{{ r.nameTitle }}" tabindex="0" style="font-size:9px;font-weight:700;color:#b8860b;background:#fff3cd;border:1px solid #f0d48a;padding:0 3px;border-radius:3px;flex:none;cursor:pointer;">⚠</span></sc-if>
-                  <input value="{{ r.name }}" data-full="{{ r.name }}" onchange="{{ r.onName }}" onkeydown="{{ r.onKeyEnter }}" style="border:none;background:transparent;font-size:13px;font-weight:600;padding:3px 2px;min-width:0;width:100%;color:var(--text-primary,#000);">
+                  <input value="{{ r.name }}" data-full="{{ r.name }}" onchange="{{ r.onName }}" onkeydown="{{ r.onKeyEnter }}" style="border:none;background:transparent;font-size:13px;font-weight:600;padding:3px 2px;min-width:0;flex:1;color:var(--text-primary,#000);">
+                  <sc-if value="{{ r.nameReview }}" hint-placeholder-val="{{ false }}"><span class="pf-tap" data-tip="{{ r.nameTitle }}" tabindex="0" style="font-size:9px;font-weight:700;color:#b8860b;background:#fff3cd;border:1px solid #f0d48a;padding:0 3px;border-radius:3px;flex:none;cursor:pointer;">⚠</span></sc-if>
                 </div>
                 <select value="{{ r.cls }}" onchange="{{ r.onCls }}" style="border:none;background:transparent;font-size:12px;padding:3px 0;color:{{ r.clsColor }};font-weight:600;">
                   <sc-for list="{{ classOpts }}" as="o" hint-placeholder-count="3"><option value="{{ o.key }}">{{ o.label }}</option></sc-for>
                 </select>
                 <div style="display:flex;align-items:center;justify-content:flex-end;gap:3px;min-width:0;">
-                  <sc-if value="{{ r.qtyBadge }}" hint-placeholder-val="{{ false }}"><span data-tip="{{ r.qtyExplain }}" tabindex="0" style="font-size:9px;font-weight:700;color:{{ r.qtyBadgeC }};background:{{ r.qtyBadgeBg }};border:1px solid {{ r.qtyBadgeBd }};padding:0 4px;border-radius:3px;flex:none;cursor:pointer;white-space:nowrap;">{{ r.qtyBadgeText }}</span></sc-if>
-                  <input value="{{ r.qty }}" onchange="{{ r.onQty }}" onkeydown="{{ r.onKeyEnter }}" placeholder="—" class="pf-num" style="border:none;background:transparent;font-size:12.5px;text-align:right;padding:3px 2px;min-width:0;width:100%;color:var(--text-primary,#000);">
+                  <input value="{{ r.qtyInput }}" onchange="{{ r.onQty }}" onkeydown="{{ r.onKeyEnter }}" placeholder="—" class="pf-num" style="border:none;background:transparent;font-size:12.5px;text-align:right;padding:3px 2px;min-width:0;flex:1;color:var(--text-primary,#000);">
+                  <sc-if value="{{ r.qtyBadge }}" hint-placeholder-val="{{ false }}"><span class="pf-tap" data-tip="{{ r.qtyExplain }}" tabindex="0" style="font-size:9px;font-weight:700;color:{{ r.qtyBadgeC }};background:{{ r.qtyBadgeBg }};border:1px solid {{ r.qtyBadgeBd }};padding:0 4px;border-radius:3px;flex:none;cursor:pointer;white-space:nowrap;">{{ r.qtyBadgeText }}</span></sc-if>
                 </div>
                 <div style="display:flex;align-items:center;justify-content:flex-end;gap:3px;min-width:0;">
                   <span title="{{ r.staleTitle }}" style="width:6px;height:6px;border-radius:50%;background:{{ r.staleColor }};flex:none;"></span>
-                  <input value="{{ r.price }}" onchange="{{ r.onPrice }}" onkeydown="{{ r.onKeyEnter }}" placeholder="—" class="pf-num" style="border:none;background:transparent;font-size:12.5px;text-align:right;padding:3px 0;width:100%;min-width:0;color:var(--text-primary,#000);">
+                  <input value="{{ r.priceInput }}" onchange="{{ r.onPrice }}" onkeydown="{{ r.onKeyEnter }}" placeholder="—" class="pf-num" style="border:none;background:transparent;font-size:12.5px;text-align:right;padding:3px 0;width:100%;min-width:0;color:var(--text-primary,#000);">
                   <span style="font-size:10px;color:var(--text-tertiary,#999);flex:none;">{{ r.cur }}</span>
                 </div>
                 <div style="display:flex;align-items:center;justify-content:flex-end;gap:3px;min-width:0;">
@@ -1668,31 +1749,38 @@
                   <span style="font-size:10px;color:var(--text-tertiary,#999);flex:none;">{{ r.cur }}</span>
                 </div>
                 <div style="display:flex;align-items:center;justify-content:flex-end;gap:3px;min-width:0;">
-                  <sc-if value="{{ r.valueReview }}" hint-placeholder-val="{{ false }}"><span data-tip="{{ r.valueTitle }}" tabindex="0" style="font-size:9px;font-weight:700;color:#b8860b;background:#fff3cd;border:1px solid #f0d48a;padding:0 3px;border-radius:3px;flex:none;cursor:pointer;">⚠</span></sc-if>
-                  <sc-if value="{{ r.hasQP }}" hint-placeholder-val="{{ true }}"><span class="pf-num" style="font-size:12.5px;font-weight:600;text-align:right;">{{ r.valueStr }}</span></sc-if>
-                  <sc-if value="{{ r.noQP }}" hint-placeholder-val="{{ false }}"><input value="{{ r.valueInput }}" onchange="{{ r.onValue }}" onkeydown="{{ r.onKeyEnter }}" class="pf-num" style="border:none;background:transparent;font-size:12.5px;font-weight:600;text-align:right;padding:3px 2px;min-width:0;width:100%;color:var(--text-primary,#000);"></sc-if>
+                  <sc-if value="{{ r.valueRO }}" hint-placeholder-val="{{ true }}"><span class="pf-num pf-money" style="font-size:12.5px;font-weight:600;text-align:right;flex:1;">{{ r.valueStr }}</span></sc-if>
+                  <sc-if value="{{ r.valueEdit }}" hint-placeholder-val="{{ false }}"><input value="{{ r.valueInput }}" disabled="{{ r.valueLock }}" onchange="{{ r.onValue }}" onkeydown="{{ r.onKeyEnter }}" class="pf-num pf-money" style="border:none;background:transparent;font-size:12.5px;font-weight:600;text-align:right;padding:3px 2px;min-width:0;flex:1;color:var(--text-primary,#000);"></sc-if>
+                  <sc-if value="{{ r.valueReview }}" hint-placeholder-val="{{ false }}"><span class="pf-tap" data-tip="{{ r.valueTitle }}" tabindex="0" style="font-size:9px;font-weight:700;color:#b8860b;background:#fff3cd;border:1px solid #f0d48a;padding:0 3px;border-radius:3px;flex:none;cursor:pointer;">⚠</span></sc-if>
                 </div>
                 <span class="pf-num" style="font-size:12.5px;text-align:right;color:var(--text-secondary,#6e6e6e);">{{ r.weightStr }}</span>
                 <span class="pf-num" style="font-size:12.5px;font-weight:600;text-align:right;color:{{ r.plColor }};">{{ r.plStr }}</span>
-                <button onclick="{{ r.onDelete }}" title="삭제" style="border:none;background:transparent;color:var(--ig-gray-40,#b4b4b4);cursor:pointer;font-size:15px;padding:0;line-height:1;" style-hover="color:var(--ig-red-heart,#ed4956);">×</button>
+                <button class="pf-tap" onclick="{{ r.onDelete }}" title="삭제" style="border:none;background:transparent;color:var(--ig-gray-40,#b4b4b4);cursor:pointer;font-size:15px;padding:0;line-height:1;" style-hover="color:var(--ig-red-heart,#ed4956);">×</button>
               </div>
-            </sc-if>
+            </sc-for>
+            </div>
           </div>
         </sc-for>
-        </div>
        </div>
-        <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:6px 16px;padding:10px 8px 14px;font-size:11.5px;color:var(--text-tertiary,#999);">
-          <div style="display:flex;flex-wrap:wrap;align-items:center;gap:5px 12px;flex:1;min-width:0;">
-            <span style="display:inline-flex;align-items:center;gap:4px;">수량 표시 —
-              <span style="font-size:9px;font-weight:700;color:#1a6dc4;background:#e8f2fd;border:1px solid #bcdcfb;padding:0 4px;border-radius:3px;">추정</span>시세로 역산(대체로 정확)
-              <span style="font-size:9px;font-weight:700;color:#b8860b;background:#fff3cd;border:1px solid #f0d48a;padding:0 4px;border-radius:3px;">확인 권장</span>정확도 낮음
-              <span style="font-size:9px;font-weight:700;color:#8a8a93;background:#f0f0f2;border:1px solid #d8d8de;padding:0 4px;border-radius:3px;">수량 미확인</span>상세화면 추가 시 채워짐 · <b style="color:var(--text-secondary,#6e6e6e);">배지를 탭하면 계산 근거</b></span>
-            <span style="display:inline-flex;align-items:center;gap:4px;"><span style="font-size:9px;font-weight:700;color:#b8860b;background:#fff3cd;border:1px solid #f0d48a;padding:0 3px;border-radius:3px;">⚠</span>종목·평가금액 확인 필요(탭하면 사유)</span>
-            <span style="display:inline-flex;align-items:center;gap:4px;"><span style="width:6px;height:6px;border-radius:50%;background:#f5a623;display:inline-block;"></span>노란 점 = 시세 24h 경과(재업로드 시 자동 갱신)</span>
+        <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:6px 16px;padding:10px var(--pf-sec-pad,18px) 14px;font-size:11.5px;color:var(--text-tertiary,#999);">
+          <!-- 배지 범례 — 각 배지+설명을 독립 단위(white-space:nowrap)로 두어, 좁은 화면에선 항목별로
+               줄바꿈되고(넓은 화면은 한 줄로 흐름) 한 배지 설명이 중간에 잘리지 않는다.
+               좁은 화면에선 6줄을 차지하므로 기본 접힘(legendOpen 초기값이 화면 폭으로 갈린다). -->
+          <div class="pf-legend" style="display:flex;flex-wrap:wrap;gap:4px 10px;flex:1;min-width:0;">
+            <button onclick="{{ onLegend }}" style="border:none;background:transparent;padding:0;font-size:11.5px;font-weight:600;color:var(--text-secondary,#6e6e6e);cursor:pointer;white-space:nowrap;">{{ legendCaret }} 배지 설명</button>
+            <sc-if value="{{ legendOpen }}" hint-placeholder-val="{{ true }}">
+              <span class="pf-legend" style="display:flex;flex-wrap:wrap;gap:4px 10px;min-width:0;">
+                <span class="pf-legend-item"><span style="font-size:9px;font-weight:700;color:#1a6dc4;background:#e8f2fd;border:1px solid #bcdcfb;padding:0 4px;border-radius:3px;">추정</span>화면에 수량이 없어 금액 ÷ 시세로 계산했어요</span>
+                <span class="pf-legend-item"><span style="font-size:9px;font-weight:700;color:#b8860b;background:#fff3cd;border:1px solid #f0d48a;padding:0 4px;border-radius:3px;">확인 권장</span>계산 근거가 약해요 — 값을 확인해 주세요</span>
+                <span class="pf-legend-item"><span style="font-size:9px;font-weight:700;color:#8a8a93;background:#f0f0f2;border:1px solid #d8d8de;padding:0 4px;border-radius:3px;">수량 미확인</span>수량을 알 수 없어요 — 수량이 보이는 화면을 올리면 채워져요</span>
+                <span class="pf-legend-item"><span style="font-size:9px;font-weight:700;color:#b8860b;background:#fff3cd;border:1px solid #f0d48a;padding:0 3px;border-radius:3px;">⚠</span>종목명이나 평가금액이 확실하지 않아요</span>
+                <span class="pf-legend-item"><span style="width:6px;height:6px;border-radius:50%;background:#f5a623;display:inline-block;flex:none;"></span>시세가 하루 넘게 지났어요 — 재평가해 주세요</span>
+                <span style="white-space:nowrap;color:var(--text-tertiary,#999);">· 배지를 탭하면 <b style="color:var(--text-secondary,#6e6e6e);">어떻게 계산했는지</b> 볼 수 있어요</span>
+              </span>
+            </sc-if>
           </div>
-          <span style="white-space:nowrap;">합계 <b class="pf-num" style="color:var(--text-primary,#000);font-size:12.5px;">{{ totalStr }}</b></span>
+          <span style="white-space:nowrap;">합계 <b class="pf-num pf-money" style="color:var(--text-primary,#000);font-size:12.5px;">{{ totalStr }}</b></span>
         </div>
-      </div>
     </section>
 
     <!-- ── 3. Target ─────────────────────────── -->
@@ -1740,7 +1828,7 @@
             </svg>
             <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;pointer-events:none;">
               <span style="font-size:10.5px;font-weight:600;letter-spacing:0.5px;color:var(--text-tertiary,#999);">현재 배분</span>
-              <span class="pf-step-title">{{ totalShort }}</span>
+              <span class="pf-step-title pf-money">{{ totalShort }}</span>
             </div>
           </div>
           <div style="display:flex;flex-wrap:wrap;gap:6px 12px;justify-content:center;">
@@ -1793,7 +1881,7 @@
               <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
                 <span style="font-size:11px;font-weight:700;letter-spacing:0.5px;padding:3px 8px;border-radius:4px;background:{{ a.dirBg }};color:#fff;">{{ a.dirLabel }}</span>
                 <span style="font-size:14px;font-weight:700;">{{ a.title }}</span>
-                <span style="font-size:12px;color:var(--text-tertiary,#999);">약 {{ a.amt }} 규모</span>
+                <span style="font-size:12px;color:var(--text-tertiary,#999);">약 <span class="pf-money">{{ a.amt }}</span> 규모</span>
               </div>
               <span style="font-size:12.5px;color:var(--text-secondary,#6e6e6e);">{{ a.sub }}</span>
             </div>
@@ -1857,14 +1945,19 @@ class Component extends DCLogic {
       // 라이브 추출 프리뷰(STEP1) — 확인 버튼 전까지 STEP2 미반영
       streamStage: '',            // '' | 'live'(스트리밍 중) | 'review'(최종·확인 대기)
       streamRows: [],             // 표시용 행 dict 배열(중간 원시 또는 최종 보정본)
-      gateReport: null,           // {lines:[{kind,text}]} — 게이트 대조/보정 로그
+      gateReport: null,           // {lines:[{kind,icon,text,raw}], summary} — 자동 점검 결과
+      gateOpen: false,            // 요약만 보이고, 눌러야 줄이 펼쳐진다
       streamPending: null,        // 확인 시 applySnapshot에 넘길 pending
       streamNote: '',
       streamCapture: '',          // 촬영 시점 라벨(EXIF/기준일) — 라이브 헤더에 표시
       // 에이전트 연결(헤더)
       agentUrlInput: '',
+      agentOpen: false,           // 칩을 눌러 연 URL 입력 팝오버
       connStatus: '○ 미설정',
       connColor: '#9a9aa2',
+      maskMoney: false,           // 금액 가리기 — fmtW/fmtShort 가 단독으로 본다(저장됨)
+      // 배지 범례 — 좁은 화면은 접고 시작(6줄을 차지한다), 넓은 화면은 지금처럼 한 줄로 편다
+      legendOpen: typeof window !== 'undefined' && window.innerWidth > 640,
       // 현재가 재평가(STEP2)
       capInput: '',
       repriceMsg: '',
@@ -1884,11 +1977,12 @@ class Component extends DCLogic {
         h.avgCost = h.cost / h.qty; h.avgCost_src = 'computed:cost/qty';
       }
     });
+    const mask = !!(saved && saved.maskMoney);
     if (holdings.length) {
-      this.setState({ holdings, target: saved.target || this.state.target, fx: saved.fx || 1380, loaded: true });
+      this.setState({ holdings, target: saved.target || this.state.target, fx: saved.fx || 1380, maskMoney: mask, loaded: true });
     } else {
       // 빈 시작 — 첫 방문자에게 아무것도 자동 노출하지 않는다. 데모는 '예시 데이터로 둘러보기' 버튼으로만.
-      this.setState({ loaded: true });
+      this.setState({ maskMoney: mask, loaded: true });
     }
     this.fetchFx();
     // 같은 오리진 자동 채택 — 에이전트가 이 페이지를 직접 서빙하면(엣지: 폰 안의 :8899)
@@ -1913,7 +2007,8 @@ class Component extends DCLogic {
     // 요소는 매번 다시 찾는다 — STEP1 프리뷰는 나타났다 사라지고 리렌더로 노드가 갈리므로,
     // 마운트 때 잡아둔 참조는 detached 가 돼 높이 0(=틈)을 발행한다.
     const HEADS = { '--pf-bar-h': 'header', '--pf-sec1-h': '[data-sechead="1"]',
-      '--pf-sec2-h': '[data-sechead="2"]', '--pf-res-h': '.pf-res-head', '--pf-ch1-h': '.pf-col-head-1' };
+      '--pf-sec2-h': '[data-sechead="2"]', '--pf-res-h': '.pf-res-head',
+      '--pf-ch1-h': '.pf-col-head-1', '--pf-ch2-h': '.pf-col-head-2' };
     this._setSticky = () => {
       const r = document.documentElement.style;
       Object.keys(HEADS).forEach(k => {
@@ -1935,7 +2030,7 @@ class Component extends DCLogic {
     // 가려진 내용 신호 — 고정 스택에서 '맨 아래 붙어 있는 단'을 찾아 거기에만 얕은 그림자를 켠다.
     // 붙었는지는 rect.top 이 자기 sticky top 과 같은지로 본다: 아직 안 붙었으면 그보다 아래에 있고,
     // 컨테이너 끝에서 밀려나는 중이면 그보다 위에 있다. 둘 다 '가리는 중'이 아니므로 신호도 없다.
-    const BANDS = 'header,.pf-sec-head,.pf-res-head,.pf-colhead-vp,.pf-grp-1';
+    const BANDS = 'header,.pf-sec-head,.pf-res-head,.pf-colhead-vp,.pf-grp-sticky';
     this._setScrim = () => {
       let low = null, lowBottom = -1;
       if ((window.scrollY || window.pageYOffset || 0) > 0) {   // 맨 위 = 가려진 것이 없다
@@ -1953,6 +2048,8 @@ class Component extends DCLogic {
       if (low) low.classList.add('pf-scrim');
     };
     this._setScrim();
+    // 스크롤할 때 하는 일은 **재는 것뿐**이다 — 스크롤 위치로 무엇을 접거나 펴지 않는다.
+    // 접으면 그 요소가 flow 안에 있는 한 아래 내용이 그만큼 튀고, 스크롤 중 리레이아웃까지 걸린다.
     this._remeasure = () => {
       if (this._raf) return;
       this._raf = requestAnimationFrame(() => { this._raf = 0; this._setSticky(); this._setScrim(); });
@@ -1985,7 +2082,7 @@ class Component extends DCLogic {
     // 세로 팬은 브라우저(페이지 스크롤)로 가고 가로 제스처만 여기로 온다(플래그로 다투지 않는다).
     const bodyOf = (row) => row.parentElement && row.parentElement.querySelector('.pf-tbl-body');
     this._grpDown = (ev) => {
-      const row = ev.target && ev.target.closest && ev.target.closest('.pf-grp-1');
+      const row = ev.target && ev.target.closest && ev.target.closest('.pf-grp-sticky');
       if (!row) return;
       const body = bodyOf(row);
       if (!body || body.scrollWidth <= body.clientWidth) return;   // 밀 폭이 없으면 관여하지 않는다
@@ -2008,7 +2105,7 @@ class Component extends DCLogic {
       this._pan = null;
     };
     this._grpWheel = (ev) => {    // 트랙패드 가로 스크롤·Shift+휠도 같은 통로로
-      const row = ev.target && ev.target.closest && ev.target.closest('.pf-grp-1');
+      const row = ev.target && ev.target.closest && ev.target.closest('.pf-grp-sticky');
       if (!row) return;
       const dx = ev.shiftKey ? (ev.deltaX || ev.deltaY) : ev.deltaX;
       if (!dx) return;             // 순수 세로 휠은 페이지에 넘긴다
@@ -2023,7 +2120,7 @@ class Component extends DCLogic {
     document.addEventListener('pointercancel', this._grpUp);
     document.addEventListener('wheel', this._grpWheel, { passive: false });
     // 종목명 툴팁 — 열이 좁아 잘린 이름만 풀네임을 띄운다(안 잘렸으면 띄울 이유가 없다).
-    // 표 안에 그리면 본문 스크롤러(overflow-x:auto → overflow-y 도 auto)가 잘라내므로 body 에 붙인다.
+    // 표 안에 그리면 본문 스크롤러(overflow-y:hidden)가 잘라내므로 body 에 붙인다.
     this._tipHide = () => { if (this._tipEl) { this._tipEl.remove(); this._tipEl = null; this._tipFor = null; } };
     this._tipShow = (el) => {
       // data-tip = 명시 설명(탭하면 뜸, 잘림과 무관) · data-full = 잘린 이름(잘렸을 때만)
@@ -2139,7 +2236,7 @@ class Component extends DCLogic {
       // 시드(데모·옛 실계좌)는 디스크에 남기지 않는다 — 새로고침·재방문 시 되살아나지 않게.
       const holdings = this.state.holdings.filter(h => !this.isSeed(h));
       localStorage.setItem('pf_rebalancer_v1', JSON.stringify({
-        holdings, target: this.state.target, fx: this.state.fx
+        holdings, target: this.state.target, fx: this.state.fx, maskMoney: this.state.maskMoney
       }));
     } catch (e) {}
   }
@@ -2170,6 +2267,9 @@ class Component extends DCLogic {
     if (a != null && h.qty != null) return a * h.qty;
     return this.costKrw(h);
   }
+  // 원화 금액 표시의 단일 출처 — 총자산·손익·그룹합계·계좌칩·평가금액·도넛·액션이 전부 이 둘을 지난다.
+  // '금액 가리기'는 여기서 하지 않는다: 문자열을 갈아끼우면 폭이 변해 표가 흔들리고, 마스크 상태에서
+  // 편집·복사되면 가짜 값이 커밋된다. 가리기는 표시층(.pf-money + [data-mask])이 맡는다.
   fmtW(n) {
     if (n == null || isNaN(n)) return '—';
     return '₩' + Math.round(n).toLocaleString('ko-KR');
@@ -2179,6 +2279,9 @@ class Component extends DCLogic {
     return '₩' + Math.round(n / 10000).toLocaleString('ko-KR') + '만';
   }
   fmtNum(n) { return n == null ? '' : Number(n).toLocaleString('ko-KR', { maximumFractionDigits: 2 }); }
+  // 통화 기호 단일 출처 — 현재가·평균가 등 '주당 원통화' 표시 옆에 붙인다(평가금액은 항상 ₩ 환산).
+  // 향후 다통화 확장은 이 맵만 넓히면 된다(인라인 삼항 흩뿌리지 않기).
+  curSym(c) { return ({ USD: '$', KRW: '₩' })[c] || '₩'; }
   // key를 가진 목록(CLASSES·ACCOUNTS·ALLOC) → key로 찾는 맵.
   byKey(list) { const m = {}; list.forEach(x => m[x.key] = x); return m; }
   // 추출 결과의 낯선 계좌명은 '일반'으로 — 아는 계좌는 ACCOUNTS가 단일 출처.
@@ -2190,6 +2293,12 @@ class Component extends DCLogic {
 
   updateHolding(id, patch) {
     this.set({ holdings: this.state.holdings.map(h => h.id === id ? { ...h, ...patch } : h) });
+  }
+
+  // STEP1 프리뷰(review) 인라인 편집 — 확인 대기 중인 streamPending 을 갱신한다. commitStream 이
+  // 이 streamPending 을 그대로 applySnapshot 에 넘기므로, 여기서 고친 값이 STEP2 반영에 반영된다.
+  updateStreamPending(id, patch) {
+    this.setState({ streamPending: (this.state.streamPending || []).map(p => p.id === id ? { ...p, ...patch } : p) });
   }
 
   // ---------- extraction ----------
@@ -2225,7 +2334,7 @@ class Component extends DCLogic {
   // 보유자산을 현재가로 재평가(에이전트 /reprice) — 수량 없는 종목은 캡처시점 종가로 역산(추정 표시).
   async repriceNow() {
     const base = this.agentUrl();
-    if (!base) { this.setState({ repriceMsg: '헤더에서 에이전트 URL을 입력하세요' }); return; }
+    if (!base) { this.setState({ repriceMsg: '헤더의 에이전트 칩을 눌러 URL을 입력하세요' }); return; }
     const holdings = this.state.holdings;
     if (!holdings.length) { this.setState({ repriceMsg: '보유자산이 없습니다 (먼저 추출/입력)' }); return; }
     this.setState({ repriceMsg: '현재가 조회 중… (수량 추정 포함 수십 초)' });
@@ -2357,34 +2466,45 @@ class Component extends DCLogic {
     };
   }
 
-  // ---------- 라이브 추출 프리뷰(STEP1) ----------
-  // 한 행(원시 dict 또는 최종 보정본)을 프리뷰 표시용으로. 중간·최종이 같은 매핑을 탄다(단일 출처).
-  // 라이브 프리뷰 행 — STEP2 보유표와 **같은 형태**(증권사·계좌 그룹헤더 + 소계, 동일 컬럼·수치 파생)로
-  // 읽기전용 렌더한다. 값 파생은 STEP2와 같은 메서드(krw·costBasisKrw·avgKrw)를 공유해 단일 출처를 지킨다.
-  // 입력은 원시(assetClass) 또는 최종(cls) dict 둘 다 받는다. 확인 전 편집은 없다(재업로드로 대체).
+  // ---------- 표 행 뷰모델 — STEP1 라이브 프리뷰와 STEP2 보유표의 단일 출처 ----------
+  // 두 표는 같은 열·같은 파생값·같은 확인필요 판정을 쓴다. 그래서 빌더도 하나다 —
+  // 갈라두면 한쪽에만 열이 붙거나 배지 기준이 어긋난다(전에 실제로 그랬다).
+  // 입력은 원시(assetClass) dict 와 최종 보유 dict 둘 다 받는다. 차이는 전부 opts 로 흡수:
+  //   total         가중치 분모. 없으면 이 목록의 합(STEP1=프리뷰 합, STEP2=포트폴리오 전체)
+  //   editable      셀을 입력으로 열지 (STEP1 은 review 단계에만, STEP2 는 항상)
+  //   update(id,patch)  편집 커밋 대상 — updateStreamPending / updateHolding
+  //   remove(id)    있으면 삭제 버튼 (STEP2 전용)
+  //   stale         시세 경과 점 (STEP2 전용 — 프리뷰는 방금 추출한 값이라 의미 없다)
+  //   mismatchCheck 화면 검산(수량×현재가 vs 평가금액) 배지 (STEP2 전용, 아래 주석 참조)
+  //   normAcct      계좌유형을 ACCOUNTS 로 접기. STEP1 은 서버 원시 라벨이라 접어야 하고(단일 출처),
+  //                 STEP2 는 저장된 값을 **그대로** 묶는다 — 접으면 옛 데이터의 서로 다른 계좌가
+  //                 '일반' 하나로 합쳐져 소계가 뭉개진다.
   // 반환은 (증권사·계좌) 그룹 배열 — 그룹행이 표 본문 스크롤러 밖에 있어야 세로로 고정되므로,
   // 화면 구조(그룹행 + 그룹별 본문)와 데이터 구조를 같은 모양으로 맞춘다.
-  buildStreamGroups(list) {
+  buildGroups(list, opts) {
+    const O = opts || {};
+    const ed = !!O.editable;
+    const mask = !!this.state.maskMoney;
     const cmap = this.byKey(this.CLASSES), amap = this.byKey(this.ACCOUNTS);
     const clsMap = { '성장주': 'growth', '배당주': 'dividend', '채권': 'bond', '금·원자재': 'gold', '현금': 'cash', '부동산': 'realestate' };
-    const norm = h => {
-      const cls = h.cls || clsMap[h.assetClass] || (String(h.assetClass || '').indexOf('혼합') >= 0 ? 'mixed' : 'growth');
+    // 원본을 펼쳐 얹는다(필드 열거 X) — reviewFlag·_qtyExplain 이 보는 신호(qty_note·qty_resid·
+    // reprice_note·confidence…)가 입력 종류마다 달라서, 골라 담으면 한쪽에서 조용히 사라진다.
+    const items = (list || []).map(h => {
       const cost = h.cost != null ? Number(h.cost) : null;
       const qty = h.qty != null ? Number(h.qty) : null;
-      return {
-        broker: h.broker || '미상', accountType: this.normAcct(h.accountType),
-        name: h.name || '(이름 없음)', cls, currency: h.currency === 'USD' ? 'USD' : 'KRW',
+      return { ...h,
+        broker: h.broker || '미상',
+        accountType: O.normAcct ? this.normAcct(h.accountType) : (h.accountType || '일반'),
+        name: h.name || '(이름 없음)',
+        cls: h.cls || clsMap[h.assetClass] || (String(h.assetClass || '').indexOf('혼합') >= 0 ? 'mixed' : 'growth'),
+        currency: h.currency === 'USD' ? 'USD' : 'KRW',
         qty, price: h.price != null ? Number(h.price) : null,
         value: h.value != null ? Number(h.value) : null, cost,
-        avgCost: (cost != null && qty) ? cost / qty : null,
-        value_src: h.value_src || '',
-        // 확인필요 판정 신호(최종 보정본에만 존재) + 소스 이미지 귀속
-        confidence: h.confidence, qty_src: h.qty_src || '', qty_note: h.qty_note || '',
-        symbol_note: h.symbol_note || '', checkFail: h.checkFail, img: h._img || null
+        avgCost: h.avgCost != null ? Number(h.avgCost) : ((cost != null && qty) ? cost / qty : null),
+        img: h._img != null ? h._img : null
       };
-    };
-    const items = (list || []).map(norm);
-    const total = items.reduce((s, h) => s + this.krw(h), 0);
+    });
+    const total = O.total != null ? O.total : items.reduce((s, h) => s + this.krw(h), 0);
     const groups = new Map();
     items.forEach(h => {
       const key = h.broker + '|' + h.accountType;
@@ -2400,21 +2520,60 @@ class Component extends DCLogic {
         const v = this.krw(h), c = this.costBasisKrw(h);
         const pl = c != null && c > 0 ? (v - c) / c * 100 : null;
         const corrected = String(h.value_src || '').indexOf('보정') >= 0;
+        const hasQP = h.qty != null && h.price != null;
         const rf = this.reviewFlag(h);
+        const id = h.id;
+        let qb = { show: rf.qtyBadge, text: rf.qtyBadgeText, c: rf.qtyBadgeC, bg: rf.qtyBadgeBg, bd: rf.qtyBadgeBd, explain: rf.qtyExplain };
+        // 화면 검산: 수량×현재가 vs 화면 평가금액. **추출 시점의 스크린샷 값들끼리만** 의미가 있다 —
+        // 사용자가 고치거나(manual) 현재가로 재평가하면 벌어지는 게 정상이므로 가짜 경고를 띄우지 않는다.
+        if (O.mismatchCheck && hasQP && h.value != null && h.value > 0 && rf.qtyTier === 'none'
+            && !(h.qty_src === 'manual' || h.price_src === 'manual' || h.value_src === 'manual')
+            && !String(h.value_src || '').startsWith('reprice')) {
+          const gap = Math.abs(h.qty * h.price - h.value) / h.value;
+          if (gap > 0.02) qb = this._qtyBadge('low', '수량×현재가(' + this.fmtNum(Math.round(h.qty * h.price)) +
+            ')가 화면 평가금액(' + this.fmtNum(h.value) + ')과 ' + (gap * 100).toFixed(1) + '% 달라요 — 값을 확인해 주세요.');
+        }
+        const stale = !!O.stale && Date.now() - (h.updatedAt || 0) > 86400000;
         rows.push({
-          name: h.name, clsColor: (cmap[h.cls] || cmap.growth).color, clsLabel: (cmap[h.cls] || cmap.growth).label,
+          name: h.name, cls: h.cls, clsColor: (cmap[h.cls] || cmap.growth).color, clsLabel: (cmap[h.cls] || cmap.growth).label,
           qtyStr: h.qty == null ? '—' : ((rf.qtyTier === 'est' || rf.qtyTier === 'low') ? '≈' : '') + this.fmtNum(h.qty),
           priceStr: h.price == null ? '—' : this.fmtNum(h.price),
           avgStr: h.avgCost == null ? '—' : this.fmtNum(h.avgCost),
+          cur: this.curSym(h.currency),
           valueStr: this.fmtW(v),
           weightStr: total > 0 ? (v / total * 100).toFixed(1) + '%' : '—',
           plStr: pl == null ? '—' : (pl >= 0 ? '+' : '') + pl.toFixed(1) + '%',
           plColor: pl == null ? '#999' : pl >= 0 ? '#ed4956' : '#3897f0',
           corrected, correctedTitle: corrected ? '게이트가 계좌합계 대조로 자릿수 보정한 행' : '',
           nameReview: rf.nameReview, nameTitle: rf.nameTitle,
-          qtyBadge: rf.qtyBadge, qtyBadgeText: rf.qtyBadgeText,
-          qtyBadgeC: rf.qtyBadgeC, qtyBadgeBg: rf.qtyBadgeBg, qtyBadgeBd: rf.qtyBadgeBd, qtyExplain: rf.qtyExplain,
-          hasImg: h.img != null, imgTag: h.img != null ? String(h.img) : ''
+          valueReview: rf.valueReview, valueTitle: rf.valueTitle,
+          qtyBadge: qb.show, qtyBadgeText: qb.text,
+          qtyBadgeC: qb.c, qtyBadgeBg: qb.bg, qtyBadgeBd: qb.bd, qtyExplain: qb.explain,
+          hasImg: h.img != null, imgTag: h.img != null ? String(h.img) : '',
+          hasStale: stale, staleColor: stale ? '#f5a623' : 'transparent',
+          staleTitle: stale ? '시세가 24시간 이상 지났습니다 — 현재가를 갱신하세요' : '',
+          editable: ed, readonly: !ed,
+          hasQP, noQP: !hasQP,
+          // 평가금액은 수량·현재가가 있으면 계산값(읽기전용) — 편집은 둘이 없는 행(현금·부동산 등)만.
+          valueEdit: ed && !hasQP, valueRO: !(ed && !hasQP),
+          qtyInput: h.qty == null ? '' : this.fmtNum(h.qty),
+          priceInput: h.price == null ? '' : this.fmtNum(h.price),
+          avgInput: h.avgCost == null ? '' : this.fmtNum(h.avgCost),
+          // 값은 항상 진짜다(가리는 건 CSS 블러). 다만 흐린 칸을 눈감고 고치는 건 막는다.
+          // 잠금은 disabled 로 건다 — readonly 는 이 런타임에서 **동작하지 않는다**: React 가 아는
+          // 이름은 readOnly 인데 마크업은 camelCase 를 낼 수 없고(HTML 파서가 속성명을 소문자화),
+          // 소문자 readonly 는 React 가 경고하고 버린다. disabled 는 소문자가 정식 이름이라 통한다.
+          valueInput: h.value == null ? '' : this.fmtNum(h.value),
+          valueLock: mask,
+          // 수동 편집은 '확인'으로 간주 — 해당 필드의 확인필요 신호를 함께 해제한다(단일 출처 규칙).
+          onName:  ed ? (e => O.update(id, { name: e.target.value, symbol_note: '' })) : null,
+          onCls:   ed ? (e => O.update(id, { cls: e.target.value })) : null,
+          onQty:   ed ? (e => O.update(id, { qty: this.parseNum(e.target.value), qty_src: 'manual', confidence: 1, qty_note: '' })) : null,
+          onPrice: ed ? (e => O.update(id, { price: this.parseNum(e.target.value), price_src: 'manual', updatedAt: Date.now() })) : null,
+          onAvg:   ed ? (e => O.update(id, { avgCost: this.parseNum(e.target.value), avgCost_src: 'manual' })) : null,
+          onValue: ed ? (e => O.update(id, { value: this.parseNum(e.target.value), value_src: 'manual', reprice_note: '', checkFail: false, updatedAt: Date.now() })) : null,
+          hasDelete: !!O.remove, onDelete: O.remove ? (() => O.remove(id)) : null,
+          onKeyEnter: e => { if (e.key === 'Enter') e.target.blur(); }
         });
       });
     });
@@ -2458,15 +2617,42 @@ class Component extends DCLogic {
     return '촬영 시점 ' + t + tag;
   }
 
-  // 게이트 리포트 → 로그 줄. repairs(실제 보정)를 먼저, 중복 아닌 warnings를 뒤에.
+  // 게이트 리포트 → 사람이 읽는 줄. 서버(finalize.py)는 내부 용어로 쓴다(상세합·미대조 총액·
+  // 자릿수 보정·재현율) — 번역은 서버 계약을 건드리지 않고 **여기 한 곳**에서 한다.
+  // 규칙에 안 걸리면 원문을 그대로 통과시킨다: 서버 문구가 바뀌어도 앱이 조용히 삼키지 않는다.
+  // 원문은 각 줄의 data-tip 으로 남겨 탭하면 볼 수 있다.
   buildGateReport(gate) {
+    const RULES = [
+      [/평가금액 ([\d,.-]+) → ([\d,.-]+) \(계좌합계 ([\d,.-]+)/,
+        m => '평가금액을 ' + m[1] + '원으로 읽었는데, 계좌 합계 ' + m[3] + '원과 맞춰보니 ' + m[2] + '원이었어요. 자동으로 고쳤습니다.'],
+      [/'(.+?)' 총액을 읽지 못함\(([\d,.-]+)은 평가손익\)/,
+        m => "'" + m[1] + "'의 평가금액 자리에 평가손익(" + m[2] + '원)이 들어 있어, 이 항목은 금액 확인을 건너뛰었어요.'],
+      [/계좌 '(.+?)' 잔고를 읽지 못함\(([\d,.-]+)은 평가손익\)/,
+        m => m[1] + ' 계좌의 잔고 자리에 평가손익(' + m[2] + '원)이 들어 있어, 이 계좌는 금액 확인을 건너뛰었어요.'],
+      [/미대조 .*?총액 (.+?) ([\d,.-]+) —/,
+        m => m[1] + ' 합계 ' + m[2] + '원에 해당하는 종목 화면이 없어요. 그 계좌의 종목 목록 화면을 함께 올리면 채워집니다.'],
+      [/상세합 ([\d,.-]+) — 근접 총액/,
+        m => '종목 금액을 더한 값(' + m[1] + '원)이 화면의 계좌 합계와 맞지 않아요. 잘못 읽은 행이 있을 수 있으니 표에서 확인해 주세요.'],
+      [/추출 0행 —/,
+        () => '이 화면에서 표를 찾지 못했어요. 표가 흐리거나 잘린 화면일 수 있어요.']
+    ];
     const reps = (gate && gate.repairs) || [];
     const warns = (gate && gate.warnings) || [];
-    const humanize = t => String(t).replace(/\bimg(\d+)\b/g, '이미지 $1');   // 게이트 원인의 화면 귀속을 사람이 읽게
+    const say = raw => {
+      const t = String(raw).replace(/\bimg(\d+)\b/g, '이미지 $1');   // 게이트 원인의 화면 귀속을 사람이 읽게
+      const where = (t.match(/^(이미지 \d+):/) || [])[1];            // 어느 화면인지는 앞에 붙여 유지한다
+      for (const [re, fn] of RULES) {
+        const m = t.match(re);
+        if (m) return (where ? where + ' · ' : '') + fn(m);
+      }
+      return t;                                                     // 미매칭 = 원문 그대로(유실 없음)
+    };
     const lines = [];
-    reps.forEach(t => lines.push({ kind: 'repair', text: humanize(t) }));
-    warns.forEach(w => { if (reps.indexOf(w) < 0) lines.push({ kind: 'warn', text: humanize(w) }); });
-    return { lines };
+    reps.forEach(t => lines.push({ kind: 'repair', icon: '✓', text: say(t), raw: String(t) }));
+    warns.forEach(w => { if (reps.indexOf(w) < 0) lines.push({ kind: 'warn', icon: '⚠', text: say(w), raw: String(w) }); });
+    const nr = lines.filter(l => l.kind === 'repair').length, nw = lines.length - nr;
+    const sum = [nr ? '✓ ' + nr + '건 자동 보정' : '', nw ? '⚠ ' + nw + '건 확인 필요' : ''].filter(Boolean).join(' · ');
+    return { lines, summary: sum };
   }
 
   // 확인 버튼 — 프리뷰를 STEP2에 반영하고 정리.
@@ -2605,6 +2791,9 @@ class Component extends DCLogic {
   }
 
   async extractFiles(fileList) {
+    // 재업로드 차단의 단일 통제점 — 파일선택·드래그드롭·프로그램 호출이 전부 여기로 모인다.
+    // 업로드 영역의 pointer-events 는 눈에 보이는 어포던스일 뿐, 방어는 이 한 줄이다.
+    if (this.state.extracting) return;
     const files = Array.from(fileList || []).filter(f => f.type.startsWith('image/'));
     if (!files.length) return;
     const base = this.agentUrl();
@@ -2820,7 +3009,13 @@ class Component extends DCLogic {
     S.holdings.forEach(h => { acctTot[h.accountType] = (acctTot[h.accountType] || 0) + this.krw(h); });
     const acctChips = Object.keys(acctTot).map(k => ({ label: k, value: this.fmtShort(acctTot[k]) }));
 
-    const rows = this.buildHoldingRows(ctx);
+    // STEP2 보유표 — 가중치 분모는 포트폴리오 전체(total), 항상 편집 가능, 삭제·시세경과·화면검산 켬.
+    const holdGroups = this.buildGroups(S.holdings, {
+      total, editable: true,
+      update: (id, patch) => this.updateHolding(id, patch),
+      remove: id => this.set({ holdings: S.holdings.filter(x => x.id !== id) }),
+      stale: true, mismatchCheck: true
+    });
     const { donutSegs, legendRows } = this.buildDonut(ctx);
     const driftRows = this.buildDrift(ctx);
     const { targetRows, targetSum, presets } = this.buildTarget(ctx);
@@ -2835,10 +3030,18 @@ class Component extends DCLogic {
       onFxRefresh: () => this.fetchFx(),
       // 입력 확정: 엔터 = blur → 기존 onchange 커밋
       onKeyEnter: e => { if (e.key === 'Enter') e.target.blur(); },
-      // 에이전트 연결(헤더)
+      // 에이전트 연결(헤더) — 칩에 상태, 탭하면 URL 입력 팝오버
       agentUrlInput: S.agentUrlInput || '',
       onAgentUrl: e => this.onAgentUrl(e),
       connStatus: S.connStatus, connColor: S.connColor,
+      agentOpen: S.agentOpen, onAgentToggle: () => this.setState({ agentOpen: !S.agentOpen }),
+      // 금액 가리기 — 가리는 일은 CSS 가 한다([data-mask="1"] .pf-money). 여기선 그 스위치만 낸다.
+      maskAttr: S.maskMoney ? '1' : '',
+      maskMoney: S.maskMoney, maskIcon: S.maskMoney ? '🙈' : '👁',
+      maskTitle: S.maskMoney ? '금액 표시' : '금액 가리기',
+      onMask: () => this.set({ maskMoney: !S.maskMoney }),
+      legendOpen: S.legendOpen, legendCaret: S.legendOpen ? '▾' : '▸',
+      onLegend: () => this.setState({ legendOpen: !S.legendOpen }),
       // 현재가 재평가(STEP2)
       capInput: S.capInput || '',
       onCapChange: e => this.setState({ capInput: e.target.value }),
@@ -2846,7 +3049,12 @@ class Component extends DCLogic {
       repriceMsg: S.repriceMsg, hasRepriceMsg: !!S.repriceMsg,
       repriceSummaryText: this.repriceSummaryText(), hasRepriceSummary: !!S.repriceSummary,
       // 라이브 추출 프리뷰(STEP1)
-      streamGroups: this.buildStreamGroups(S.streamRows || []),
+      // live: 스트리밍 중 원시행(streamRows)을 읽기전용으로. review: id 를 가진 streamPending 을
+      // 편집 가능하게 — 여기서 고친 값이 곧 commitStream 이 넘길 커밋 데이터다(단일 출처).
+      streamGroups: this.buildGroups(
+        S.streamStage === 'review' ? (S.streamPending || []) : (S.streamRows || []),
+        { editable: S.streamStage === 'review', normAcct: true,
+          update: (id, patch) => this.updateStreamPending(id, patch) }),
       streamHasRows: (S.streamRows || []).length > 0,
       streamLive: S.streamStage === 'live',
       streamReview: S.streamStage === 'review',
@@ -2856,8 +3064,12 @@ class Component extends DCLogic {
             : ''),
       gateLines: (S.gateReport && S.gateReport.lines) || [],
       hasGate: !!(S.gateReport && S.gateReport.lines && S.gateReport.lines.length),
+      gateSummary: (S.gateReport && S.gateReport.summary) || '',
+      gateOpen: S.gateOpen, gateCaret: S.gateOpen ? '▾' : '▸',
+      onGate: () => this.setState({ gateOpen: !S.gateOpen }),
       // 상단 요약 배너 — STEP1(추출 직후, 게이트 보정 건수 포함) / STEP2(보유 현황)
-      streamSummary: this._summaryStr(this._tierCounts(S.streamRows || []),
+      // review 단계는 편집 대상인 streamPending 기준으로 집계 — 사용자가 값을 고쳐 배지가 사라지면 요약도 따라 준다.
+      streamSummary: this._summaryStr(this._tierCounts(S.streamStage === 'review' ? (S.streamPending || []) : (S.streamRows || [])),
         ((S.gateReport && S.gateReport.lines) || []).filter(l => l.kind === 'repair').length),
       hasStreamSummary: S.streamStage === 'review' && (S.streamRows || []).length > 0,
       holdSummary: this._summaryStr(this._tierCounts(S.holdings || []), 0),
@@ -2867,8 +3079,12 @@ class Component extends DCLogic {
       hasInfo: !!S.extractInfo, extractInfo: S.extractInfo,
       totalStr: this.fmtW(total),
       totalShort: this.fmtShort(total),
-      plStr: hasBasis ? ((plSum >= 0 ? '+' : '') + this.fmtW(plSum).replace('₩-', '-₩') + ' (' + (plPct >= 0 ? '+' : '') + plPct.toFixed(1) + '%)') : '—',
-      plColor: hasBasis ? (plSum >= 0 ? '#ed4956' : '#3897f0') : '#999',
+      // 손익률과 손익금액을 한 문자열로 합치지 않는다 — 가리는 건 금액뿐이고 %는 그대로 보여야 한다.
+      // 툴팁은 body 에 그려져 .pf-money 밖이라 CSS 가 못 가린다 → 누수 경로를 여기서 닫는다.
+      plPct: hasBasis ? ((plPct >= 0 ? '+' : '') + plPct.toFixed(1) + '%') : '—',
+      plChipColor: hasBasis ? (plSum >= 0 ? '#ff8f9a' : '#8ec9ff') : 'rgba(255,255,255,0.55)',
+      plTip: !hasBasis ? '평균단가가 없어 평가손익을 계산할 수 없어요'
+        : '평가손익 ' + (S.maskMoney ? '(금액 가림)' : (plSum >= 0 ? '+' : '') + this.fmtW(plSum).replace('₩-', '-₩')),
       acctChips,
       extracting: S.extracting, notExtracting: !S.extracting,
       extractStatus: S.extractStatus,
@@ -2879,7 +3095,7 @@ class Component extends DCLogic {
       onLoadDemo: () => this.set({ holdings: this.sampleData() }),
       onDemoStream: () => this.demoStream(),
       classOpts,
-      rows,
+      holdGroups,
       onAddManual: () => this.set({
         holdings: [...S.holdings, {
           id: 'h' + Date.now(), broker: '직접입력', accountType: '일반', name: '새 자산 (이름 수정)',
@@ -2892,77 +3108,6 @@ class Component extends DCLogic {
       bandStr: String(band),
       actions, noActions: actions.length === 0
     };
-  }
-
-  // (증권사·계좌)별로 묶은 보유행 — 각 그룹 앞에 계좌 헤더행이 들어간다.
-  buildHoldingRows(ctx) {
-    const { S, total, cmap, amap } = ctx;
-    // 검산: 수량×현재가 vs 화면 평가금액. 이 대조는 **추출 시점의 스크린샷 값들**끼리만 의미가 있다.
-    // 사용자가 직접 고치거나(manual) 현재가로 재평가(reprice)하면 qty×price가 스크린샷 평가금액과
-    // 벌어지는 게 정상이므로 검산하지 않는다 — 재평가 행에 가짜 불일치 경고를 띄우지 않는다.
-    const chkGap = h => (h.qty != null && h.price != null && h.value != null && h.value > 0)
-      ? Math.abs(h.qty * h.price - h.value) / h.value : 0;
-    const mkRow = h => {
-      const v = this.krw(h);
-      const c = this.costBasisKrw(h);
-      const pl = c != null && c > 0 ? (v - c) / c * 100 : null;
-      const hasQP = h.qty != null && h.price != null;
-      const anyManual = h.qty_src === 'manual' || h.price_src === 'manual' || h.value_src === 'manual';
-      const repriced = String(h.value_src || '').startsWith('reprice');
-      const gap = chkGap(h);
-      const mismatch = gap > 0.02 && !anyManual && !repriced;   // 스크린샷 검산(수동·재평가 제외)
-      const stale = Date.now() - (h.updatedAt || 0) > 86400000;
-      // 확인필요 판정(단일 출처) — 수량 등급 배지. 스크린샷 검산 불일치(mismatch)는 확정 행이라도 '확인 권장'으로.
-      const rf = this.reviewFlag(h);
-      let qb = { show: rf.qtyBadge, text: rf.qtyBadgeText, c: rf.qtyBadgeC, bg: rf.qtyBadgeBg, bd: rf.qtyBadgeBd, explain: rf.qtyExplain };
-      if (mismatch && rf.qtyTier === 'none') {
-        qb = this._qtyBadge('low', '수량×현재가(' + this.fmtNum(Math.round(h.qty * h.price)) +
-          ')가 화면 평가금액(' + this.fmtNum(h.value) + ')과 ' + (gap * 100).toFixed(1) + '% 달라요 — 값을 확인해 주세요.');
-      }
-      return {
-        isHeader: false, isHolding: true,
-        id: h.id, broker: h.broker, accountType: h.accountType,
-        acctColor: (amap[h.accountType] || amap['일반']).color,
-        name: h.name, cls: h.cls, clsColor: (cmap[h.cls] || cmap.growth).color,
-        qty: h.qty == null ? '' : this.fmtNum(h.qty),
-        price: h.price == null ? '' : this.fmtNum(h.price),
-        cur: h.currency === 'USD' ? '$' : '₩',
-        avgInput: h.avgCost == null ? '' : this.fmtNum(h.avgCost),
-        hasQP, noQP: !hasQP,
-        valueStr: this.fmtW(v),
-        valueInput: h.value == null ? '' : this.fmtNum(h.value),
-        nameReview: rf.nameReview, nameTitle: rf.nameTitle,
-        qtyBadge: qb.show, qtyBadgeText: qb.text, qtyBadgeC: qb.c, qtyBadgeBg: qb.bg, qtyBadgeBd: qb.bd, qtyExplain: qb.explain,
-        valueReview: rf.valueReview, valueTitle: rf.valueTitle,
-        weightStr: total > 0 ? (v / total * 100).toFixed(1) + '%' : '—',
-        plStr: pl == null ? '—' : (pl >= 0 ? '+' : '') + pl.toFixed(1) + '%',
-        plColor: pl == null ? '#999' : pl >= 0 ? '#ed4956' : '#3897f0',
-        staleColor: stale ? '#f5a623' : 'transparent',
-        staleTitle: stale ? '시세가 24시간 이상 지났습니다 — 현재가를 갱신하세요' : '',
-        onName: e => this.updateHolding(h.id, { name: e.target.value }),
-        onCls: e => this.updateHolding(h.id, { cls: e.target.value }),
-        onQty: e => this.updateHolding(h.id, { qty: this.parseNum(e.target.value), qty_src: 'manual' }),
-        onPrice: e => this.updateHolding(h.id, { price: this.parseNum(e.target.value), price_src: 'manual', updatedAt: Date.now() }),
-        onValue: e => this.updateHolding(h.id, { value: this.parseNum(e.target.value), value_src: 'manual', updatedAt: Date.now() }),
-        onAvg: e => this.updateHolding(h.id, { avgCost: this.parseNum(e.target.value), avgCost_src: 'manual' }),
-        onKeyEnter: e => { if (e.key === 'Enter') e.target.blur(); },
-        onDelete: () => this.set({ holdings: S.holdings.filter(x => x.id !== h.id) })
-      };
-    };
-    // (증권사·계좌)별 그룹 — 첫 등장 순서 유지, 각 그룹 앞에 계좌 헤더행 삽입
-    const _groups = new Map();
-    S.holdings.forEach(h => {
-      const key = (h.broker || '미상') + '|' + (h.accountType || '일반');
-      if (!_groups.has(key)) _groups.set(key, { broker: h.broker || '미상', accountType: h.accountType || '일반', items: [], sub: 0 });
-      const g = _groups.get(key); g.items.push(h); g.sub += this.krw(h);
-    });
-    const rows = [];
-    _groups.forEach(g => {
-      rows.push({ isHeader: true, isHolding: false, broker: g.broker, atype: g.accountType,
-        atypeColor: (amap[g.accountType] || amap['일반']).color, subtotalStr: this.fmtW(g.sub) });
-      g.items.forEach(h => rows.push(mkRow(h)));
-    });
-    return rows;
   }
 
   // 자산배분 도넛의 호(arc)와 범례.
