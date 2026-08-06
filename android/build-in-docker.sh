@@ -38,7 +38,28 @@ IMAGE="portf-android-build:1"
 COMPILE_SDK=35
 BUILD_TOOLS=35.0.0
 
-mkdir -p "$SDK_DIR" "$GRADLE_DIR"
+mkdir -p "$SDK_DIR" "$GRADLE_DIR" "$GRADLE_DIR/home"
+
+# ── 컨테이너를 **호스트 사용자로** 돌린다 ────────────────────────────────────────
+# 안 그러면 컨테이너 root가 바인드 마운트에 쓴 파일이 전부 호스트에서 root 소유가 된다.
+# 실측(2026-08-06): 레포 worktree에 4,908개, $SDK_DIR에 14,718개, $GRADLE_DIR에 18,417개가
+# root 소유로 남아 사용자가 sudo 없이는 지울 수도 없었다(worktree 정리가 막혔다).
+# HOME도 줘야 한다 — --user 를 쓰면 HOME이 /(쓰기 불가)로 잡혀 자바·sdkmanager가 죽는다.
+# 캐시 마운트 안에 두어 다음 실행에서 재사용된다.
+HOST_UID="$(id -u)"; HOST_GID="$(id -g)"
+
+# 이미 root 소유로 오염된 마운트는 비루트 컨테이너가 쓸 수 없다 → 한 번만 복구한다.
+# **호스트 sudo가 필요 없다**: 도커 자체가 root를 주므로 일회용 root 컨테이너로 chown 한다.
+_fix_owner() {
+  for d in "$@"; do
+    [ -d "$d" ] || continue
+    [ -n "$(find "$d" ! -user "$(id -un)" -print -quit 2>/dev/null)" ] || continue
+    echo "== 소유권 복구(과거 root 실행 잔재): $d"
+    docker run --rm --network host -v "$d:/fix" alpine \
+      chown -R "$HOST_UID:$HOST_GID" /fix
+  done
+}
+_fix_owner "$SDK_DIR" "$GRADLE_DIR" "$REPO_DIR/android"
 
 # binfmt 전제 확인 — 없으면 빌드가 알 수 없는 곳에서 죽는다. 여기서 먼저 잡는다.
 if [ ! -e /proc/sys/fs/binfmt_misc/qemu-x86_64 ]; then
@@ -70,10 +91,12 @@ echo "·  gradle $GRADLE_DIR"
 [ -n "$KS_IN_CONTAINER" ] && echo "·  서명   $PF_KEYSTORE → $KS_IN_CONTAINER"
 
 exec docker run --rm --network host --platform linux/amd64 \
+  --user "$HOST_UID:$HOST_GID" \
   -v "$REPO_DIR:/repo" \
   -v "$SDK_DIR:/sdk" \
   -v "$GRADLE_DIR:/gradle" \
   "${KS_MOUNT[@]}" \
+  -e HOME=/gradle/home \
   -e ANDROID_HOME=/sdk -e ANDROID_SDK_ROOT=/sdk -e GRADLE_USER_HOME=/gradle \
   -e PF_KEYSTORE="$KS_IN_CONTAINER" \
   -e PF_KEYSTORE_PASSWORD="${PF_KEYSTORE_PASSWORD:-}" \

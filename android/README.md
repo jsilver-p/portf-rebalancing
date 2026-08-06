@@ -95,6 +95,11 @@ PF_KEY_ALIAS=portf PF_KEY_PASSWORD=… \
 | `compileDebugKotlin` | `does not hold the state lock for root project` | Kotlin 플러그인 ↔ `org.gradle.parallel` → `parallel=false`(단일 모듈이라 손해 없음) |
 | `generateReleaseLintVitalReportModel` | `uses this output ... without declaring a dependency` | `assets.srcDir`에 **경로 대신 태스크**를 넘겨 Gradle이 소비자를 가리지 않고 추론하게 |
 | `validateSigningRelease` | `Keystore file not found` | 호스트 경로를 컨테이너에 그대로 넘김 → 읽기 전용 마운트 후 컨테이너 경로로 치환 |
+| 빌드 **후** | 산출물이 호스트에서 **root 소유** — 사용자가 sudo 없이 못 지운다 | 컨테이너 기본 사용자가 root라 바인드 마운트에 쓴 파일이 전부 root 소유가 된다. 실측 33,135개(worktree 4,908 + SDK 14,718 + gradle 18,417)로 **worktree 정리가 막혔다.** → `--user $(id -u):$(id -g)`. HOME도 같이 줘야 한다(`--user`면 HOME이 `/`로 잡혀 쓰기 불가) |
+
+> **이미 오염된 캐시는 호스트 sudo 없이 복구된다** — 도커 자체가 root를 주므로 일회용 root
+> 컨테이너로 `chown -R` 하면 된다. `build-in-docker.sh`가 실행 전에 자동으로 감지·복구한다.
+> 같은 방법으로 root 소유가 섞인 디렉터리 삭제도 sudo 없이 가능하다.
 
 ### 프라이버시 주장을 어떻게 검증하나
 
