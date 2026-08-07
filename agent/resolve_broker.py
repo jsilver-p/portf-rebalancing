@@ -19,7 +19,11 @@ import collections, json, os, re, sys, urllib.parse, urllib.request
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import outbound                                     # noqa: E402  외부망 단일 통로
 OLLAMA = os.environ.get("OLLAMA", "http://127.0.0.1:11434") + "/api/generate"
-MODEL = os.environ.get("MODEL", "qwen2.5vl:7b")
+# 기본값은 `server.py:22`와 **같아야 한다.** 갈려 있었고(여기 7b / 서버 3b-ft3-q8), 그래서
+# CLI·하네스처럼 MODEL을 안 주는 경로가 다른 모델을 썼다. 실측 2026-08-07: 검색 텍스트에 답이
+# 55번 들어 있는데(`메리츠 증권 슈퍼 365`) **7b는 UNKNOWN**을 내고 3b-ft3-q8은 `메리츠증권`을
+# 낸다 — 즉 이 갈림 하나로 증권사 해석이 **통째로 죽어 있었다**(콜드 6/6 실패).
+MODEL = os.environ.get("MODEL", "qwen2.5vl:3b-ft3-q8")
 DATA_DIR = os.environ.get("DATA_DIR", os.path.expanduser("~/portf-agent/data"))
 CACHE_PATH = os.path.join(DATA_DIR, "broker_cache.json")
 
