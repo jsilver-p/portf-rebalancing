@@ -7,15 +7,17 @@
   3) 계좌번호/계좌별칭    "1234567890-01", "[ISA…]"  → 라벨만으론 불가 → 크로스-스크린(finalize)에서
                                                        같은 앱 요약화면의 정규사를 상속(여기선 None 반환)
 
-검색은 GT를 만들 때와 동일한 방식('추출 후 서치'): naver 검색 결과 텍스트를 근거로
-로컬 LLM이 정규사명을 읽어낸다(모델의 틀린 기억이 아니라 검색결과 기반). LLM 미가용/실패 시
-검색결과의 최빈 'XX증권' 토큰으로 폴백. 확정 결과는 캐시(파생 데이터, 레포 밖).
-"""
-import collections, json, os, re, urllib.parse, urllib.request
+검색은 naver 검색 결과 텍스트를 근거로 **로컬 LLM이** 정규사명을 읽어낸다(모델의 기억이 아니라
+검색결과 기반, 확인 불가면 UNKNOWN). **폴백은 없다** — LLM이 없거나 실패하면 None이다
+(최빈 토큰 폴백은 6개 중 5개를 지어내 폐기했다, `_freq_broker` 참조). 확정 결과는 캐시.
 
-UA = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-      "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36",
-      "Accept-Language": "ko,en;q=0.9"}
+나가는 것: **브랜드 토큰 하나**('Super365'). 계좌번호·별칭·종목명·금액은 `brand_token`이
+미리 거른다. 실제 요청은 `outbound.py`를 지난다(`PF_OUTBOUND`로 끌 수 있다).
+"""
+import collections, json, os, re, sys, urllib.parse, urllib.request
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import outbound                                     # noqa: E402  외부망 단일 통로
 OLLAMA = os.environ.get("OLLAMA", "http://127.0.0.1:11434") + "/api/generate"
 MODEL = os.environ.get("MODEL", "qwen2.5vl:7b")
 DATA_DIR = os.environ.get("DATA_DIR", os.path.expanduser("~/portf-agent/data"))
@@ -79,8 +81,7 @@ def brand_token(label):
 
 def _search_text(query, timeout=15):
     url = "https://search.naver.com/search.naver?query=" + urllib.parse.quote(query)
-    with urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=timeout) as r:
-        h = r.read().decode("utf-8", "ignore")
+    h = outbound.get("broker", url, timeout).decode("utf-8", "ignore")
     h = re.sub(r"(?is)<(script|style).*?</\1>", " ", h)
     return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", h)).strip()
 
@@ -136,8 +137,8 @@ def search_broker(brand, use_llm=True):
     남은 유일한 검색 경로는 LLM이 검색 텍스트를 읽고 '확인 불가면 UNKNOWN'을 지키는 것이다
     (Orin 전용). 엣지(`use_llm=False`)에서는 **캐시에 이미 확정된 답이 있을 때만** 풀리고,
     없으면 None → 화면 상속 → 그래도 없으면 `증권사 미상` 경고. 지어내지 않는다."""
-    if not use_llm:
-        return None
+    if not use_llm or not outbound.enabled("broker"):
+        return None                      # 정책이 껐거나 검증할 LLM이 없으면 **나가지도 않는다**
     try:
         text = _search_text(f"{brand} 어느 증권사")
     except Exception:

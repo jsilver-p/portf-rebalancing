@@ -24,10 +24,11 @@
     "errors": { "<symbol>": "<reason>" }   # 실패 심볼(있을 때만)
   }
 """
-import json, sys, time, urllib.parse, urllib.request
+import json, os, sys, time, urllib.parse
 from datetime import datetime, timezone, timedelta
 
-UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import outbound                                     # noqa: E402  외부망 단일 통로
 CHART = "https://query1.finance.yahoo.com/v8/finance/chart/"
 STALE_DAYS = 4          # 연휴를 넘겨 이만큼 오래된 종가는 stale로 표시
 FX_SYMBOL = "KRW=X"     # USD/KRW
@@ -45,14 +46,14 @@ def fetch_one(symbol, retries=2):
     last = None
     for i in range(retries + 1):
         try:
-            req = urllib.request.Request(url, headers={"User-Agent": UA})
-            with urllib.request.urlopen(req, timeout=20) as r:
-                d = json.loads(r.read())
+            d = json.loads(outbound.get("quote", url, timeout=20))
             res = d.get("chart", {}).get("result")
             if not res:
                 err = d.get("chart", {}).get("error")
                 raise ValueError(str(err) or "no result")
             return res[0]["meta"]
+        except outbound.Blocked:
+            raise                       # 정책 차단은 일시적 실패가 아니다 — 재시도하지 않는다
         except Exception as e:
             last = e
             time.sleep(0.5 * (i + 1))
@@ -65,13 +66,13 @@ def chart(symbol, rng="1d", interval="1d", retries=2):
     last = None
     for i in range(retries + 1):
         try:
-            req = urllib.request.Request(url, headers={"User-Agent": UA})
-            with urllib.request.urlopen(req, timeout=20) as r:
-                d = json.loads(r.read())
+            d = json.loads(outbound.get("quote", url, timeout=20))
             res = d.get("chart", {}).get("result")
             if not res:
                 raise ValueError(str(d.get("chart", {}).get("error") or "no result"))
             return res[0]
+        except outbound.Blocked:
+            raise                       # 정책 차단은 일시적 실패가 아니다 — 재시도하지 않는다
         except Exception as e:
             last = e
             time.sleep(0.5 * (i + 1))

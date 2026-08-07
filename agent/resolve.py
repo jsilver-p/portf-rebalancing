@@ -11,17 +11,16 @@
 
 CLI:  python3 agent/resolve.py "TIGER 차이나휴머노이드로봇"  KODEX...  VOO
 """
-import json, os, re, sys, time, urllib.parse, urllib.request
+import json, os, re, sys, time, urllib.parse
 
-UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import outbound                                     # noqa: E402  외부망 단일 통로
 CACHE_PATH = os.path.join(os.path.dirname(__file__), ".symbol-cache.json")
 CASH_KEYS = ("예수금", "현금", "예금", "잔고", "CMA", "deposit")
 
 
 def _get(url, timeout=15):
-    req = urllib.request.Request(url, headers={"User-Agent": UA})
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        return json.loads(r.read())
+    return json.loads(outbound.get("symbol", url, timeout))    # 아웃바운드는 outbound.py 한 곳
 
 
 def is_cash(name):

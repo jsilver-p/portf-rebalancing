@@ -107,9 +107,20 @@ PF_KEY_ALIAS=portf PF_KEY_PASSWORD=… \
 
 1. `AndroidManifest.xml` — 권한은 `INTERNET` 하나. 저장소·미디어 권한 없음.
 2. `res/xml/network_security_config.xml` — 평문 통신을 **127.0.0.1로만** 허용, 그 외 차단.
-3. 추출 코드 경로에 네트워크 호출이 없다:
-   `MlKitOcr.recognize` → `bind.bind` → `finalize` 게이트. 나가는 통신은 **심볼·시세·환율**
-   조회뿐이고(`fetch_prices.py`, `resolve*.py`) **스크린샷과 금액은 나가지 않는다.**
+3. 추출 코드 경로(`MlKitOcr.recognize` → `bind.bind` → `finalize` 게이트)에 네트워크 호출이
+   없다. 외부로 나가는 것은 **`agent/outbound.py` 한 함수**를 지나고, 목적은 셋뿐이다:
+
+   | 목적 | 호스트 | 나가는 것 | APK에서 |
+   |---|---|---|---|
+   | `symbol` | `ac.stock.naver.com` | 종목명 한 개 | 허용 |
+   | `quote` | `query1.finance.yahoo.com` | 심볼 한 개(환율 `KRW=X`) | 허용 |
+   | `broker` | `search.naver.com` | 증권사 브랜드 토큰 한 개 | **차단**(검증할 LLM이 기기에 없다) |
+
+   **스크린샷·금액·수량·계좌번호·계좌별칭은 나가지 않는다.**
+   `android_main.py`가 `PF_OUTBOUND=prices`를 고정한다. `python3 agent/outbound.py`로
+   현재 정책과 나가는 항목을 그대로 출력해 확인할 수 있다.
+   다만 **보유 종목명·심볼은 나간다** — 금액은 아니지만 '무엇을 갖고 있는지'는 드러난다.
+   `PF_OUTBOUND=none`이면 추출만 되고 시세·심볼이 빈다.
 
 기기 네트워크를 끈 상태에서 **추출이 성공**하는 것으로 실증한다(시세만 나중에 붙는다).
 

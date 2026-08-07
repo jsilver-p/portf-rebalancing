@@ -13,7 +13,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 
-def start(index_path, data_dir, port=8899, granularity="line"):
+def start(index_path, data_dir, port=8899, granularity="element"):
     """Kotlin에서 호출. 블로킹이다 — 반드시 백그라운드 스레드에서 부를 것."""
     os.environ["INDEX_PATH"] = str(index_path)
     os.environ["DATA_DIR"] = str(data_dir)
@@ -23,7 +23,14 @@ def start(index_path, data_dir, port=8899, granularity="line"):
     # 기기에는 비전 LLM이 없다 — OCR+기하만. ollama를 부르는 경로로 절대 가지 않는다.
     os.environ["EXTRACT"] = "ocr"
     os.environ["OCR_ENGINE"] = "mlkit"
+    # 기본은 **element** — ML Kit의 Line 그룹핑에 걸지 않고 `ocr.merge_lines`로 우리가 합친다.
+    # bind가 견디는 봉투는 R∈[0.6,1.8]이고 우리 임계값 1.0은 그 한가운데다(docs §4.8).
+    # 'line'을 쓰면 봉투 안인지가 ML Kit 손에 넘어간다.
     os.environ["OCR_MLKIT_GRANULARITY"] = str(granularity)
+    # 기기에는 검증할 LLM이 없다. 그런데 `finalize(use_llm=True)`가 기본이라 증권사 브랜드
+    # **웹검색은 나가고** LLM이 없어 실패해 None이 된다 — 값도 못 얻고 요청만 나가는 낭비다.
+    # 시세·심볼만 남긴다(`outbound.py` 정책). 증권사는 화면 표기·계좌 상속·캐시로만 푼다.
+    os.environ.setdefault("PF_OUTBOUND", "prices")
 
     os.makedirs(data_dir, exist_ok=True)
     if HERE not in sys.path:
