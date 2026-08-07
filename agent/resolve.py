@@ -7,7 +7,11 @@
 - 현금성(예수금·CMA 등): 시세 대상 아님 → None.
 
 해석 결과는 Yahoo chart 엔드포인트가 그대로 받는 심볼이다(measure: 2026-07-09 26/26 커버).
-결과는 선택적으로 캐시(name→symbol)한다 — 파생 데이터일 뿐이라 언제든 갱신 가능.
+
+**디스크 캐시는 없다(규칙).** 이름을 심볼로 푸는 수단은 검색이지 저장이 아니다. 저장하면
+"검색이 항상 동작하는가"를 가린다 — 증권사 쪽에서 실제로 그 일이 났다(`resolve_broker`
+docstring). 한 실행 안에서 같은 이름이 여러 번 나오면 호출부의 **메모 dict**로 한 번만
+질의한다(휘발성). 자동완성은 실측 5/5·0.05s라 재질의 비용이 문제되지 않는다.
 
 CLI:  python3 agent/resolve.py "TIGER 차이나휴머노이드로봇"  KODEX...  VOO
 """
@@ -15,7 +19,6 @@ import json, os, re, sys, time, urllib.parse
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import outbound                                     # noqa: E402  외부망 단일 통로
-CACHE_PATH = os.path.join(os.path.dirname(__file__), ".symbol-cache.json")
 CASH_KEYS = ("예수금", "현금", "예금", "잔고", "CMA", "deposit")
 
 
@@ -130,14 +133,15 @@ def naver_resolve(name):
     return None, None
 
 
-def resolve(name, currency=None, cache=None):
+def resolve(name, currency=None, memo=None):
     """이름 → {'symbol','market','source'} 또는 None(현금/해석실패).
-    cache: name→record dict(옵션). currency 힌트가 있으면 미국/국내 분기에 사용."""
+    memo: name→record dict. **한 실행 안에서만 사는 메모다**(디스크 캐시 없음, 모듈 docstring).
+    currency 힌트가 있으면 미국/국내 분기에 사용."""
     name = (name or "").strip()
     if not name or is_cash(name):
         return None
-    if cache is not None and name in cache:
-        return cache[name]
+    if memo is not None and name in memo:
+        return memo[name]
     rec = None
     m = re.search(r"\(([A-Z][A-Z0-9.]{0,5})\)", name)   # 괄호 티커 '알파벳 A (GOOGL)' — 명시적 근거
     if m:
@@ -149,20 +153,9 @@ def resolve(name, currency=None, cache=None):
     t = us_ticker(name, allow_leading=(currency == "USD"))
     if rec is None and t:  # 검색이 실패했을 때만 티커 형태로 폴백
         rec = {"symbol": t, "market": "US", "source": "ticker"}
-    if cache is not None and rec is not None:
-        cache[name] = rec
+    if memo is not None and rec is not None:
+        memo[name] = rec
     return rec
-
-
-def load_cache(path=CACHE_PATH):
-    try:
-        return json.load(open(path))
-    except Exception:
-        return {}
-
-
-def save_cache(cache, path=CACHE_PATH):
-    json.dump(cache, open(path, "w"), ensure_ascii=False, indent=2)
 
 
 if __name__ == "__main__":

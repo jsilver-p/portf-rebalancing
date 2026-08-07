@@ -298,12 +298,11 @@ def _label_supported(label, screen_text, broker, evidence):
     return False
 
 
-def finalize(screens, use_llm=True, broker_cache=None):
+def finalize(screens, use_llm=True):
     """screens: [{"file":str,"raw":str,"evidence":str|None}]. 반환 {holdings, gate}.
 
     evidence = 그 화면의 OCR 원문 텍스트(선택). 있으면 broker 라벨의 독립 심판으로 쓴다."""
-    if broker_cache is None:
-        broker_cache = RB.load_cache()
+    broker_memo = {}      # 이 실행 안에서만 산다 — 디스크 캐시 없음(`resolve_broker` docstring)
     parsed = []
     for sc in screens:
         rows = parse_rows(sc.get("raw", ""))
@@ -395,7 +394,7 @@ def finalize(screens, use_llm=True, broker_cache=None):
         names = {str(r.get("name") or "").strip() for r in real}
         if label.strip() in names:
             label = ""
-        broker = RB.resolve_broker(label, broker_cache, use_llm=use_llm)   # 정규명·브랜드(검색)
+        broker = RB.resolve_broker(label, broker_memo, use_llm=use_llm)   # 정규명·브랜드(검색)
         bsrc = "screen" if (broker and RB.canonical_in(label)) else ("research" if broker else None)
         if not broker:
             broker = RB.canonical_in(screen_text)   # 화면 어딘가의 정규명(예: '현금성자산(삼성증권)')
@@ -507,7 +506,6 @@ def finalize(screens, use_llm=True, broker_cache=None):
     for p in parsed:                     # 빈 화면 = 추출 실패. 조용히 넘기지 않는다.
         if p["type"] == "empty":
             gate["warnings"].insert(0, f"{p['file']}: 추출 0행 — 화면 유실(파싱 실패·미인식) 의심")
-    RB.save_cache(broker_cache)
     return {"holdings": holdings, "gate": gate,
             "screens": [{"file": p["file"], "type": p["type"]} for p in parsed]}
 

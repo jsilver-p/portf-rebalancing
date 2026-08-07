@@ -422,7 +422,7 @@ def enrich(rows, capture_dt, mode="extract"):
       실패                             → qty=null + unreproducible (지어내지 않는다)
     T3가 T4보다 위인 이유: 같은 캡처 시점·같은 종목의 주가라 시장 타이밍·환율 오차가 끼지 않는다.
     capture_dt: tz-aware datetime (스크린샷 캡처 시각)."""
-    cache = resolve.load_cache()
+    cache = {}          # 이름→심볼 메모: 이 요청 안에서만 산다(디스크 캐시 없음, `resolve` docstring)
     fx_cap = ["unset"]  # 캡처 시점 USD/KRW (lazy)
     def get_fx():
         if fx_cap[0] == "unset":
@@ -673,7 +673,6 @@ def enrich(rows, capture_dt, mode="extract"):
             h["price_src"] = "cash"
         for k in ("_native_usd", "_value_krw"):
             h.pop(k, None)
-    resolve.save_cache(cache)
     return rows
 
 
@@ -829,12 +828,11 @@ def extract_batch(images, capture_dt, on_screen=None, on_stage=None):
         on_stage("finalizing")
     screens = [{"file": f"img{i + 1}", "raw": raw, "evidence": evid[i]}
                for i, raw in enumerate(raws)]
-    # 브랜드→증권사 캐시를 **실제로 넘긴다.** 안 넘기면 요청마다 웹검색을 다시 하고, 검색 순위가
-    # 호출마다 달라 **같은 스크린샷이 다른 증권사를 낸다**(실측 2026-08-07: Super365가 같은
-    # 세션에서 메리츠증권/대신증권으로 갈림). 캐시는 '한 번 확정한 사실'을 고정하는 장치다.
-    bcache = finalize_mod.RB.load_cache()
-    fin = finalize_mod.finalize(screens, broker_cache=bcache)   # holdings(정규화) + gate(대조 리포트)
-    finalize_mod.RB.save_cache(bcache)
+    # 증권사는 **요청마다 검색으로 다시 확정한다**(디스크 캐시 없음, `resolve_broker` docstring).
+    # 예전엔 검색 순위가 호출마다 달라 같은 스크린샷이 다른 증권사를 냈고 캐시가 그걸 고정했다.
+    # 그 흔들림의 원인은 최빈-토큰 폴백이었고 이미 제거됐다 — 지금은 LLM이 검색 텍스트를 읽고
+    # 확인 불가면 UNKNOWN이라 **캐시 없이도 결정적이다**(실측 2026-08-07: 브랜드 4종 각 6/6).
+    fin = finalize_mod.finalize(screens)          # holdings(정규화) + gate(대조 리포트)
     rows = enrich(fin["holdings"], capture_dt)    # 심볼 해석 + 수량 사다리 + 가격(_file은 화면단위 게이트에 필요)
     for h in rows:
         h.pop("_file", None)

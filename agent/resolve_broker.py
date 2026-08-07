@@ -9,7 +9,13 @@
 
 검색은 naver 검색 결과 텍스트를 근거로 **로컬 LLM이** 정규사명을 읽어낸다(모델의 기억이 아니라
 검색결과 기반, 확인 불가면 UNKNOWN). **폴백은 없다** — LLM이 없거나 실패하면 None이다
-(최빈 토큰 폴백은 6개 중 5개를 지어내 폐기했다, `_freq_broker` 참조). 확정 결과는 캐시.
+(최빈 토큰 폴백은 6개 중 5개를 지어내 폐기했다, `_freq_broker` 참조).
+
+**디스크 캐시는 없다(규칙).** 브랜드를 푸는 수단은 검색이지 저장이 아니다. 저장은 "방법이
+항상 동작하는가"를 가려서, 검색 경로가 죽어 있어도 통과시킨다 — 실제로 그랬다(2026-08-07:
+`MODEL` 기본값이 갈려 검색이 6/6 실패하는 동안 캐시가 정답을 내고 있었다). 매 실행 검색으로
+확정하고, 못 풀면 못 풀었다고 말한다. 한 실행 안에서 같은 브랜드가 여러 화면에 나오면
+호출부가 넘긴 **메모 dict**로 한 번만 검색한다(휘발성, 파일 아님).
 
 나가는 것: **브랜드 토큰 하나**('Super365'). 계좌번호·별칭·종목명·금액은 `brand_token`이
 미리 거른다. 실제 요청은 `outbound.py`를 지난다(`PF_OUTBOUND`로 끌 수 있다).
@@ -24,8 +30,6 @@ OLLAMA = os.environ.get("OLLAMA", "http://127.0.0.1:11434") + "/api/generate"
 # 55번 들어 있는데(`메리츠 증권 슈퍼 365`) **7b는 UNKNOWN**을 내고 3b-ft3-q8은 `메리츠증권`을
 # 낸다 — 즉 이 갈림 하나로 증권사 해석이 **통째로 죽어 있었다**(콜드 6/6 실패).
 MODEL = os.environ.get("MODEL", "qwen2.5vl:3b-ft3-q8")
-DATA_DIR = os.environ.get("DATA_DIR", os.path.expanduser("~/portf-agent/data"))
-CACHE_PATH = os.path.join(DATA_DIR, "broker_cache.json")
 
 # 계좌별칭/유형 토큰: 브랜드가 아니라 계좌 성격 → 검색 대상 아님(크로스-스크린으로)
 _ACCT_HINT = ("연금", "IRP", "ISA", "퇴직", "CMA", "중개형", "비대면", "저축")
@@ -139,8 +143,11 @@ def search_broker(brand, use_llm=True):
     없으므로 **임계값으로 덮지 않고 단계를 없앤다**(각도 분류기 cls를 껐던 것과 같은 판단).
 
     남은 유일한 검색 경로는 LLM이 검색 텍스트를 읽고 '확인 불가면 UNKNOWN'을 지키는 것이다
-    (Orin 전용). 엣지(`use_llm=False`)에서는 **캐시에 이미 확정된 답이 있을 때만** 풀리고,
-    없으면 None → 화면 상속 → 그래도 없으면 `증권사 미상` 경고. 지어내지 않는다."""
+    (Orin 전용). 엣지(`use_llm=False`)에는 읽을 수단이 없으므로 **나가지도 않고 None**이다 →
+    화면 상속 → 그래도 없으면 `증권사 미상` 경고. 지어내지 않는다.
+
+    캐시로 이 구멍을 덮지 않는다(모듈 docstring). 엣지가 브랜드만 찍히는 앱에서 증권사를
+    못 푸는 것은 **현재 사실**이고, 감출 대상이 아니라 측정 결과다."""
     if not use_llm or not outbound.enabled("broker"):
         return None                      # 정책이 껐거나 검증할 LLM이 없으면 **나가지도 않는다**
     try:
@@ -151,24 +158,12 @@ def search_broker(brand, use_llm=True):
     return name if is_broker_name(name) else None
 
 
-def load_cache(path=CACHE_PATH):
-    """캐시 로드 + 자가 치유: 자리표시 키(과거 오염)를 버린다. 코드만 고치고 캐시를 두면 버그가 살아남는다."""
-    try:
-        c = json.load(open(path))
-    except Exception:
-        return {}
-    return {k: v for k, v in c.items()          # 자리표시 키·비(非)증권사명 값(과거 오염) 폐기
-            if not is_placeholder(k) and is_broker_name(v)}
-
-
-def save_cache(cache, path=CACHE_PATH):
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    json.dump(cache, open(path, "w"), ensure_ascii=False, indent=2)
-
-
-def resolve_broker(label, cache=None, use_llm=True):
+def resolve_broker(label, memo=None, use_llm=True):
     """broker 라벨 → 정규 증권사명 또는 None(라벨만으론 불가 → 크로스-스크린 상속 필요).
-    cache: 브랜드 토큰(소문자) → 정규명 dict(옵션)."""
+
+    memo: 브랜드 토큰(소문자) → 정규명 dict. **한 실행 안에서만 사는 메모다** — 호출부가
+    매번 새로 만들고 어디에도 저장하지 않는다(디스크 캐시 없음, 모듈 docstring 참조).
+    같은 브랜드가 6개 화면에 나와도 검색은 한 번이면 되지만, 다음 실행은 다시 검색한다."""
     c = canonical_in(label)
     if c:
         return c
@@ -176,18 +171,17 @@ def resolve_broker(label, cache=None, use_llm=True):
     if not bt:
         return None
     key = bt.lower()
-    if cache is not None and key in cache:
-        return cache[key]
+    if memo is not None and key in memo:
+        return memo[key]
     name = search_broker(bt, use_llm=use_llm)
-    if cache is not None and name:
-        cache[key] = name
+    if memo is not None and name:
+        memo[key] = name
     return name
 
 
 if __name__ == "__main__":
     import sys
-    cache = load_cache()
+    memo = {}
     for lab in (sys.argv[1:] or ["삼성증권", "[Super365]", "1234567890-01",
                                  "[ISA(평생혜택 중개형)(비대면)]"]):
-        print(f"{lab:34} -> {resolve_broker(lab, cache)}")
-    save_cache(cache)
+        print(f"{lab:34} -> {resolve_broker(lab, memo)}")

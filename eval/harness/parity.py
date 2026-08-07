@@ -103,9 +103,9 @@ def capture_dt():
 
 def run_pipeline(screens, use_llm=True):
     """앱이 타는 경로와 동일: finalize → enrich.
-    브랜드→증권사 캐시도 서버와 **같이** 넘긴다(server.extract_batch). 안 넘기면 매번 웹검색이
-    돌아 같은 입력이 다른 증권사를 내고, 채점기가 서버와 다른 구성을 재게 된다."""
-    fin = F.finalize(screens, use_llm=use_llm, broker_cache=F.RB.load_cache())
+    서버와 마찬가지로 **증권사 캐시를 쓰지 않는다** — 채점기가 캐시를 쓰면 검색 경로가 죽어도
+    통과한다(2026-08-07에 실제로 그랬다)."""
+    fin = F.finalize(screens, use_llm=use_llm)
     rows = S.enrich(fin["holdings"], capture_dt())   # _file은 화면단위 게이트(현금 병합)에 필요
     for h in rows:
         h.pop("_file", None)

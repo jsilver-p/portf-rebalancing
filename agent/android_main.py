@@ -29,7 +29,8 @@ def start(index_path, data_dir, port=8899, granularity="element"):
     os.environ["OCR_MLKIT_GRANULARITY"] = str(granularity)
     # 기기에는 검증할 LLM이 없다. 그런데 `finalize(use_llm=True)`가 기본이라 증권사 브랜드
     # **웹검색은 나가고** LLM이 없어 실패해 None이 된다 — 값도 못 얻고 요청만 나가는 낭비다.
-    # 시세·심볼만 남긴다(`outbound.py` 정책). 증권사는 화면 표기·계좌 상속·캐시로만 푼다.
+    # 시세·심볼만 남긴다(`outbound.py` 정책). 증권사는 **화면 표기·계좌 상속으로만** 푼다 —
+    # 캐시는 없다(규칙). 브랜드만 찍히는 앱에서는 `증권사 미상` 경고가 남는다. 알려진 구멍이다.
     os.environ.setdefault("PF_OUTBOUND", "prices")
 
     os.makedirs(data_dir, exist_ok=True)
