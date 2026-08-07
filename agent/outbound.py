@@ -38,7 +38,7 @@ ROUTES = {
     "broker": ("search.naver.com", _UA_PLAIN,
                "증권사 브랜드 토큰 한 개 (예: 'Super365')",
                "계좌번호·계좌별칭·종목명·금액·스크린샷 (brand_token이 미리 거른다)",
-               "broker=None + '증권사 미상' 경고 — 지어내지 않는다"),
+               "정규명 없이 **화면 브랜드 라벨**로 남는다('Super365') — 지어내지 않는다"),
 }
 LEVELS = {"all": set(ROUTES), "prices": {"symbol", "quote"}, "none": set()}
 
