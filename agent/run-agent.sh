@@ -56,7 +56,15 @@ if fuser "$PORT/tcp" >/dev/null 2>&1; then
 fi
 
 # 1) 에이전트 서버 -----------------------------------------------------------
-python3 "$REPO_DIR/agent/server.py" >/tmp/agent-server.log 2>&1 &
+# 인터프리터는 **OCR이 되는 것**을 고른다. 한 서버가 요청마다 engine=edge|orin 을 고르므로
+# (docs §4.15), 시스템 python3로 띄우면 엣지 경로가 통째로 죽고 셀렉터가 반쪽이 된다.
+# 부수효과: VLM 경로의 broker 심판(evidence OCR)도 그동안 라이브에서 조용히 꺼져 있었다.
+PY="${PY:-python3}"
+for c in "$HOME/workspaces/edge-ocr-venv/bin/python" "$REPO_DIR/../edge-ocr-venv/bin/python"; do
+  [ -x "$c" ] && "$c" -c "import rapidocr" >/dev/null 2>&1 && { PY="$c"; break; }
+done
+echo "· 인터프리터 $PY $("$PY" -c "import rapidocr" 2>/dev/null && echo '(엣지 경로 사용 가능)' || echo '(OCR 없음 — engine=edge 비활성)')"
+"$PY" "$REPO_DIR/agent/server.py" >/tmp/agent-server.log 2>&1 &
 SRV=$!
 sleep 2
 if ! kill -0 "$SRV" 2>/dev/null; then

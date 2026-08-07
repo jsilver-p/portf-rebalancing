@@ -29,11 +29,52 @@ NP = int(os.environ.get("NP", "2"))            # 동시 비전 요청 수 — ol
 # 추출 백엔드: vlm(기본, 라이브 유지) | ocr(엣지 — OCR+기하, 신경망 LLM 0개).
 # 기본을 바꾸지 않는 이유: 이 파일은 라이브 에이전트와 공유된다. 엣지는 기동 스크립트에서 켠다.
 EXTRACT = os.environ.get("EXTRACT", "vlm")
+
+# ── 경로(engine)는 **요청마다 고를 수 있다** ────────────────────────────────
+# 폰에서 한 URL로 두 경로를 나란히 비교하려면 프로세스를 두 개 띄우는 게 아니라 요청이 골라야
+# 한다(데이터·holdings가 갈리면 비교가 아니라 다른 앱 두 개가 된다).
+#
+# **경로는 추출기만이 아니다.** 폰에는 검색 결과를 읽을 LLM이 없으므로 `edge`는 증권사
+# 검색까지 함께 꺼야 진짜 폰과 같다(그래야 브랜드 폴백이 실제로 밟힌다, docs §4.14).
+#   engine → (추출기, finalize의 use_llm)
+ENGINES = {"edge": ("ocr", False),      # ML Kit/RapidOCR + 기하. 신경망 LLM 0개 = APK와 같은 경로
+           "orin": ("vlm", True)}       # 커스텀 FT 비전모델 + 증권사 검색·판독
+DEFAULT_ENGINE = "edge" if EXTRACT == "ocr" else "orin"
+
+
+def engine_of(name):
+    """요청이 준 engine 이름 → (추출기, use_llm). 모르는 값이면 서버 기본값으로."""
+    return ENGINES.get(str(name or "").strip().lower(), ENGINES[DEFAULT_ENGINE])
+
+
+def engine_status():
+    """각 경로가 이 프로세스에서 실제로 도는가 — 프런트가 못 고르게 막을 근거."""
+    out = {}
+    try:
+        sys.path.insert(0, HERE)
+        import ocr as _ocr                      # noqa: F401  rapidocr/mlkit가 있는 인터프리터인가
+        out["edge"] = {"ok": True}
+    except Exception as e:
+        out["edge"] = {"ok": False, "why": f"OCR 엔진 없음({type(e).__name__})"}
+    try:
+        with urllib.request.urlopen(OLLAMA.replace("/api/generate", "/api/tags"), timeout=3) as r:
+            names = [m.get("name") for m in json.loads(r.read()).get("models", [])]
+        out["orin"] = ({"ok": True} if MODEL in names else
+                       {"ok": False, "why": f"모델 미적재({MODEL})"})
+    except Exception as e:
+        out["orin"] = {"ok": False, "why": f"ollama 없음({type(e).__name__})"}
+    return out
 PROMPT_FILE = os.environ.get("PROMPT_FILE", os.path.join(ROOT, "eval/harness/prompt4f.txt"))
 # prompt4f = prompt4e + broker 정의 단일화(계좌라벨 제거)·시장지수 제외·자릿수 — Phase2 3b-ft3
 # OCR 경로는 프롬프트를 쓰지 않는다. APK에는 eval/ 트리가 없으므로 읽지도 않는다
 # (임포트 시점에 죽지 않게. VLM 경로에서는 없으면 여전히 즉시 실패한다).
-PROMPT = open(PROMPT_FILE).read().strip() if EXTRACT != "ocr" else ""
+# 프롬프트는 **없으면 빈 문자열**이다. 예전엔 EXTRACT=ocr일 때만 건너뛰었는데, 이제 한
+# 프로세스가 두 경로를 다 태우므로 엣지 기본으로 떠 있어도 orin 요청이 올 수 있다.
+# APK에는 eval/ 트리가 없다 → 여기서 죽으면 임포트가 통째로 죽는다. VLM 요청 시점에 검사한다.
+try:
+    PROMPT = open(PROMPT_FILE).read().strip()
+except Exception:
+    PROMPT = ""
 # 앱(index.html)을 에이전트가 직접 서빙 → 단일 오리진. 터널·CORS·혼합 컨텐츠가 사라진다.
 INDEX_PATH = os.environ.get("INDEX_PATH", os.path.join(ROOT, "index.html"))
 
@@ -763,18 +804,22 @@ def _evidence_text(boxes):
     return " ".join(str(b["text"]) for b in sorted(boxes, key=lambda b: (b["y"], b["x"])))
 
 
-def _vision(b64):
+def _vision(b64, mode=None):
     """이미지 1장 → (추출 원문 텍스트, 화면 OCR 텍스트). 배치·단건 공용.
 
     두 번째 값(evidence)은 **비전 모델과 독립인 심판**이다. 값에는 총액 대조가 있지만
     라벨에는 심판이 없어 모델이 증권사명을 지어내면 게이트가 침묵했다 —
     OCR 텍스트가 그 자리를 메운다(finalize._label_supported).
+
+    mode: 'ocr' | 'vlm'. 없으면 프로세스 기본(EXTRACT).
     """
-    if EXTRACT == "ocr":
+    if (mode or EXTRACT) == "ocr":
         sys.path.insert(0, HERE)
         import bind
         boxes = _ocr_boxes(b64)                     # OCR은 한 번만 — 추출과 심판이 같은 박스에서 나온다
         return json.dumps(bind.bind(boxes), ensure_ascii=False), _evidence_text(boxes)
+    if not PROMPT:                                  # 프롬프트 없이 비전 호출 = 조용히 쓰레기를 낸다
+        raise RuntimeError(f"VLM 경로인데 프롬프트가 없다: {PROMPT_FILE}")
     body = json.dumps({"model": MODEL, "prompt": PROMPT, "images": [resample_half_b64(b64)],
                        "stream": False, "keep_alive": -1, "options": {"temperature": 0, "num_ctx": 8192}}).encode()
     req = urllib.request.Request(OLLAMA, data=body, headers={"Content-Type": "application/json"})
@@ -791,7 +836,7 @@ def _vision(b64):
     return raw, evidence
 
 
-def extract_batch(images, capture_dt, on_screen=None, on_stage=None):
+def extract_batch(images, capture_dt, on_screen=None, on_stage=None, engine=None):
     """여러 화면을 한 번에: 화면별 비전추출 → finalize(계좌합계 대조 게이트 + broker 정규화)
     → 결정적 enrich(심볼·수량·현재가). 앱이 스크린샷 여러 장을 종합해 정확한 결과를 얻는 경로.
 
@@ -799,6 +844,10 @@ def extract_batch(images, capture_dt, on_screen=None, on_stage=None):
     가중치 스트리밍을 공유하므로 총 처리량이 슬롯 수에 가깝게 늘어난다. 요청은 여전히 화면당
     1개라 행→화면 귀속은 구조적으로 보존된다(NP는 ollama 슬롯 수와 일치시킬 것)."""
     t0 = time.time()
+    eng = str(engine or DEFAULT_ENGINE).strip().lower()
+    if eng not in ENGINES:
+        eng = DEFAULT_ENGINE
+    mode, use_llm = ENGINES[eng]
     exif_found = False
     for b64 in images:                            # EXIF는 병렬 전에 순차로(빠름·상태 갱신 결정적)
         dt = exif_capture_dt(b64)
@@ -818,12 +867,12 @@ def extract_batch(images, capture_dt, on_screen=None, on_stage=None):
     if NP > 1 and n > 1:
         from concurrent.futures import ThreadPoolExecutor, as_completed
         with ThreadPoolExecutor(max_workers=NP) as ex:
-            futs = {ex.submit(_vision, b64): i for i, b64 in enumerate(images)}
+            futs = {ex.submit(_vision, b64, mode): i for i, b64 in enumerate(images)}
             for fut in as_completed(futs):        # 완료되는 대로 방출 — 최종 조립은 raws[i]로 순서 보존
                 _done(futs[fut], fut.result())
     else:
         for i, b64 in enumerate(images):
-            _done(i, _vision(b64))
+            _done(i, _vision(b64, mode))
     if on_stage:                                  # 비전추출 끝 → 종합·검증 단계로(라이브 상태 전환)
         on_stage("finalizing")
     screens = [{"file": f"img{i + 1}", "raw": raw, "evidence": evid[i]}
@@ -832,13 +881,14 @@ def extract_batch(images, capture_dt, on_screen=None, on_stage=None):
     # 예전엔 검색 순위가 호출마다 달라 같은 스크린샷이 다른 증권사를 냈고 캐시가 그걸 고정했다.
     # 그 흔들림의 원인은 최빈-토큰 폴백이었고 이미 제거됐다 — 지금은 LLM이 검색 텍스트를 읽고
     # 확인 불가면 UNKNOWN이라 **캐시 없이도 결정적이다**(실측 2026-08-07: 브랜드 4종 각 6/6).
-    fin = finalize_mod.finalize(screens)          # holdings(정규화) + gate(대조 리포트)
+    fin = finalize_mod.finalize(screens, use_llm=use_llm)   # holdings(정규화) + gate(대조 리포트)
     rows = enrich(fin["holdings"], capture_dt)    # 심볼 해석 + 수량 사다리 + 가격(_file은 화면단위 게이트에 필요)
     for h in rows:
         h.pop("_file", None)
     update_watchlist(rows)
     result = {"holdings": rows, "gate": fin["gate"], "screens": fin["screens"],
-              "seconds": round(time.time() - t0, 1), "model": MODEL,
+              "seconds": round(time.time() - t0, 1), "engine": eng,
+              "model": MODEL if mode == "vlm" else f"OCR+기하({os.environ.get('OCR_ENGINE', 'rapidocr')})",
               "captureDateTime": capture_dt.isoformat(),
               "captureSource": "exif" if exif_found else "fallback"}
     # 개발 캡처 저장 — 화면별 raw(모델 원문)를 함께 남겨 오류를 사후 분석한다.
@@ -846,7 +896,7 @@ def extract_batch(images, capture_dt, on_screen=None, on_stage=None):
     return result
 
 
-def _batch_run(jid, images, capture_dt):
+def _batch_run(jid, images, capture_dt, engine=None):
     seed = lambda: {"done": 0, "total": len(images), "rows": [], "stage": "extracting"}
     def on_screen(idx, rows):                     # 화면 완료 시 진행 상황에 원시 행 누적(폴링이 읽어감)
         with _JOBS_LOCK:
@@ -864,7 +914,8 @@ def _batch_run(jid, images, capture_dt):
             if j and j.get("status") == "pending":
                 j.setdefault("progress", seed())["stage"] = stage
     try:
-        res = extract_batch(images, capture_dt, on_screen=on_screen, on_stage=on_stage)
+        res = extract_batch(images, capture_dt, on_screen=on_screen, on_stage=on_stage,
+                            engine=engine)
         with _JOBS_LOCK:
             _JOBS[jid] = {"status": "done", "result": res, "ts": time.time()}
     except Exception as e:
@@ -879,7 +930,8 @@ def submit_batch(body):
     with _JOBS_LOCK:
         _JOBS[jid] = {"status": "pending", "ts": time.time(),
                       "progress": {"done": 0, "total": len(images), "rows": [], "stage": "extracting"}}
-    threading.Thread(target=_batch_run, args=(jid, images, capture_dt), daemon=True).start()
+    threading.Thread(target=_batch_run,
+                     args=(jid, images, capture_dt, body.get("engine")), daemon=True).start()
     _job_gc()
     return {"id": jid}
 
@@ -976,8 +1028,14 @@ class H(BaseHTTPRequestHandler):
             self.send_response(200)
             self.send_header("Content-Type", "application/manifest+json; charset=utf-8"); self._cors()
             self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b)
-        elif self.path == "/health":
-            self.send_response(200); self._cors(); self.end_headers(); self.wfile.write(b'{"ok":true}')
+        elif self.path.split("?")[0] == "/health":
+            # 프런트의 경로 셀렉터가 읽는다 — **고를 수 없는 경로를 고르게 두지 않는다.**
+            # (라이브는 시스템 python3라 rapidocr가 없을 수 있고, 엣지 기동엔 ollama가 없다)
+            b = json.dumps({"ok": True, "default": DEFAULT_ENGINE,
+                            "engines": engine_status()}, ensure_ascii=False).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8"); self._cors()
+            self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b)
         elif self.path.split("?")[0] in ("/complete/result", "/extract/batch/result"):
             qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
             jid = (qs.get("id") or [""])[0]

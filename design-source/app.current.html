@@ -1530,6 +1530,17 @@
       <div style="padding:8px var(--pf-sec-pad,18px) 0;">
         <span class="pf-step-desc">스크린샷이 그 계좌의 현재 스냅샷 — 화면에 없는 종목은 자동 제거됩니다</span>
       </div>
+      <!-- 추출 경로 — 같은 URL로 두 경로를 번갈아 잰다. 서버가 /health 로 가용성을 줄 때만 뜬다.
+           경로는 추출기만이 아니라 증권사 해석까지 함께 갈린다(엣지엔 검색을 읽을 LLM이 없다). -->
+      <sc-if value="{{ hasEngines }}" hint-placeholder-val="{{ true }}">
+        <div style="padding:10px var(--pf-sec-pad,18px) 0;display:flex;align-items:center;gap:7px;flex-wrap:wrap;">
+          <span style="font-size:10.5px;font-weight:600;letter-spacing:0.3px;color:var(--text-tertiary,#999);">추출 경로</span>
+          <sc-for list="{{ engineOpts }}" as="e" hint-placeholder-count="2">
+            <button disabled="{{ e.off }}" onclick="{{ e.onPick }}" title="{{ e.title }}" style="border:1px solid {{ e.bd }};background:{{ e.bg }};color:{{ e.fg }};border-radius:999px;padding:5px 13px;font-size:11.5px;font-weight:700;cursor:pointer;white-space:nowrap;">{{ e.label }}</button>
+          </sc-for>
+          <span style="font-size:11px;color:var(--text-tertiary,#999);">엣지 = 폰에서 도는 경로(신경망 LLM 0개)</span>
+        </div>
+      </sc-if>
       <div style="padding:14px var(--pf-sec-pad,18px) 18px;">
         <!-- 추출 중엔 이 영역이 입력을 받지 않는다(pointer-events:none) — 실제 차단은 extractFiles
              진입부 한 줄이고(파일선택·드롭·프로그램 호출이 다 거기로 모인다), 여기는 어포던스다. -->
@@ -1652,6 +1663,24 @@
             <sc-if value="{{ hasStreamSummary }}" hint-placeholder-val="{{ false }}">
               <div style="padding:9px 12px;border-top:1px solid var(--border-default,#dfdfe8);background:var(--bg-app,#fafafa);font-size:12px;color:var(--text-secondary,#6e6e6e);line-height:1.5;"><b style="color:var(--text-primary,#000);">요약</b> · {{ streamSummary }} <span style="color:var(--text-tertiary,#999);">— <span style="color:#1a6dc4;font-weight:600;">추정</span>·<span style="color:#b8860b;font-weight:600;">확인 권장</span> 배지를 탭하면 어떻게 계산했는지 볼 수 있어요</span></div>
             </sc-if>
+            <!-- 증권사 정규명 확인 — 화면 브랜드('Super365')까지만 얻은 행이 있을 때만 뜬다.
+                 그냥 두어도 된다(브랜드가 곧 그룹 키다). 답하면 이 배치의 행에만 적용되고
+                 어디에도 저장하지 않는다 — 다음 업로드는 다시 묻는다(캐시 금지 규칙). -->
+            <sc-for list="{{ brandAsks }}" as="ba" hint-placeholder-count="0">
+              <div style="padding:10px 12px;border-top:1px solid var(--border-default,#dfdfe8);background:#fffdf5;display:flex;flex-direction:column;gap:6px;">
+                <span style="font-size:11.5px;color:var(--text-secondary,#6e6e6e);line-height:1.5;">화면에 <b style="color:var(--text-primary,#000);">{{ ba.brand }}</b>라고만 적혀 있어요({{ ba.count }}행). 어느 증권사인가요? <span style="color:var(--text-tertiary,#999);">— 비워두면 브랜드 그대로 씁니다</span></span>
+                <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                  <input value="{{ ba.input }}" onchange="{{ ba.onInput }}" onkeydown="{{ ba.onKeyEnter }}" placeholder="예: 메리츠증권" style="width:150px;border:1px solid var(--border-default,#dfdfe8);border-radius:5px;padding:5px 9px;font-size:12px;background:var(--bg-surface,#fff);color:var(--text-primary,#000);">
+                  <button onclick="{{ ba.onApply }}" style="border:none;background:var(--ig-blue,#1fa1ff);color:#fff;border-radius:5px;padding:6px 13px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">적용</button>
+                  <sc-if value="{{ ba.hasOpts }}" hint-placeholder-val="{{ false }}">
+                    <span style="font-size:10.5px;color:var(--text-tertiary,#999);">기존:</span>
+                    <sc-for list="{{ ba.opts }}" as="o" hint-placeholder-count="1">
+                      <button onclick="{{ o.onPick }}" style="border:1px solid var(--border-default,#dfdfe8);background:var(--bg-surface,#fff);border-radius:999px;padding:4px 11px;font-size:11.5px;font-weight:600;cursor:pointer;color:var(--text-secondary,#6e6e6e);white-space:nowrap;" style-hover="border-color:var(--ig-blue,#1fa1ff);color:var(--ig-blue,#1fa1ff);">{{ o.label }}</button>
+                    </sc-for>
+                  </sc-if>
+                </div>
+              </div>
+            </sc-for>
             <sc-if value="{{ streamReview }}" hint-placeholder-val="{{ false }}">
               <div style="padding:10px 12px;border-top:1px solid var(--border-default,#dfdfe8);display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
                 <button onclick="{{ onConfirmStream }}" style="border:none;background:var(--ig-blue,#1fa1ff);color:#fff;border-radius:6px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;">Step 2에 반영</button>
@@ -1950,6 +1979,14 @@ class Component extends DCLogic {
       streamPending: null,        // 확인 시 applySnapshot에 넘길 pending
       streamNote: '',
       streamCapture: '',          // 촬영 시점 라벨(EXIF/기준일) — 라이브 헤더에 표시
+      // 증권사 정규명 확인(STEP1) — 화면 브랜드('Super365')만 얻은 행을 사용자에게 한 번 묻는다.
+      // 답은 **이 배치의 행에만** 적용되고 어디에도 저장하지 않는다(에이전트의 캐시 금지 규칙과
+      // 같은 이유: 저장하면 물어본 적 없는 화면까지 조용히 답이 붙는다). 재입력 부담은
+      // 기존 보유의 증권사 목록을 원탭 칩으로 주어 던다.
+      brandInput: {},             // 브랜드 → 입력 중인 정규명
+      // 추출 경로(STEP1) — 폰에서 두 경로를 같은 URL로 번갈아 재기 위한 선택
+      engine: '',                 // '' = 서버 기본 | 'edge' | 'orin'
+      engineInfo: null,           // /health 가 준 {default, engines:{edge:{ok,why},…}}
       // 에이전트 연결(헤더)
       agentUrlInput: '',
       agentOpen: false,           // 칩을 눌러 연 URL 입력 팝오버
@@ -2323,12 +2360,28 @@ class Component extends DCLogic {
       const to = ctl ? setTimeout(() => ctl.abort(), 6000) : null;
       const r = await fetch(base + '/health', { signal: ctl ? ctl.signal : undefined });
       if (to) clearTimeout(to);
+      // /health 가 경로 가용성도 준다(구버전 서버는 안 준다 → engineInfo 없이 셀렉터를 숨긴다).
+      let info = null;
+      try { const j = await r.clone().json(); if (j && j.engines) info = j; } catch (e) {}
       this.setState((r && r.ok)
-        ? { connStatus: '● 연결됨', connColor: '#1c9c5b' }
-        : { connStatus: '△ 응답없음', connColor: '#c88a1e' });
+        ? { connStatus: '● 연결됨', connColor: '#1c9c5b', engineInfo: info,
+            engine: this.state.engine || (info && info.default) || '' }
+        : { connStatus: '△ 응답없음', connColor: '#c88a1e', engineInfo: null });
     } catch (e) {
-      this.setState({ connStatus: '△ 응답없음', connColor: '#c88a1e' });
+      this.setState({ connStatus: '△ 응답없음', connColor: '#c88a1e', engineInfo: null });
     }
+  }
+
+  // 브랜드만 얻은 행에 사용자가 준 정규명을 입힌다. **이 배치의 pending 에만** 쓴다.
+  applyBrokerName(brand, name) {
+    const nm = String(name || '').trim();
+    if (!nm) return;
+    this.setState({
+      brandInput: { ...(this.state.brandInput || {}), [brand]: '' },
+      streamPending: (this.state.streamPending || []).map(
+        p => (p.broker === brand && p.broker_src === 'brand')
+          ? { ...p, broker: nm, broker_src: 'user' } : p)
+    });
   }
 
   // 보유자산을 현재가로 재평가(에이전트 /reprice) — 수량 없는 종목은 캡처시점 종가로 역산(추정 표시).
@@ -2743,7 +2796,9 @@ class Component extends DCLogic {
     })));
     const sub = await fetch(base + '/extract/batch/submit', {
       method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ images })
+      // engine: 'edge'(OCR+기하, 신경망 LLM 0개) | 'orin'(비전모델 + 증권사 검색·판독).
+      // 빈 값이면 서버 기본 — 구버전 서버는 이 필드를 그냥 무시한다(하위호환).
+      body: JSON.stringify({ images, engine: this.state.engine || undefined })
     }).then(r => r.json());
     if (!sub || !sub.id) throw new Error((sub && sub.error) || '제출 실패');
     let res = null, seen = 0;
@@ -2769,6 +2824,8 @@ class Component extends DCLogic {
     const pending = finalHoldings.map((h, j) => ({
       id: 'p' + Date.now() + '_' + j,
       broker: h.broker || '미상',
+      // 증권사 값의 출처 — 'brand'면 화면 브랜드까지만 얻은 것이라 아래에서 사용자에게 묻는다.
+      broker_src: h.broker_src || '',
       accountType: this.normAcct(h.accountType),
       name: h.name || '', cls: clsMap[h.assetClass] || (String(h.assetClass || '').indexOf('혼합') >= 0 ? 'mixed' : 'growth'),
       currency: h.currency === 'USD' ? 'USD' : 'KRW',
@@ -3074,6 +3131,45 @@ class Component extends DCLogic {
       hasStreamSummary: S.streamStage === 'review' && (S.streamRows || []).length > 0,
       holdSummary: this._summaryStr(this._tierCounts(S.holdings || []), 0),
       hasHoldSummary: (S.holdings || []).length > 0,
+      // 추출 경로 셀렉터(STEP1) — 서버가 /health 로 가용성을 줄 때만 뜬다.
+      // 고를 수 없는 경로는 눌리지 않게 한다(엣지 기동엔 ollama가, 라이브엔 OCR이 없을 수 있다).
+      hasEngines: !!(S.engineInfo && S.engineInfo.engines),
+      engineOpts: [
+        { key: 'edge', label: '엣지', hint: 'OCR+기하 · 신경망 LLM 0개 (폰과 같은 경로)' },
+        { key: 'orin', label: 'Orin', hint: '비전모델 + 증권사 검색·판독' }
+      ].map(o => {
+        const st = (S.engineInfo && S.engineInfo.engines && S.engineInfo.engines[o.key]) || {};
+        const on = (S.engine || (S.engineInfo && S.engineInfo.default)) === o.key;
+        return { ...o, off: !st.ok,
+          title: st.ok ? o.hint : (o.hint + ' — 사용 불가: ' + (st.why || '미확인')),
+          bd: on ? 'var(--ig-blue,#1fa1ff)' : 'var(--border-default,#dfdfe8)',
+          bg: on ? '#eef7ff' : 'var(--bg-surface,#fff)',
+          fg: st.ok ? (on ? 'var(--ig-blue-deep,#004c8b)' : 'var(--text-secondary,#6e6e6e)') : '#b9b9c0',
+          onPick: () => { if (st.ok) this.setState({ engine: o.key }); } };
+      }),
+      // 증권사 정규명 확인 — 브랜드까지만 얻은 행이 있을 때만 뜬다. 답은 이 배치에만 적용.
+      brandAsks: (() => {
+        const P = (S.streamStage === 'review' && S.streamPending) || [];
+        const brands = [];
+        P.forEach(p => { if (p.broker_src === 'brand' && brands.indexOf(p.broker) < 0) brands.push(p.broker); });
+        // 원탭 후보 = 이미 쓰고 있는 정규 증권사명(기존 보유 + 이번 배치). 저장된 매핑이 아니라
+        // 사용자 자신의 목록이라 규칙과 충돌하지 않고, 매번 타이핑하는 부담만 던다.
+        const known = [];
+        [].concat(S.holdings || [], P).forEach(h => {
+          const b = String(h.broker || '');
+          if (b.indexOf('증권') >= 0 && known.indexOf(b) < 0) known.push(b);
+        });
+        return brands.map(b => ({
+          brand: b,
+          count: P.filter(p => p.broker === b && p.broker_src === 'brand').length,
+          input: (S.brandInput || {})[b] || '',
+          opts: known.map(k => ({ label: k, onPick: () => this.applyBrokerName(b, k) })),
+          hasOpts: known.length > 0,
+          onInput: e => this.setState({ brandInput: { ...(S.brandInput || {}), [b]: e.target.value } }),
+          onKeyEnter: e => { if (e.key === 'Enter') this.applyBrokerName(b, (S.brandInput || {})[b]); },
+          onApply: () => this.applyBrokerName(b, (S.brandInput || {})[b])
+        }));
+      })(),
       onConfirmStream: () => this.commitStream(),
       onDiscardStream: () => this.discardStream(),
       hasInfo: !!S.extractInfo, extractInfo: S.extractInfo,
