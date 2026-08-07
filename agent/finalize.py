@@ -10,7 +10,7 @@
 입력: [{"file":.., "raw": 비전 원문 JSON텍스트}] (+ 캡처시각)
 출력: {"holdings":[...정규화...], "gate": {대조 리포트}}
 """
-import os, re, sys
+import difflib, os, re, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -170,6 +170,40 @@ def _drop_total_rows(grp, tol=0.02):
     return keep if keep else grp        # 전부 지워질 상황이면 아무것도 지우지 않는다(보수적)
 
 
+# 예수금 상세 화면의 '같은 돈 다른 표기' — 확정 잔고 한 행 아래에 시점 추정치와 내역이 깔린다.
+_DEPOSIT_ECHO = ("현금", "수표", "청약증거금", "접기", "접기›", "출금가능금액", "대용금")
+
+
+def _drop_deposit_echoes(grp, totals=()):
+    """예수금 상세 화면: **같은 돈이 여러 행**으로 나오는 것을 한 행으로 되돌린다.
+
+    화면은 잔고 하나를 시점별(`예수금(당일)`·`추정예수금(D+1)`·`(D+2)`)로, 그리고 내역
+    (`현금`·`수표`·`청약증거금`)으로 나눠 보여준다. 미결제가 없으면 값이 전부 같아 위의
+    `seen_vals` 중복 제거가 접어버리지만, **미결제가 있으면 값이 달라 각각 살아남아 예수금이
+    2~3배로 부푼다**(실측 test-asset 07-21: 48,789,151 + 44,186,151 + 40,225,651).
+
+    **어느 시점이 자산인가는 추측하지 않는다.** 화면이 직접 답한다 — 같은 앱의 상품요약
+    화면에 `원화예수금` 총액이 따로 찍히고, 그것과 일치하는 시점이 그 계좌의 예수금이다
+    (실측 2026-07-29: 요약 36,682,999 = **D+2**, 당일 41,153,999은 미결제 포함 금액이라
+    자산이 아니다 — 앱 자신의 헤드라인도 `원화 예수금 (D+2) 36,682,999원`이다).
+    대조할 총액이 없으면 접지 않는다 — 무엇이 진짜인지 모르는 채로 버리느니 남겨두고
+    게이트가 `상세합 ≠ 총액`으로 울게 한다.
+
+    (비전 LLM 경로는 프롬프트가 이 화면을 한 행으로 내라고 지시해 이 문제가 없다 —
+    OCR 경로는 화면에 있는 것을 다 읽으므로 여기서 같은 규칙을 코드로 준다.)"""
+    def deposit_like(h):
+        n = str(h.get("name") or "").strip()
+        return ("예수금" in n) or (n in _DEPOSIT_ECHO)
+    cands = [h for h in grp if deposit_like(h) and h.get("value")]
+    if len(cands) < 2:
+        return grp
+    anchor = next((h for h in cands for t in totals
+                   if t and abs(h["value"] - t) / abs(t) <= 0.01), None)
+    if anchor is None:
+        return grp                      # 근거 없음 → 접지 않는다(게이트가 불일치를 알린다)
+    return [h for h in grp if h is anchor or not deposit_like(h)]
+
+
 def acct_tokens(text):
     """계좌 식별 토큰: 계좌번호 + 계좌유형. 상세화면과 요약화면의 '같은 계좌'를 잇는 열쇠.
     전역 상속(증권사 3곳 이상이면 반드시 오염)을 대신해 **계좌 단위**로만 상속하기 위한 것."""
@@ -202,6 +236,41 @@ def _ev_forms(evidence):
     toks = str(evidence or "").split()
     return (_norm_ev(evidence),
             _norm_ev("".join(t for t in toks if not _NUMTOK.match(t))))
+
+
+NAME_SUPPORT = 0.6      # 종목명 ↔ 화면 근거의 최장 연속 일치 비율 하한
+NAME_MIN_LEN = 4        # 이보다 짧은 이름은 심판하지 않는다 — 아래 주석 참조
+
+
+def _name_supported(name, evidence):
+    """모델이 낸 **종목명**이 화면에 실재하는가 — broker와 같은 심판을 이름에 건다.
+
+    필요한 이유: 범용 VLM이 `△△전자`(가림 기호 자리표시자)를 종목명으로 낸 적이 있고(§4.2)
+    금액만 맞으면 총액 대조를 통과해 게이트가 침묵했다. 이름에는 심판이 없었다.
+
+    **완전 일치를 요구하지 않는다.** 근거인 OCR 자신도 글리프를 틀리므로(`IVV`→`IWV`)
+    엄격히 대조하면 옳은 이름을 거짓 경보로 잡는다. 그래서 *최장 연속 일치*가 이름 길이의
+    NAME_SUPPORT 이상이면 근거로 인정한다 — 한두 글자 오독은 통과하고, 화면에 아예 없는
+    이름은 통과하지 못한다.
+
+    **짧은 이름(NAME_MIN_LEN 미만)은 판정하지 않는다.** 3자 티커는 한 글자만 어긋나도
+    비율이 0.33으로 떨어져 오독과 날조를 구분할 수 없다. 그 자리는 이미 심볼 게이트가
+    **시세**라는 더 강한 근거로 지킨다(`server._arbitrate_symbol`) — 약한 심판을 겹쳐서
+    거짓 경보를 만들 이유가 없다."""
+    n = _norm_ev(name)
+    if not evidence or len(n) < NAME_MIN_LEN:
+        return True
+    # 근거 전체와 한 번에 비교하면 안 된다 — 긴 텍스트엔 글자가 다 흩어져 있어 아무 이름이나
+    # '부분적으로' 맞는다. 이름 길이만 한 **창**을 밀면서 그 안에서만 유사도를 잰다.
+    step = max(1, len(n) // 3)
+    best = 0.0
+    for ev in _ev_forms(evidence):
+        for i in range(0, max(1, len(ev) - len(n) + 1), step):
+            w = ev[i:i + len(n) + step]
+            best = max(best, difflib.SequenceMatcher(None, n, w, autojunk=False).ratio())
+            if best >= NAME_SUPPORT:
+                return True
+    return False
 
 
 def _label_supported(label, screen_text, broker, evidence):
@@ -320,15 +389,25 @@ def finalize(screens, use_llm=True, broker_cache=None):
         label = str((real[0].get("broker") if real else "") or "")
         screen_text = " ".join(str(r.get(k, "")) for r in real
                                for k in ("broker", "accountType", "name"))
+        # 증권사 라벨이 그 화면의 **종목명과 같으면** 열이 잘못 채워진 것이다(브랜드가 아니다).
+        # 그대로 검색에 태우면 종목 검색결과에서 아무 증권사나 주워온다 — 실측 오염:
+        # `한화오션`→대신증권, `TIGER 미국나스닥100`→키움증권이 캐시에 남아 있었다.
+        names = {str(r.get("name") or "").strip() for r in real}
+        if label.strip() in names:
+            label = ""
         broker = RB.resolve_broker(label, broker_cache, use_llm=use_llm)   # 정규명·브랜드(검색)
+        bsrc = "screen" if (broker and RB.canonical_in(label)) else ("research" if broker else None)
         if not broker:
             broker = RB.canonical_in(screen_text)   # 화면 어딘가의 정규명(예: '현금성자산(삼성증권)')
+            bsrc = "screen" if broker else None
         if broker and not _label_supported(label, screen_text, broker, p.get("evidence")):
             fabricated.append(f"{p['file']}: 증권사 '{broker}' — 화면 텍스트에 근거 없음"
                               f"(추출 모델이 지어낸 값으로 판단해 비움)")
             broker = None
+            bsrc = None
         inh_broker, inh_atype = inherit(screen_text)
-        broker = broker or inh_broker               # 계좌번호·별칭뿐이면 같은 계좌의 요약에서 상속
+        if not broker and inh_broker:               # 계좌번호·별칭뿐이면 같은 계좌의 요약에서 상속
+            broker, bsrc = inh_broker, "inherited"
         grp, seen_vals = [], {}
         screen_total = None
         for r in p["rows"]:
@@ -348,11 +427,24 @@ def finalize(screens, use_llm=True, broker_cache=None):
             # 값이 아니라 **라벨을 지어내는** 것이고, 게이트는 침묵했다(측정 test-asset 07-21: 6/34행).
             # 근거가 없으면 비운다 — 미상은 아래에서 경고로 표면화된다.
             h["broker"] = broker or None
+            # 증권사 값의 **출처**를 남긴다 — 다른 필드(qty_src·price_src)와 같은 규약.
+            # screen=화면에 적혀 있음 / inherited=같은 계좌의 요약화면 / research=검색으로 확정.
+            # 근거 없이 채운 값은 이제 존재하지 않으므로, 이 칸이 비면 broker도 비어 있다.
+            if broker:
+                h["broker_src"] = bsrc
+            # 종목명의 독립 심판. **이름은 비우지 않는다** — 행의 식별자라 비우면 행이 사라지고,
+            # 값(금액·수량)은 이 판정과 무관하게 멀쩡하다. 표시만 하고 경고로 표면화한다.
+            if not _name_supported(h.get("name"), p.get("evidence")):
+                h["name_src"] = "unverified"
+                fabricated.append(f"{p['file']}: 종목명 '{h.get('name')}' — 화면 텍스트에 근거 없음"
+                                  f"(추출 모델이 지어냈을 수 있음 — 값은 유지)")
             atype = str(r.get("accountType") or "")
             # 유형도 계좌 단위 상속: 상세화면 라벨은 줄임말이기 쉽다('퇴직연금' ← '퇴직연금(다이렉트IRP)')
             h["accountType"] = inh_atype or norm_atype(atype or label)
             h["_file"] = p["file"]
             grp.append(h)
+        # 예수금 상세: 같은 돈의 시점·내역 표기를 한 행으로 — 어느 시점인지는 요약 총액이 정한다
+        grp = _drop_deposit_echoes(grp, list(product_totals.values()))
         grp = _drop_total_rows(grp)          # 화면 제목·탭·소계가 종목처럼 섞여 나오는 것 제거
         holdings.extend(grp)
         groups.append({"file": p["file"], "sum": sum(x["value"] or 0 for x in grp),

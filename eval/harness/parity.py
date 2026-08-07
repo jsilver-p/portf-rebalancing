@@ -30,8 +30,8 @@ def norm(s):
     s = re.sub(r"\(.*?\)", "", str(s))
     return re.sub(r"[\s·\-_.,]", "", s).lower()
 
-GT_PATH = os.path.join(ROOT, "test-fixtures", "ground-truth.json")
-SHOTS = os.path.join(ROOT, "test-fixtures", "screenshots")
+GT_PATH = os.environ.get("GT_PATH", os.path.join(ROOT, "test-fixtures", "ground-truth.json"))
+SHOTS = os.environ.get("SHOTS", os.path.join(ROOT, "test-fixtures", "screenshots"))
 VAL_TOL = 0.01        # 평가금액: 화면값 그대로여야 함(1% — OCR 오차 아닌 것만 통과)
 PRICE_TOL = 0.02      # 주가: 파생값(반올림·시간외가) 여유
 
@@ -67,14 +67,17 @@ def _evidence(image):
     if os.environ.get("EVIDENCE") == "0":
         return None
     cache = json.load(open(_EV_CACHE)) if os.path.exists(_EV_CACHE) else {}
-    if image not in cache:
+    # 키는 **경로 전체**여야 한다 — 코퍼스 그룹마다 `img1.png`가 있어 파일명만 쓰면 서로 다른
+    # 화면이 같은 근거를 공유한다(조용한 오염).
+    key = os.path.join(SHOTS, image)
+    if key not in cache:
         sys.path.insert(0, os.path.join(ROOT, "agent"))
         import ocr
-        boxes = ocr.recognize(os.path.join(SHOTS, image))
-        cache[image] = " ".join(str(b["text"])
-                                for b in sorted(boxes, key=lambda b: (b["y"], b["x"])))
+        boxes = ocr.recognize(key)
+        cache[key] = " ".join(str(b["text"])
+                              for b in sorted(boxes, key=lambda b: (b["y"], b["x"])))
         json.dump(cache, open(_EV_CACHE, "w"), ensure_ascii=False)
-    return cache[image]
+    return cache[key]
 
 
 def load_screens(d):
@@ -99,8 +102,10 @@ def capture_dt():
 
 
 def run_pipeline(screens, use_llm=True):
-    """앱이 타는 경로와 동일: finalize → enrich."""
-    fin = F.finalize(screens, use_llm=use_llm)
+    """앱이 타는 경로와 동일: finalize → enrich.
+    브랜드→증권사 캐시도 서버와 **같이** 넘긴다(server.extract_batch). 안 넘기면 매번 웹검색이
+    돌아 같은 입력이 다른 증권사를 내고, 채점기가 서버와 다른 구성을 재게 된다."""
+    fin = F.finalize(screens, use_llm=use_llm, broker_cache=F.RB.load_cache())
     rows = S.enrich(fin["holdings"], capture_dt())   # _file은 화면단위 게이트(현금 병합)에 필요
     for h in rows:
         h.pop("_file", None)

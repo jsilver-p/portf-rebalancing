@@ -31,6 +31,11 @@ H_PNL = ("평가손익", "손익", "평가손실")
 H_RATE = ("수익률", "손익률", "등락률")
 H_QTY = ("수량", "보유수량", "잔고수량")
 H_PRICE = ("현재가", "평균단가", "매입단가", "단가")
+# 분류 열 — **금액이 아니라 범주**가 들어가는 칸(값이 비거나 '매도가능' 같은 글자다).
+# 열로 잡으면 행 앵커가 망가진다: `잔고구분`이 `잔고`(H_VALUE)에 걸려 value 열이 되면
+# 밴드 깊이가 2가 되고, 한 행에 숫자가 하나뿐이라 **다음 행의 수량이 이 행의 평가금액으로**
+# 들어간다(실측 2026-08-06 mPOP 퇴직연금 화면: qty=3,146,613 / value=30).
+H_CATEGORY = ("구분", "유형", "상태")
 HEADER_VOCAB = H_NAME + H_VALUE + H_COST + H_PNL + H_RATE + H_QTY + H_PRICE
 
 # 시장지수 표시줄 — 보유종목이 아니다(프롬프트 규칙 2).
@@ -68,6 +73,13 @@ def _clean_num(s):
     a = _amount_of(s)
     if a is None:
         a = re.sub(r"[원$,\s주]", "", str(s)).rstrip("|")
+    # 마침표 뒤 **정확히 세 자리로 끝나는** 자리수구분 숫자는 쉼표 오독이다 — 자리수 구분은
+    # 세 자리씩이고 소수부가 세 자리인 금액은 이 화면들에 없다(원화는 정수, 달러는 두 자리).
+    # 실측 2026-07-29: 화면 `+3,662,786원`을 OCR이 `+3,662.786원`(conf 0.98)으로 읽어 손익이
+    # **1000분의 1**이 됐고, cost가 파생값이라 회계 항등식은 그대로 성립해 아무도 못 잡았다.
+    # `IVV`→`IWV`와 같은 글리프 혼동이지만 이쪽은 **금액의 크기**를 바꾼다.
+    if re.search(r"[.,]\d{3}\.\d{3}$", a):
+        a = a[::-1].replace(".", ",", 1)[::-1]
     a = a.replace(",", "")
     if not a or a in ("-", "+", "."):
         return None
@@ -240,6 +252,8 @@ def find_header(lines):
 def _kind_of(text):
     """헤더 텍스트 → 의미 열. 긴 어휘부터 봐야 '평가손익'이 '평가금액'에 먹히지 않는다."""
     t = str(text)
+    if any(k in t for k in H_CATEGORY):      # 분류 열은 어떤 의미 열도 아니다 → 밴드를 만들지 않는다
+        return None
     for keys, kind in ((H_PNL, "pnl"), (H_RATE, "rate"), (H_COST, "cost"), (H_VALUE, "value"),
                        (H_QTY, "qty"), (H_PRICE, "price"), (H_NAME, "name")):
         if any(k in t for k in keys):
@@ -518,6 +532,14 @@ def _is_field_label(name):
     # 필드 라벨은 그 자체가 이름인 경우만 잡는다(괄호주석 제거 후 완전일치).
     bare = re.sub(r"\(.*?\)", "", n).strip()
     if bare in HEADER_VOCAB:
+        return True
+    # UI 어포던스 기호가 붙은 이름은 종목이 아니라 **누를 수 있는 것**이다('접기›', '더보기>').
+    # 종목명에는 이 기호가 안 붙는다 — 앱별 어휘를 늘리지 않고 형태로 가른다.
+    if re.search(r"[›»⌄˅>]\s*$", n):
+        return True
+    # 이름 안에 자릿수 구분 쉼표·소수점이 있는 수 = 그 라벨이 **자기 값을 달고 있다**
+    # ('환율 1,482.00'). 종목명의 숫자는 지수·배수라 이런 서식이 없다('나스닥100', 'S&P500').
+    if re.search(r"\d,\d{3}|\d\.\d{2}", n):
         return True
     return any(v in n for v in FIELD_LABEL_EXTRA)
 

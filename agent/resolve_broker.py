@@ -86,7 +86,14 @@ def _search_text(query, timeout=15):
 
 
 def _freq_broker(text):
-    """검색결과 텍스트에서 최빈 'XX증권' 정규명(불용어 제외) 또는 None."""
+    """검색결과 텍스트에서 최빈 'XX증권' 정규명(불용어 제외) 또는 None.
+
+    ⚠ **채택 근거로 쓰지 않는다** — `search_broker`에서 제거됐다. 실측(2026-08-07, 라벨 6종):
+    최빈은 6개 중 5개를 지어냈다(`보유계좌`→지분증권, `종합잔고`→나무증권,
+    `TIGER 미국나스닥100`→신한투자증권, `my자산현황`→유가증권, 그리고 정답이 페이지에 있는
+    `Super365`조차 메리츠증권(1회) 대신 **대신증권(2회)**). 근접도로 바꿔도 같이 지어낸다
+    (`보유계좌`→다올투자증권, `TIGER…`→키움증권). 즉 **검색 텍스트 마이닝 자체에 분별력이 없다.**
+    진단용으로만 남긴다."""
     c = collections.Counter(m.group(1) + "증권"
                             for m in re.finditer(r"([가-힣A-Za-z]{2,10})증권", text)
                             if m.group(1) not in _STOP)
@@ -117,17 +124,25 @@ def is_broker_name(s):
 def search_broker(brand, use_llm=True):
     """브랜드 토큰 → 정규 증권사명(검색 근거) 또는 None.
 
-    **근거 없으면 답하지 않는다.** 예전엔 LLM이 확정 못하면 검색결과의 '최빈 ○○증권'으로 폴백했는데,
-    그러면 브랜드가 아닌 문구(화면 제목·일반명사)를 검색했을 때 아무 증권사나 정답으로 둔갑한다
-    (실제 오염: '보유계좌'→신한투자증권). 최빈 폴백은 LLM이 없을 때만, 그것도 형태 검증을 통과할 때만."""
+    **근거 없으면 답하지 않는다 — 폴백이 없다.**
+
+    예전엔 LLM이 없을 때 검색결과의 '최빈 ○○증권'으로 폴백했다. 그 폴백을 실측으로 기각했다
+    (2026-08-07, 라벨 6종 — `_freq_broker` 주석 참조): 최빈은 6개 중 5개를 지어냈고, **정답이
+    페이지에 있는 `Super365`조차 틀렸다**(대신증권 2회 vs 메리츠증권 1회). 게다가 검색 순위가
+    호출마다 달라 **같은 입력이 다른 증권사를 낸다** — 같은 세션 안에서 메리츠/대신이 갈렸다.
+    근접도(브랜드 토큰과의 거리)로 바꿔봐도 마찬가지로 지어낸다. 텍스트 마이닝 자체가 분별력이
+    없으므로 **임계값으로 덮지 않고 단계를 없앤다**(각도 분류기 cls를 껐던 것과 같은 판단).
+
+    남은 유일한 검색 경로는 LLM이 검색 텍스트를 읽고 '확인 불가면 UNKNOWN'을 지키는 것이다
+    (Orin 전용). 엣지(`use_llm=False`)에서는 **캐시에 이미 확정된 답이 있을 때만** 풀리고,
+    없으면 None → 화면 상속 → 그래도 없으면 `증권사 미상` 경고. 지어내지 않는다."""
+    if not use_llm:
+        return None
     try:
         text = _search_text(f"{brand} 어느 증권사")
     except Exception:
         return None
-    if use_llm:
-        name = _llm_broker(brand, text)      # 검색결과 근거 + 확인 불가 시 UNKNOWN
-        return name if is_broker_name(name) else None
-    name = _freq_broker(text)
+    name = _llm_broker(brand, text)          # 검색결과 근거 + 확인 불가 시 UNKNOWN
     return name if is_broker_name(name) else None
 
 

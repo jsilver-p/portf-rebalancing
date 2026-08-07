@@ -48,17 +48,68 @@ def _norm(s):
     return re.sub(r"[\s·\-_.,()]", "", str(s or "")).lower()
 
 
+def _script_pieces(s):
+    """한글↔라틴 전환 지점에서 쪼갠 조각 — OCR이 **공백을 잃어도** 토큰 폴백이 돌게 한다.
+
+    측정(2026-08-06): 자동완성은 `알파벳A`도 `알파벳 A`도 못 풀고 `알파벳`만 GOOGL을 준다.
+    즉 공백 자체가 근거인 게 아니라, 아래 질의 폴백이 **공백에서만** 토큰을 쪼개는 것이 원인이다.
+    그리고 rec 모델은 이 공백을 4종 전부 잃는다(korean v4/v5, ch v5) — 그러니 소비자 쪽에서
+    쪼갠다. 상수 없는 문자 종류 규칙이라 특정 이름에 맞춘 것이 아니다.
+
+    한 글자짜리 조각은 버린다(`A`처럼 질의로 의미가 없고 오매칭만 만든다)."""
+    return [p for p in re.findall(r"[가-힣]+|[A-Za-z][A-Za-z0-9.&]*", str(s or ""))
+            if len(p) > 1]
+
+
+# 글리프 혼동류 — 같은 잉크를 내는 문자들. 근거(측정, 2026-08-06): 화면의 `IVV`가 커닝 때문에
+# `IWV`의 잉크와 구분되지 않고, rec 모델 4종·8배 확대까지 전부 같은 답을 낸다. 즉 **문자열
+# 층에는 정보가 없다.** 그래서 후보를 만들어 두고 판정은 시세(외부 근거)에 맡긴다.
+_CONFUSE = ("VWUY", "Il1T", "O0DQ", "S5", "B8", "G6C", "Z2", "PR", "EF", "MN", "XK")
+_CLASS = {c: cls for cls in _CONFUSE for c in cls}
+_REPEAT = "VWIl1"          # 획 반복으로 개수가 흔들리는 글자 (VV↔W, Il↔II)
+MAX_VARIANTS = 48          # 후보당 자동완성 1회 — 기각된 행에서만 도는 비용의 상한
+
+
+def confusable_variants(token):
+    """식별자 토큰 → **편집거리 1** 혼동 후보들(원본 제외, 안정 정렬).
+
+    치환·삭제·삽입 전부 위 혼동류 **안에서만** 일어난다. 임의 편집이 아니므로 후보 수가
+    토큰 길이에 선형이고(3~4자 티커면 10~20개), 실재 티커가 아닌 것은 자동완성이 걸러낸다.
+    `IWV` → `W`를 같은 류의 `V`로 치환 → **`IVV`**가 후보에 든다.
+
+    이 함수는 시세도 심볼도 모른다 — 순수 문자열 함수다(순환 없음, 테스트 쉬움)."""
+    t = str(token or "")
+    if not re.fullmatch(r"[A-Za-z][A-Za-z0-9]{1,5}", t):
+        return []                       # 국내 6자리 코드·한글명은 이 실패 모드가 아니다
+    out = []
+    for i, c in enumerate(t):
+        for alt in _CLASS.get(c, ""):   # 치환
+            if alt != c:
+                out.append(t[:i] + alt + t[i + 1:])
+        if i and c in _CLASS and t[i - 1] in _CLASS.get(c, ""):
+            out.append(t[:i] + t[i + 1:])          # 삭제 — 같은 류가 붙어 있을 때만
+        if c in _REPEAT:
+            out.append(t[:i] + c + t[i:])          # 삽입 — 획 반복 글자를 하나 더
+    seen, uniq = {t}, []
+    for v in out:
+        if v not in seen:
+            seen.add(v); uniq.append(v)
+    return uniq[:MAX_VARIANTS]
+
+
 def naver_resolve(name):
     """이름 → (symbol, market). 실패 시 (None, None).
     **국내·미국 모두** 자동완성으로 해석한다(한국 앱은 미국주식도 한글명으로 표기한다:
     '엔비디아'→NVDA, '팔란티어 테크'→PLTR). 통화 힌트는 믿지 않는다 — 비전 모델이 해외주식을
     KRW로 표기하는 일이 흔하다(화면의 평가금액이 원화라서).
-    질의 폴백: 원문 → 괄호 제거 → 첫 토큰. 이름 정확·접두 일치를 우선(오매칭 방지)."""
+    질의 폴백: 원문 → 괄호 제거 → 첫 토큰 → **스크립트 경계 조각**. 이름 정확·접두 일치를
+    우선(오매칭 방지). 조각은 **맨 뒤**에 붙인다 — 앞의 질의로 이미 풀리는 이름의 결과를
+    바꾸지 않기 위해서다(회귀 방지)."""
     base = re.sub(r"\(.*?\)", "", name).strip()
     tok = base.split()
     tok = tok[0] if tok else ""
     queries, seen = [], set()
-    for q in (name, base, tok):
+    for q in (name, base, tok, *_script_pieces(base)):
         if q and q not in seen:
             seen.add(q); queries.append(q)
     want = {_norm(name), _norm(base)}

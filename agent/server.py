@@ -359,6 +359,40 @@ def _is_cash(h):
     return h.get("assetClass") == "현금" or any(k in n for k in ("예수금", "현금", "달러", "CMA"))
 
 
+def _explains(per, close, fx):
+    """캡처시점 참가격이 화면 단가를 설명하는가 — 네이티브/원화표기 두 가정 중 가까운 쪽."""
+    if not close:
+        return 9.0
+    e = abs(per - close) / close
+    return min(e, abs(per - close * fx) / (close * fx)) if fx else e
+
+
+def _arbitrate_symbol(h, per, fx, close_of, cache):
+    """심볼 게이트가 기각한 행을 **근거로** 고칠 수 있는지 본다 — 글리프 혼동 후보 중
+    캡처시점 시세가 화면 단가를 설명하는 것이 **정확히 하나**면 그것으로 교정한다.
+
+    왜 여기인가: 오독은 OCR 층에서 못 고친다(측정 2026-08-06 — 화면의 `IVV`가 커닝 때문에
+    `IWV`와 같은 잉크이고, rec 모델 4종·8배 확대까지 전부 같은 답을 낸다). 그리고 검색으로도
+    못 가른다(`IVV`·`IWV` 둘 다 실재 ETF). 가르는 근거는 **시세뿐**이다:
+    화면 단가 751.18 / IVV 749.06(−0.28%) / IWV 424.96(+76.8%).
+
+    0개면 교정하지 않고 2개 이상이면 **분별력이 없는 것**이라 역시 교정하지 않는다.
+    두 경우 다 호출부가 기존대로 심볼을 비우고 경고한다 — **지어내지 않는다.**
+    판정 허용치는 심볼 게이트와 **같은 `SYMBOL_TOL`**이다(새 상수를 만들지 않는다)."""
+    hits = []
+    for cand in resolve.confusable_variants(h.get("symbol")):
+        try:
+            rec = resolve.resolve(cand, h.get("currency"), cache)
+        except Exception:
+            continue
+        if not rec or rec["symbol"] != cand:
+            continue                      # 자동완성이 다른 종목을 준 것 = 실재 티커가 아니다
+        close, _ = close_of(rec, h.get("currency"))
+        if _explains(per, close, fx) <= SYMBOL_TOL:
+            hits.append((cand, rec, close))
+    return hits[0] if len(hits) == 1 else None
+
+
 def _fix_cost(h):
     """cost/pnl 정리 — 회계 항등식(평가금액 = 매수금액 + 평가손익)을 강제한다.
     · 매수금액 열이 없는 화면에서 모델은 평가손익을 cost에 밀어넣는다(매수금액은 음수 불가).
@@ -482,6 +516,21 @@ def enrich(rows, capture_dt, mode="extract"):
         e_native = abs(per - close) / close                       # 화면값이 네이티브 통화
         e_krw = abs(per - close * fx) / (close * fx) if fx else 9  # 화면값이 원화(해외주식 원화표기)
         if min(e_native, e_krw) > SYMBOL_TOL:
+            bad = h["symbol"]
+            fix = _arbitrate_symbol(h, per, fx, close_of, cache)   # 버리기 전에 근거로 고쳐본다
+            if fix:
+                cand, rec, cclose = fix
+                if str(h.get("name") or "").strip() == bad:        # 이름 자체가 티커였으면 같이
+                    h["name"] = cand
+                h["symbol"], h["market"] = rec["symbol"], rec["market"]
+                h["symbol_src"] = "corrected:price-arbitration"
+                # 화면 평가금액이 원화 표기면 단가도 원화다 → 근거를 **같은 단위로** 적는다
+                h["_value_krw"] = (abs(per - cclose * fx) / (cclose * fx) if fx else 9) < \
+                                  abs(per - cclose) / cclose
+                shown = per / fx if (h["_value_krw"] and fx) else per
+                h["symbol_note"] = (f"식별자 교정 {bad}→{cand} — 화면 단가({shown:,.2f})를 캡처일 "
+                                    f"종가({cclose:,.2f})가 설명(글리프 혼동 후보 중 유일)")
+                continue
             h["symbol_note"] = (f"심볼 불일치 — {h['symbol']} 캡처일 종가로 화면 단가({per:,.0f})가 "
                                 f"설명되지 않음(오해석 의심)")
             h.pop("symbol", None); h.pop("market", None)
@@ -607,6 +656,13 @@ def enrich(rows, capture_dt, mode="extract"):
         if abs(h["qty"] * h["price"] - h["value"]) / h["value"] > 0.02:
             h["price_note"] = (f"화면 현재가 {h['price']:,} 기각 — qty×price가 평가금액과 "
                                f"불일치(오독 의심)")
+            h["price"] = round(h["value"] / h["qty"], 2)
+            h["price_src"] = "computed:value/qty"
+        elif not h.get("price_src"):
+            # **출처 없는 숫자를 그대로 두지 않는다.** 추출기가 낸 price가 항등식은 통과했지만
+            # 어디서 왔는지 우리가 댈 근거가 없다(이 화면들엔 단가 열이 아예 없다 — 모델이 계산했거나
+            # 지어낸 것이다). 우리가 확인한 두 값(value·qty)으로 다시 계산해 **근거를 붙인다.**
+            # 항등식을 이미 통과했으므로 값은 2% 안에서 같다 — 바뀌는 것은 출처의 유무뿐이다.
             h["price"] = round(h["value"] / h["qty"], 2)
             h["price_src"] = "computed:value/qty"
 
@@ -773,7 +829,12 @@ def extract_batch(images, capture_dt, on_screen=None, on_stage=None):
         on_stage("finalizing")
     screens = [{"file": f"img{i + 1}", "raw": raw, "evidence": evid[i]}
                for i, raw in enumerate(raws)]
-    fin = finalize_mod.finalize(screens)          # holdings(정규화) + gate(대조 리포트)
+    # 브랜드→증권사 캐시를 **실제로 넘긴다.** 안 넘기면 요청마다 웹검색을 다시 하고, 검색 순위가
+    # 호출마다 달라 **같은 스크린샷이 다른 증권사를 낸다**(실측 2026-08-07: Super365가 같은
+    # 세션에서 메리츠증권/대신증권으로 갈림). 캐시는 '한 번 확정한 사실'을 고정하는 장치다.
+    bcache = finalize_mod.RB.load_cache()
+    fin = finalize_mod.finalize(screens, broker_cache=bcache)   # holdings(정규화) + gate(대조 리포트)
+    finalize_mod.RB.save_cache(bcache)
     rows = enrich(fin["holdings"], capture_dt)    # 심볼 해석 + 수량 사다리 + 가격(_file은 화면단위 게이트에 필요)
     for h in rows:
         h.pop("_file", None)
