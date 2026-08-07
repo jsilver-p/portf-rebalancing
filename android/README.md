@@ -116,6 +116,9 @@ PF_KEY_ALIAS=portf PF_KEY_PASSWORD=… \
    | `quote` | `query1.finance.yahoo.com` | 심볼 한 개(환율 `KRW=X`) | 허용 |
    | `broker` | `search.naver.com` | 증권사 브랜드 토큰 한 개 | **차단**(검증할 LLM이 기기에 없다) |
 
+   증권사는 **화면 표기 → 계좌 상속 → 화면 브랜드 라벨**로 푼다(`docs` §4.14). 캐시는 없다.
+   정규명(`메리츠증권`)까지는 못 가고 브랜드(`Super365`)로 남지만, 커버리지는 Orin과 같다.
+
    **스크린샷·금액·수량·계좌번호·계좌별칭은 나가지 않는다.**
    `android_main.py`가 `PF_OUTBOUND=prices`를 고정한다. `python3 agent/outbound.py`로
    현재 정책과 나가는 항목을 그대로 출력해 확인할 수 있다.

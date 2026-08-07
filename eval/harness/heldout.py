@@ -19,6 +19,9 @@
 
 사용:
   SHOTS=<원본 이미지 디렉터리> python3 eval/harness/heldout.py <OCR결과dir> <VLM결과dir> [--json out]
+
+`USE_LLM=1`이면 증권사 검색을 켠 Orin 조건, 기본(`0`)은 엣지 조건이다. 캐시가 없어진 뒤로는
+이 스위치가 곧 **증권사가 풀리는가 아닌가**를 가르므로 조건을 명시해서 재야 한다.
 """
 import json, os, sys
 
@@ -39,9 +42,12 @@ def is_cash(h):
     return h.get("assetClass") == "현금" or any(k in n for k in ("예수금", "현금", "달러", "CMA"))
 
 
+USE_LLM = os.environ.get("USE_LLM", "0") not in ("0", "", "no")
+
+
 def run(d):
     screens = P.load_screens(d)
-    rows, gate, _ = P.run_pipeline(screens, use_llm=False)
+    rows, gate, _ = P.run_pipeline(screens, use_llm=USE_LLM)
     return rows, gate
 
 

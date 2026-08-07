@@ -18,12 +18,12 @@ import os
 import urllib.error
 import urllib.request
 
-# 헤더는 **목적마다 다르다** — 통일하면 안 된다. 실측 2026-08-07: Yahoo에 Chrome UA +
-# Accept-Language를 붙이면 **HTTP 429**로 거절한다(같은 시각 기존 헤더는 정상, 양성 대조 확인).
+# **브라우저 흉내를 내지 않는다.** 버전을 박은 UA는 썩는다 — 두 번 실측했다(2026-08-07):
+#   · Yahoo:  Chrome/120 UA + Accept-Language → **HTTP 429** (같은 시각 아래 헤더는 정상)
+#   · Naver:  Chrome/120 UA → **HTTP 403 · 0/10** (같은 시각 아래 헤더는 **10/10**, 중앙 0.63s)
+# 낡은 Chrome 버전이 차단 대상이 됐고, 아침에 되던 채널이 오후에 죽었다. 버전 없는 UA 하나로
+# 통일한다 — 흉내를 정교하게 할수록 상대의 봇 규칙에 더 잘 걸린다.
 _UA_PLAIN = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"}
-_UA_BROWSER = {"User-Agent": ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
-                              "(KHTML, like Gecko) Chrome/120 Safari/537.36"),
-               "Accept-Language": "ko,en;q=0.9"}
 
 # 목적(purpose) → (호스트, 헤더, 나가는 내용, 안 나가는 것, 없으면 어떻게 되나)
 ROUTES = {
@@ -35,7 +35,7 @@ ROUTES = {
                "심볼 한 개 (예: 'NVDA', '005930.KS', 환율은 'KRW=X')",
                "수량·금액·계좌·증권사·스크린샷",
                "price/FX 없음 → T3·T4 수량 유도와 재평가가 꺼진다"),
-    "broker": ("search.naver.com", _UA_BROWSER,
+    "broker": ("search.naver.com", _UA_PLAIN,
                "증권사 브랜드 토큰 한 개 (예: 'Super365')",
                "계좌번호·계좌별칭·종목명·금액·스크린샷 (brand_token이 미리 거른다)",
                "broker=None + '증권사 미상' 경고 — 지어내지 않는다"),

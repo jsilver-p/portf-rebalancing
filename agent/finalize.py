@@ -407,6 +407,17 @@ def finalize(screens, use_llm=True):
         inh_broker, inh_atype = inherit(screen_text)
         if not broker and inh_broker:               # 계좌번호·별칭뿐이면 같은 계좌의 요약에서 상속
             broker, bsrc = inh_broker, "inherited"
+        if not broker:
+            # 정규명도 상속도 없다 → **화면에 찍힌 브랜드를 그대로 라벨로 쓴다**(`Super365`).
+            # 지어내는 게 아니다. 브랜드는 화면에 실재하고 심판도 통과한다. 정규명이 아닐 뿐이다.
+            #
+            # 비우는 것보다 **엄격히 낫다.** broker=None은 중립이 아니라 프런트에서 전부
+            # `미상`으로 접히고, 그러면 **서로 다른 증권사의 보유가 한 그룹으로 합쳐진다**
+            # (실측 B그룹: 메리츠 Super365 21행 + 삼성 종합 1행이 `미상|일반` 하나로).
+            # 브랜드를 쓰면 그룹은 계좌별로 갈리고, 정규명은 요약화면이 오면 상속으로 승격된다.
+            bt = RB.brand_token(label)
+            if bt and _label_supported(label, screen_text, bt, p.get("evidence")):
+                broker, bsrc = bt, "brand"
         grp, seen_vals = [], {}
         screen_total = None
         for r in p["rows"]:
@@ -502,6 +513,12 @@ def finalize(screens, use_llm=True):
     no_broker = sorted({h.get("_file") or "?" for h in holdings if not h.get("broker")})
     unknown = [f"{f}: 증권사 미상 — 화면에 근거 없음(계좌요약 화면을 함께 올리면 해결)"
                for f in no_broker]
+    # 브랜드 표기로 남은 것은 **미상이 아니다** — 값이 있고 그룹핑도 된다. 다만 정규명이 아니라
+    # 다른 캡처의 정규명과 자동으로 합쳐지지 않는다. 그 사실만 알린다(경고 문구를 섞지 않는다).
+    branded = sorted({(h.get("_file") or "?", h["broker"]) for h in holdings
+                      if h.get("broker_src") == "brand"})
+    unknown += [f"{f}: 증권사 정규명 미확인 — 화면 브랜드 '{b}'를 그대로 씀"
+                f"(계좌요약 화면을 함께 올리면 정규명으로 합쳐진다)" for f, b in branded]
     gate["warnings"] = bad_totals + repairs + fabricated + unknown + gate["warnings"]
     for p in parsed:                     # 빈 화면 = 추출 실패. 조용히 넘기지 않는다.
         if p["type"] == "empty":
