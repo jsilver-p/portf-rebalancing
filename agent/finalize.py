@@ -614,9 +614,23 @@ def _merge_across_screens(holdings, checks):
             i = idx_of.get(k)
             if i is not None and out[i].get("_file") != h.get("_file"):
                 prev_i = i
+        elif name:
+            # 미상(broker·계좌번호 모두 없음) — VLM 경로의 ISA 재캡처가 여기로 온다(실측 G9:
+            # 같은 화면 두 장이 미상 4행씩 복제, 경고도 없이 총액 +1M). 구별 증거가 0인 행
+            # (유형·이름에 더해 **값·수량·원가·손익까지 전부 동일**)만 같은 것으로 본다 —
+            # 하나라도 다르면 다른 계좌일 수 있으므로 합치지 않고 '중복 의심'으로 알린다.
+            k = ("anon", (h.get("accountType"), name))
+            i = idx_of.get(k)
+            if i is not None and out[i].get("_file") != h.get("_file"):
+                same = all(out[i].get(f) == h.get(f) for f in ("value", "qty", "cost", "pnl"))
+                if same:
+                    continue                 # 완전 동일 복제 — 버린다(보완할 것도 없다)
+                warns.append(f"{out[i].get('_file')}·{h.get('_file')}: '{h.get('name')}' 중복 의심 — "
+                             f"증권사 미상·같은 유형인데 값이 다름 — 둘 다 남김(확인 필요)")
         if prev_i is None:
             idx_of[("acct", (toks, name)) if toks else
-                   ("label", (h.get("broker"), h.get("accountType"), name))] = len(out)
+                   ("label", (h.get("broker"), h.get("accountType"), name)) if h.get("broker") else
+                   ("anon", (h.get("accountType"), name))] = len(out)
             out.append(h)
             continue
         prev = out[prev_i]
