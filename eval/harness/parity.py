@@ -197,8 +197,11 @@ def report(rows, gate, screens, gt):
     print(f"게이트 경고 {len(gate['warnings'])}건" + ("  (침묵 — 정상)" if not gate["warnings"] else ""))
     for w in gate["warnings"]:
         print("  ⚠ " + w)
+    # cost(매수가)는 hard 판정이다 — Step1의 목표가 (계좌, 종목, 수량, 매수가) 튜플의
+    # 정확한 데이터화이므로, 매수가가 틀리면 soft 미스가 아니라 FAIL이어야 한다
+    # (이전에는 name/price와 함께 판정식에서 빠져 있었다).
     ok = (len(matched) == n and not halluc and not any(err[k] for k in
-          ("value", "qty", "broker", "accountType", "qty_src")))
+          ("value", "qty", "cost", "broker", "accountType", "qty_src")))
     print(f"\n판정: {'PASS ✅' if ok else 'FAIL ❌'}\n{'='*72}")
     return ok
 

@@ -20,9 +20,11 @@ import resolve_broker as RB
 _CATEGORIES = ("국내주식", "해외주식", "원화예수금", "외화예수금", "국내채권", "해외채권",
                "펀드", "파생상품", "연금", "현금", "채권", "주식")
 _CASH_CAT = ("예수금", "예금", "현금", "CMA")
-# accountType 정규화(GT 어휘: 일반/연금저축/IRP/ISA/퇴직연금)
+# accountType 정규화(GT 어휘: 일반/연금저축/IRP/ISA).
+# '퇴직연금'은 IRP로 통일한다 — 같은 계좌('퇴직연금(다이렉트IRP)')가 라벨 전문에서는 IRP,
+# VLM 축약('퇴직연금')에서는 퇴직연금으로 갈려 **같은 계좌가 두 이름**이 됐다(실측 G1 edge↔orin).
 _ATYPE = (("IRP", "IRP"), ("ISA", "ISA"), ("연금저축", "연금저축"),
-          ("퇴직연금", "퇴직연금"), ("퇴직", "IRP"), ("일반", "일반"))
+          ("퇴직", "IRP"), ("일반", "일반"))
 
 
 def _num(x):
@@ -142,6 +144,9 @@ def classify(rows):
     """화면 유형: product_summary(상품별 총액) / account_summary(계좌 잔고) / detail(개별종목).
     핵심 판별자 = 행이 '개별 종목'인가 '집계(카테고리/계좌)'인가. broker가 계좌번호여도
     행 이름이 종목이면 detail(계좌번호를 broker 라벨로 쓰는 상세화면)."""
+    # 예약행(화면 총액)은 유형 판정에서 제외 — 계좌토큰이 없어서 account_summary의
+    # `all(keys)` 판정을 뒤집는다(총액 카드가 있는 계좌요약이 detail로 오분류).
+    rows = [r for r in rows if str(r.get("name") or "").strip() != SCREEN_TOTAL]
     if not rows:
         return "empty"      # 빈 화면을 '빈 상세'로 삼으면 화면 유실이 조용히 통과한다 → 게이트가 경고
     n = len(rows)
@@ -298,10 +303,24 @@ def _label_supported(label, screen_text, broker, evidence):
     return False
 
 
-def finalize(screens, use_llm=True):
-    """screens: [{"file":str,"raw":str,"evidence":str|None}]. 반환 {holdings, gate}.
+def fname_brand(fname):
+    """업로드 **파일명**에서 캡처 앱 토큰을 뽑는다 — 안드로이드 스크린샷 파일명에는 캡처한
+    앱 이름이 박힌다('Screenshot_20260709_160155_ SMART.jpg' → 'SMART', '..._mPOP.jpg' → 'mPOP').
 
-    evidence = 그 화면의 OCR 원문 텍스트(선택). 있으면 broker 라벨의 독립 심판으로 쓴다."""
+    화면에 브랜드조차 없는 캡처(mPOP 상세 등)에서 증권사의 **마지막 근거**가 된다. 단 약한
+    증거다 — 파일명은 사용자가 바꿀 수 있다. 그래서 화면 근거(정규명·상속·화면 브랜드)가 전부
+    실패한 뒤에만 쓰고, 출처를 `filename`으로 표시해 사용자 확인 대상으로 남긴다."""
+    s = re.sub(r"\.[A-Za-z0-9]+$", "", str(fname or ""))
+    s = re.sub(r"(?i)screen[-_ ]?shot|kakaotalk|\bimg\b|\bimage\b", " ", s)
+    s = re.sub(r"[\d_\-]+", " ", s).strip()
+    return s if s and not RB.is_placeholder(s) else None
+
+
+def finalize(screens, use_llm=True):
+    """screens: [{"file":str,"raw":str,"evidence":str|None,"fname":str|None}]. 반환 {holdings, gate}.
+
+    evidence = 그 화면의 OCR 원문 텍스트(선택). 있으면 broker 라벨의 독립 심판으로 쓴다.
+    fname = 업로드 원본 파일명(선택). 화면에 근거가 전무할 때 증권사 앱 토큰의 최후 근거."""
     broker_memo = {}      # 이 실행 안에서만 산다 — 디스크 캐시 없음(`resolve_broker` docstring)
     parsed = []
     for sc in screens:
@@ -312,7 +331,8 @@ def finalize(screens, use_llm=True):
             r["qty"] = _num(r.get("qty"))
             r["pnl"] = _num(r.get("pnl"))
         parsed.append({"file": sc.get("file"), "rows": rows, "type": classify(rows),
-                       "evidence": sc.get("evidence")})   # 화면 원문 텍스트(있으면 심판)
+                       "evidence": sc.get("evidence"),    # 화면 원문 텍스트(있으면 심판)
+                       "fname": sc.get("fname")})         # 업로드 원본 파일명(있으면 최후 근거)
 
     # 1) 요약화면에서 totals + 계좌 목록(계좌 → 증권사·유형) 수집
     product_totals = {}     # 카테고리 → 총액
@@ -418,6 +438,16 @@ def finalize(screens, use_llm=True):
             bt = RB.brand_token(label)
             if bt and _label_supported(label, screen_text, bt, p.get("evidence")):
                 broker, bsrc = bt, "brand"
+        if not broker:
+            # 화면에 근거가 전무 → **업로드 파일명**의 캡처 앱 토큰이 마지막 근거다
+            # ('Screenshot_…_mPOP.jpg'). 심판(_label_supported)은 걸지 않는다 — 근거가
+            # 화면이 아니라 파일명 자체다. LLM 경로는 검색으로 정규명까지 시도하고,
+            # 못 풀면 토큰을 라벨로 남긴다(브랜드 폴백과 같은 원칙, 출처만 `filename`).
+            ft = fname_brand(p.get("fname"))
+            bt = RB.brand_token(ft) if ft else None
+            if bt:
+                resolved = RB.resolve_broker(bt, broker_memo, use_llm=use_llm)
+                broker, bsrc = (resolved, "research") if resolved else (bt, "filename")
         grp, seen_vals = [], {}
         screen_total = None
         for r in p["rows"]:
@@ -451,10 +481,20 @@ def finalize(screens, use_llm=True):
             atype = str(r.get("accountType") or "")
             # 유형도 계좌 단위 상속: 상세화면 라벨은 줄임말이기 쉽다('퇴직연금' ← '퇴직연금(다이렉트IRP)')
             h["accountType"] = inh_atype or norm_atype(atype or label)
+            if h.get("value") is not None and not h.get("currency"):
+                h["currency"] = "KRW"        # 화면 금액 표기는 원화(외화는 추출기가 명시) — 표기 통일
             h["_file"] = p["file"]
+            # 화면 간 병합의 열쇠 — 이 행이 속한 계좌의 **번호 토큰**(행 구분자 우선, 없으면 화면 라벨).
+            # VLM 경로는 정규명만 내서 비어 있을 수 있다 → 그때 병합은 약한 키로만(_merge_across_screens).
+            h["_acct"] = frozenset(t for t in acct_tokens(str(r.get("broker") or "") + " " + label)
+                                   if t[:1].isdigit())
             grp.append(h)
-        # 예수금 상세: 같은 돈의 시점·내역 표기를 한 행으로 — 어느 시점인지는 요약 총액이 정한다
-        grp = _drop_deposit_echoes(grp, list(product_totals.values()))
+        # 예수금 상세: 같은 돈의 시점·내역 표기를 한 행으로 — 어느 시점인지는 총액이 정한다.
+        # 근거는 요약화면의 원화예수금 총액 **또는 이 화면 자신의 카드 총액**(예수금 탭의
+        # '원화 예수금 (D+2)' 카드). 카드가 답이 될 수 있게 되면서, 상세만 올린 세트에서도
+        # 같은 돈이 3행(당일 48.8M·D+2 44.2M·현금 40.2M)으로 새던 것이 닫힌다(실측 G4).
+        grp = _drop_deposit_echoes(grp, list(product_totals.values())
+                                   + ([screen_total] if screen_total else []))
         grp = _drop_total_rows(grp)          # 화면 제목·탭·소계가 종목처럼 섞여 나오는 것 제거
         holdings.extend(grp)
         groups.append({"file": p["file"], "sum": sum(x["value"] or 0 for x in grp),
@@ -507,6 +547,11 @@ def finalize(screens, use_llm=True):
         g["sum"] = sum(x["value"] or 0 for x in g["rows"])
     gate = _cross_check(groups, product_totals, account_totals)
     gate["repairs"] = repairs
+    # 같은 계좌가 여러 화면(재캡처·스크롤 겹침)으로 올라오면 같은 자산이 화면 수만큼 복제된다 —
+    # '한 자산 한 행'이 화면 안(seen_vals)에만 있었다(실측 G5/G9: IRP 7행·ISA 4행 2중 계상).
+    # 게이트 **뒤**에 병합한다: 화면별 상세합 대조는 화면 그대로의 행으로 해야 맞는다.
+    holdings, merge_warns = _merge_across_screens(holdings, gate["checks"])
+    gate["warnings"].extend(merge_warns)
     # 증권사 미상 경고 — **owner 추론까지 끝난 뒤에** 판정한다(그 전에 세면 거짓 경보가 난다).
     # 비워두는 것 자체는 옳지만 **조용히** 비면 안 된다: 화면에 근거가 없다는 사실이
     # 사용자에게 보여야 다음 캡처에서 계좌요약 화면을 같이 올릴 수 있다.
@@ -515,16 +560,90 @@ def finalize(screens, use_llm=True):
                for f in no_broker]
     # 브랜드 표기로 남은 것은 **미상이 아니다** — 값이 있고 그룹핑도 된다. 다만 정규명이 아니라
     # 다른 캡처의 정규명과 자동으로 합쳐지지 않는다. 그 사실만 알린다(경고 문구를 섞지 않는다).
-    branded = sorted({(h.get("_file") or "?", h["broker"]) for h in holdings
-                      if h.get("broker_src") == "brand"})
-    unknown += [f"{f}: 증권사 정규명 미확인 — 화면 브랜드 '{b}'를 그대로 씀"
-                f"(계좌요약 화면을 함께 올리면 정규명으로 합쳐진다)" for f, b in branded]
+    branded = sorted({(h.get("_file") or "?", h["broker"], h["broker_src"]) for h in holdings
+                      if h.get("broker_src") in ("brand", "filename")})
+    unknown += [f"{f}: 증권사 정규명 미확인 — "
+                + (f"화면 브랜드 '{b}'를 그대로 씀" if src == "brand"
+                   else f"파일명의 앱 이름 '{b}'를 그대로 씀")
+                + "(계좌요약 화면을 함께 올리면 정규명으로 합쳐진다)"
+                for f, b, src in branded]
     gate["warnings"] = bad_totals + repairs + fabricated + unknown + gate["warnings"]
     for p in parsed:                     # 빈 화면 = 추출 실패. 조용히 넘기지 않는다.
         if p["type"] == "empty":
             gate["warnings"].insert(0, f"{p['file']}: 추출 0행 — 화면 유실(파싱 실패·미인식) 의심")
+    for h in holdings:
+        h.pop("_acct", None)                 # 병합 키는 내부용 — 결과 스키마에 남기지 않는다
     return {"holdings": holdings, "gate": gate,
             "screens": [{"file": p["file"], "type": p["type"]} for p in parsed]}
+
+
+def _merge_across_screens(holdings, checks):
+    """화면 간 같은 계좌·같은 자산 병합 — 사용자의 업로드 방식(같은 계좌를 부분·중복 캡처)이
+    이중 계상이 되지 않게 한다.
+
+    두 단계 키(강한 근거부터, 근거 없으면 합치지 않는다):
+      · 강한 키 — 두 행 모두 **계좌번호 토큰**이 있고 교집합 + 이름 동일. 같은 계좌임이 확실
+        하므로 값이 달라도 한 행만 남긴다(화면 총액 대조를 통과한 화면 우선, 다음은 채워진
+        필드가 많은 행) + 경고.
+      · 약한 키 — 번호가 없으면(VLM 경로) (증권사, 계좌유형, 이름) 동일 + **값까지 동일**할
+        때만 병합. 값이 다르면 다른 계좌일 수 있다 → 둘 다 남기고 '중복 의심' 경고만
+        (틀린 병합은 이중 계상보다 나쁘다 — 자산 하나가 조용히 사라진다).
+    병합은 무손실: 빈 필드(수량·매수가·단가)는 상대 행에서 보완한다 — 같은 계좌를 다른
+    화면(수량이 보이는 폼·안 보이는 폼)으로 찍었을 때 서로를 채운다."""
+    st_ok = {c["file"]: c["match"] for c in checks if c.get("scope") == "화면 총액"}
+    out, warns = [], []
+    idx_of = {}                              # (종류, 키) → out 인덱스
+
+    def fill(dst, src):
+        for k in ("qty", "price", "cost", "pnl", "currency", "assetClass"):
+            if dst.get(k) is None and src.get(k) is not None:
+                dst[k] = src[k]
+
+    for h in holdings:
+        name = _norm_ev(h.get("name"))
+        toks = h.get("_acct") or frozenset()
+        prev_i = None
+        if name and toks:
+            for (kind, key), i in idx_of.items():
+                if kind == "acct" and key[1] == name and (toks & key[0]) \
+                        and out[i].get("_file") != h.get("_file"):
+                    prev_i = i
+                    break
+        elif name and h.get("broker"):
+            k = ("label", (h["broker"], h.get("accountType"), name))
+            i = idx_of.get(k)
+            if i is not None and out[i].get("_file") != h.get("_file"):
+                prev_i = i
+        if prev_i is None:
+            idx_of[("acct", (toks, name)) if toks else
+                   ("label", (h.get("broker"), h.get("accountType"), name))] = len(out)
+            out.append(h)
+            continue
+        prev = out[prev_i]
+        pv, hv = prev.get("value"), h.get("value")
+        same_val = pv is not None and hv is not None and abs(pv - hv) <= abs(pv) * 0.005
+        if same_val:
+            fill(prev, h)                    # 무손실 병합 — 복제 행은 버린다
+            continue
+        if not toks:                         # 약한 키 + 값 불일치 → 병합하지 않는다(다른 계좌 가능)
+            warns.append(f"{prev.get('_file')}·{h.get('_file')}: '{h.get('name')}' 중복 의심 — "
+                         f"같은 증권사·유형인데 값이 다름({pv:,.0f} vs {hv:,.0f}) — 둘 다 남김(확인 필요)")
+            out.append(h)
+            continue
+        keep_new = (st_ok.get(h.get("_file")) is True and
+                    st_ok.get(prev.get("_file")) is not True)
+        if not keep_new and st_ok.get(h.get("_file")) == st_ok.get(prev.get("_file")):
+            keep_new = (sum(v is not None for v in h.values())
+                        > sum(v is not None for v in prev.values()))
+        w = h if keep_new else prev
+        warns.append(f"{prev.get('_file')}·{h.get('_file')}: 같은 계좌의 '{h.get('name')}' 값이 "
+                     f"화면마다 다름({pv:,.0f} vs {hv:,.0f}) — {w.get('value'):,.0f} 채택")
+        if keep_new:
+            fill(h, prev)
+            out[prev_i] = h
+        else:
+            fill(prev, h)
+    return out, warns
 
 
 def _repair_digit_slips(groups, product_totals, account_totals,
@@ -587,7 +706,8 @@ def _cross_check(groups, product_totals, account_totals, tol=0.02):
                            "total": st, "match": st_ok})
             if not st_ok:
                 warns.append(f"{g['file']}: 상세합 {g['sum']:,.0f} ≠ 화면 총액 {st:,.0f} "
-                             f"({g['sum'] - st:+,.0f}) — 행 누락·오추출 의심")
+                             f"({g['sum'] - st:+,.0f}) — 행 누락·오추출 의심"
+                             f"(스크롤에 가려 안 찍힌 행이 있으면 이어서 내린 화면을 추가 업로드)")
         best, bi = None, -1
         for i, t in enumerate(totals):
             if used[i] or not t["amt"]:
@@ -608,7 +728,14 @@ def _cross_check(groups, product_totals, account_totals, tol=0.02):
             # 이미 경고했다(중복). 어느 쪽이든 여기서 덧붙일 정보가 없다.
             if st_ok is not None:
                 continue
-            warns.append(f"{g['file']}: 상세합 {g['sum']:,.0f} — 근접 총액 {near} (환각·오추출 의심)")
+            # '검증 실패'와 '검증 불가'는 다른 말이다 — 대조할 총액 자체가 없으면 환각의
+            # 증거가 아니라 근거 부재다(실측: 요약 없는 세트에서 전 화면에 '환각 의심'이
+            # 남발돼 진짜 경고가 묻혔다). 문구를 갈라 행동 가능하게 한다.
+            if bi >= 0:
+                warns.append(f"{g['file']}: 상세합 {g['sum']:,.0f} — 근접 총액 {near} (환각·오추출 의심)")
+            else:
+                warns.append(f"{g['file']}: 상세합 {g['sum']:,.0f} — 대조할 총액 없음(검증 불가 — "
+                             f"요약·총액이 보이는 화면을 함께 올리면 검증된다)")
 
     for i, t in enumerate(totals):
         if not used[i] and not t.get("as_cash"):   # 현금 계좌로 편입된 잔고는 누락이 아니다

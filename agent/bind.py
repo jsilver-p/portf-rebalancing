@@ -400,10 +400,16 @@ def rows_from_list(lines, m):
     # 'N주'는 라벨이 아니라 **수량**이다. 라벨로 두면 자기 금액과 cy가 거의 같아(측정 160155:
     # '6주' cy=1280 vs 금액 cy=1279.5) 진짜 종목명('SK하이닉스' cy=1200)을 이기고 name을 뺏는다.
     qtys = [b for b in boxes if QTY_RE.match(b["text"].strip())]
+    # 자기 값을 단 라벨('환율 1,482.00')과 어포던스('접기›', '…보기>')는 행 이름이 될 수 없다.
+    # 최종 필터(_is_field_label)에만 두면 **짝짓기에서 남의 금액을 훔친 뒤** 버려져 그 금액까지
+    # 유실된다(실측 G4 외화예수금 탭: '환율 1,482.00'이 환산액을 가져가 '미국 달러' 행이 통째로
+    # 사라졌다. 같은 폼이 G1에선 '환율1,466.20'이 두 번 나와 크롬 필터에 걸린 덕에 — 운으로 — 살았다).
     labels = [b for b in boxes
               if not _is_amount(b["text"]) and "%" not in b["text"]
               and b["x"] < m["x0"] + m["span"] * 0.5
-              and not QTY_RE.match(b["text"].strip())]
+              and not QTY_RE.match(b["text"].strip())
+              and not re.search(r"\d,\d{3}|\d\.\d{2}", b["text"])
+              and not re.search(r"[›»⌄˅>]\s*$", b["text"].strip())]
     # 한 화면에서 **똑같은 문구가 반복되면 UI 크롬**이다(계좌마다 붙는 '이체'·'거래내역'·'주식주문').
     # 행 이름은 화면에서 유일하다('한 자산 = 한 행' 불변식). 안 걸러내면 이 크롬이 최근접 분할에서
     # 금액을 훔쳐 가짜 행을 만들고, 화면 유형 판정까지 뒤집는다(측정: 160333이
@@ -492,6 +498,23 @@ def rows_from_list(lines, m):
         nb = _nearest_label(b)
         if nb is not None:
             fx_by_label.setdefault(id(nb), m)
+    # 외화 행의 원화 환산액은 라벨의 **아랫줄**(환율 줄)에 온다 — 최근접 분할이 그 금액을
+    # 못 붙였으면(카드 금액이 더 가깝거나 거리 상한 밖) 아직 주인 없는 금액 중 라벨 바로
+    # 아래 것을 붙인다. 규칙 (8): qty=외화 금액, value=원화 환산액 — value 없이는 행이
+    # finalize에서 버려져 외화 예수금이 통째로 누락된다(실측 G4: 미국달러 6,928.52 유실).
+    taken = {id(a) for _, amts in buckets.values() for a in amts}
+    for key, mfx in fx_by_label.items():
+        if key in buckets:
+            continue
+        lab = next((l for l in labels if id(l) == key), None)
+        if lab is None:
+            continue
+        free = [a for a in amounts if id(a) not in taken
+                and 0 < _cy(a) - _cy(lab) <= limit * 2]
+        if free:
+            a = min(free, key=lambda x: _cy(x) - _cy(lab))
+            buckets[key] = (lab, [a])
+            taken.add(id(a))
     def _sep_above(cy):
         """이 행을 덮는 계좌 구분자 = **바로 위**의 구분자. 화면이 계좌별로 쪼개져 있으면
         행마다 다른 계좌가 잡힌다(사용자 지적: '각 계좌로 나눌 수 있으면 되는 거야').
@@ -563,6 +586,39 @@ def _coherent(rows):
     return rows
 
 
+# 상단 '총액 카드'의 라벨 어휘 — 화면 자신의 총액이 실리는 자리. H_VALUE와 분리한 이유:
+# H_VALUE는 컬럼 헤더 판정에도 쓰여서 '자산'을 넣으면 '자산현황' 같은 제목이 헤더로 오인된다.
+CARD_TOTAL_VOCAB = ("자산", "총자산", "총 자산", "평가금액", "평가액", "원화예수금", "외화예수금")
+
+
+def _card_total(lines, below_y=None):
+    """상단 총액 카드 → 화면 자신의 총액. 라벨(자산/평가금액/원화·외화 예수금)과 금액이
+    같은 줄이거나, 금액이 바로 아랫줄에 단독으로 온다(큰 글씨 카드).
+
+    필요한 이유(실측): mPOP 종합잔고는 컬럼헤더 위의 '자산 35,517,145원'이 화면 총액인데,
+    헤더드 경로가 헤더 위 영역을 통째로 버려 총액이 유실됐다 — 상세행 합이 원 단위까지
+    일치하는 화면이 '대조 불가'로 남아 다른 화면의 예수금과 비교되는 오경보를 냈다.
+    예수금 탭(SMART)의 '원화 예수금 (D+2)' 카드도 같은 자리다 — 이 총액이 곧
+    finalize._drop_deposit_echoes의 접기 근거(어느 시점이 자산인가)가 된다."""
+    top = [ln for ln in lines
+           if below_y is None or max(_cy(b) for b in ln) < below_y][:8]
+    for i, ln in enumerate(top):
+        lab = next((b for b in ln
+                    if re.sub(r"\(.*?\)", "", b["text"]).replace(" ", "").strip()
+                    in tuple(v.replace(" ", "") for v in CARD_TOTAL_VOCAB)), None)
+        if lab is None:
+            continue
+        amt = next((b for b in ln if b is not lab and _is_amount(b["text"])), None)
+        if amt is None and i + 1 < len(top) and len(top[i + 1]) == 1 \
+                and _is_amount(top[i + 1][0]["text"]):
+            amt = top[i + 1][0]                  # 큰 금액이 다음 줄 단독으로(카드 레이아웃)
+        if amt is not None:
+            v = _clean_num(amt["text"])
+            if v:
+                return v
+    return None
+
+
 # ── broker/accountType 라벨 ──────────────────────────────────────────────────
 def screen_label(lines):
     """화면 상단의 증권사·계좌 라벨 줄. '[Super365] 1234-5678-01' 처럼 브랜드+계좌번호가 온다 —
@@ -600,6 +656,7 @@ def bind(boxes):
     broker = (f"{canon} {label}".strip() if canon else label.strip()) or None
 
     header = find_header(lines)
+    hdr_y = None
     if header:
         bands = columns_from_header(header, m)
         name_x1 = max([b["x"] + b["w"] for b in header if _kind_of(b["text"]) == "name"]
@@ -651,6 +708,15 @@ def bind(boxes):
             "confidence": 0.95,
         }
         out.append([row[c] for c in F.COMPACT_COLUMNS])
+    # 화면 자신의 총액이 행 경로에서 안 나왔으면 상단 카드에서 줍는다(mPOP 종합잔고의 '자산',
+    # 예수금 탭의 '원화 예수금 (D+2)'). 이미 있으면 그대로 — 진실의 출처는 하나면 된다.
+    name_i = F.COMPACT_COLUMNS.index("name")
+    if not any(r[name_i] == F.SCREEN_TOTAL for r in out):
+        tot = _card_total(lines, hdr_y)
+        if tot:
+            tr = dict.fromkeys(F.COMPACT_COLUMNS)
+            tr["name"], tr["value"], tr["confidence"] = F.SCREEN_TOTAL, tot, 0.95
+            out.insert(0, [tr[c] for c in F.COMPACT_COLUMNS])
     return out
 
 
