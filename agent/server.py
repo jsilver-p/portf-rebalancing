@@ -836,7 +836,7 @@ def _vision(b64, mode=None):
     return raw, evidence
 
 
-def extract_batch(images, capture_dt, on_screen=None, on_stage=None, engine=None):
+def extract_batch(images, capture_dt, on_screen=None, on_stage=None, engine=None, names=None):
     """여러 화면을 한 번에: 화면별 비전추출 → finalize(계좌합계 대조 게이트 + broker 정규화)
     → 결정적 enrich(심볼·수량·현재가). 앱이 스크린샷 여러 장을 종합해 정확한 결과를 얻는 경로.
 
@@ -853,6 +853,17 @@ def extract_batch(images, capture_dt, on_screen=None, on_stage=None, engine=None
         dt = exif_capture_dt(b64)
         if dt:
             store_capture(dt); capture_dt = dt; exif_found = True
+    capture_src = "exif" if exif_found else "fallback"
+    if not exif_found:                            # EXIF가 벗겨진 업로드 → 파일명의 캡처시각이 폴백
+        for nm in (names or []):                  # ('Screenshot_20260709_160155_….jpg')
+            mt = re.search(r"(20\d{2})(\d{2})(\d{2})[_\-]?(\d{2})(\d{2})(\d{2})", str(nm or ""))
+            if mt:
+                try:
+                    dt = datetime(*(int(g) for g in mt.groups()), tzinfo=KST)
+                    store_capture(dt); capture_dt = dt; capture_src = "filename"
+                    break
+                except ValueError:
+                    continue
     n = len(images)
     raws = [None] * n                             # 입력 순서 보존(행→화면 귀속 불변) — as_completed여도 자리에 채움
     evid = [None] * n                             # 화면별 OCR 원문 — broker 라벨의 독립 심판
@@ -875,7 +886,8 @@ def extract_batch(images, capture_dt, on_screen=None, on_stage=None, engine=None
             _done(i, _vision(b64, mode))
     if on_stage:                                  # 비전추출 끝 → 종합·검증 단계로(라이브 상태 전환)
         on_stage("finalizing")
-    screens = [{"file": f"img{i + 1}", "raw": raw, "evidence": evid[i]}
+    screens = [{"file": f"img{i + 1}", "raw": raw, "evidence": evid[i],
+                "fname": (names[i] if names and i < len(names) else None)}
                for i, raw in enumerate(raws)]
     # 증권사는 **요청마다 검색으로 다시 확정한다**(디스크 캐시 없음, `resolve_broker` docstring).
     # 예전엔 검색 순위가 호출마다 달라 같은 스크린샷이 다른 증권사를 냈고 캐시가 그걸 고정했다.
@@ -890,13 +902,13 @@ def extract_batch(images, capture_dt, on_screen=None, on_stage=None, engine=None
               "seconds": round(time.time() - t0, 1), "engine": eng,
               "model": MODEL if mode == "vlm" else f"OCR+기하({os.environ.get('OCR_ENGINE', 'rapidocr')})",
               "captureDateTime": capture_dt.isoformat(),
-              "captureSource": "exif" if exif_found else "fallback"}
+              "captureSource": capture_src}
     # 개발 캡처 저장 — 화면별 raw(모델 원문)를 함께 남겨 오류를 사후 분석한다.
     save_capture_batch(images, {**result, "raws": raws})
     return result
 
 
-def _batch_run(jid, images, capture_dt, engine=None):
+def _batch_run(jid, images, capture_dt, engine=None, names=None):
     seed = lambda: {"done": 0, "total": len(images), "rows": [], "stage": "extracting"}
     def on_screen(idx, rows):                     # 화면 완료 시 진행 상황에 원시 행 누적(폴링이 읽어감)
         with _JOBS_LOCK:
@@ -915,7 +927,7 @@ def _batch_run(jid, images, capture_dt, engine=None):
                 j.setdefault("progress", seed())["stage"] = stage
     try:
         res = extract_batch(images, capture_dt, on_screen=on_screen, on_stage=on_stage,
-                            engine=engine)
+                            engine=engine, names=names)
         with _JOBS_LOCK:
             _JOBS[jid] = {"status": "done", "result": res, "ts": time.time()}
     except Exception as e:
@@ -925,13 +937,14 @@ def _batch_run(jid, images, capture_dt, engine=None):
 
 def submit_batch(body):
     images = body.get("images") or []
+    names = body.get("names") or []          # 업로드 원본 파일명(선택) — 증권사 앱·캡처시각 근거
     capture_dt = parse_capture(body)
     jid = os.urandom(8).hex()
     with _JOBS_LOCK:
         _JOBS[jid] = {"status": "pending", "ts": time.time(),
                       "progress": {"done": 0, "total": len(images), "rows": [], "stage": "extracting"}}
     threading.Thread(target=_batch_run,
-                     args=(jid, images, capture_dt, body.get("engine")), daemon=True).start()
+                     args=(jid, images, capture_dt, body.get("engine"), names), daemon=True).start()
     _job_gc()
     return {"id": jid}
 

@@ -2379,7 +2379,7 @@ class Component extends DCLogic {
     this.setState({
       brandInput: { ...(this.state.brandInput || {}), [brand]: '' },
       streamPending: (this.state.streamPending || []).map(
-        p => (p.broker === brand && p.broker_src === 'brand')
+        p => (p.broker === brand && (p.broker_src === 'brand' || p.broker_src === 'filename'))
           ? { ...p, broker: nm, broker_src: 'user' } : p)
     });
   }
@@ -2798,7 +2798,11 @@ class Component extends DCLogic {
       method: 'POST', headers: { 'content-type': 'application/json' },
       // engine: 'edge'(OCR+기하, 신경망 LLM 0개) | 'orin'(비전모델 + 증권사 검색·판독).
       // 빈 값이면 서버 기본 — 구버전 서버는 이 필드를 그냥 무시한다(하위호환).
-      body: JSON.stringify({ images, engine: this.state.engine || undefined })
+      // names: 업로드 원본 파일명 — 안드로이드 스크린샷 이름에 캡처 앱('mPOP'·'SMART')과
+      // 캡처시각이 박혀 있어, 화면에 근거가 없는 캡처의 증권사·시각 근거가 된다(약한 증거,
+      // broker_src='filename'으로 표시). 구버전 서버는 무시한다(하위호환).
+      body: JSON.stringify({ images, names: files.map(f => f.name || ''),
+        engine: this.state.engine || undefined })
     }).then(r => r.json());
     if (!sub || !sub.id) throw new Error((sub && sub.error) || '제출 실패');
     let res = null, seen = 0;
@@ -3151,7 +3155,7 @@ class Component extends DCLogic {
       brandAsks: (() => {
         const P = (S.streamStage === 'review' && S.streamPending) || [];
         const brands = [];
-        P.forEach(p => { if (p.broker_src === 'brand' && brands.indexOf(p.broker) < 0) brands.push(p.broker); });
+        P.forEach(p => { if ((p.broker_src === 'brand' || p.broker_src === 'filename') && brands.indexOf(p.broker) < 0) brands.push(p.broker); });
         // 원탭 후보 = 이미 쓰고 있는 정규 증권사명(기존 보유 + 이번 배치). 저장된 매핑이 아니라
         // 사용자 자신의 목록이라 규칙과 충돌하지 않고, 매번 타이핑하는 부담만 던다.
         const known = [];
@@ -3161,7 +3165,7 @@ class Component extends DCLogic {
         });
         return brands.map(b => ({
           brand: b,
-          count: P.filter(p => p.broker === b && p.broker_src === 'brand').length,
+          count: P.filter(p => p.broker === b && (p.broker_src === 'brand' || p.broker_src === 'filename')).length,
           input: (S.brandInput || {})[b] || '',
           opts: known.map(k => ({ label: k, onPick: () => this.applyBrokerName(b, k) })),
           hasOpts: known.length > 0,
