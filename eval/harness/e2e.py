@@ -69,6 +69,13 @@ def main():
         holdings, waited = [], 0
         while waited < 1500:
             time.sleep(5); waited += 5
+            # 추출은 리뷰 단계('추출 N건 · 확인 후 반영')에서 멈춰 사용자 확인을 기다린다 —
+            # 실사용 흐름(추출→표시→확인→STEP2)이므로 하네스가 그 확인을 눌러야 한다.
+            # (이 클릭이 없으면 localStorage에는 영원히 도달하지 않는다 — 구버전 하네스의 시간초과 원인.)
+            d.execute_script("""
+              const b=[...document.querySelectorAll('button')]
+                .find(x=>x.textContent.trim()==='Step 2에 반영');
+              if (b) b.click();""")
             state = d.execute_script("return localStorage.getItem('pf_rebalancer_v1');")
             rows = json.loads(state or "{}").get("holdings") or []
             holdings = [h for h in rows if h.get("name") != "__E2E__"          # 센티넬 제외
