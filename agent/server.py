@@ -805,11 +805,15 @@ def _evidence_text(boxes):
 
 
 def _vision(b64, mode=None):
-    """이미지 1장 → (추출 원문 텍스트, 화면 OCR 텍스트). 배치·단건 공용.
+    """이미지 1장 → (추출 원문 텍스트, 화면 OCR 텍스트, 기하 바인딩 행 JSON|None). 배치·단건 공용.
 
     두 번째 값(evidence)은 **비전 모델과 독립인 심판**이다. 값에는 총액 대조가 있지만
     라벨에는 심판이 없어 모델이 증권사명을 지어내면 게이트가 침묵했다 —
     OCR 텍스트가 그 자리를 메운다(finalize._label_supported).
+
+    세 번째 값(geom)은 VLM 모드에서만 실린다 — 같은 OCR 박스를 기하 바인딩(bind)에 태운
+    결정적 판독. VLM이 비운 수량 칸을 finalize가 값-일치 조인으로 되메꾼다(실측 08-10:
+    IRP·ISA 폼에서 VLM이 화면에 실재하는 수량을 전 행 null로 냈다 → 추정으로 오표시).
 
     mode: 'ocr' | 'vlm'. 없으면 프로세스 기본(EXTRACT).
     """
@@ -817,7 +821,7 @@ def _vision(b64, mode=None):
         sys.path.insert(0, HERE)
         import bind
         boxes = _ocr_boxes(b64)                     # OCR은 한 번만 — 추출과 심판이 같은 박스에서 나온다
-        return json.dumps(bind.bind(boxes), ensure_ascii=False), _evidence_text(boxes)
+        return json.dumps(bind.bind(boxes), ensure_ascii=False), _evidence_text(boxes), None
     if not PROMPT:                                  # 프롬프트 없이 비전 호출 = 조용히 쓰레기를 낸다
         raise RuntimeError(f"VLM 경로인데 프롬프트가 없다: {PROMPT_FILE}")
     body = json.dumps({"model": MODEL, "prompt": PROMPT, "images": [resample_half_b64(b64)],
@@ -826,14 +830,18 @@ def _vision(b64, mode=None):
     with urllib.request.urlopen(req, timeout=1800) as r:
         raw = json.loads(r.read()).get("response", "")
     try:                                            # 심판은 있으면 좋은 것 — 실패해도 추출을 막지 않는다
-        evidence = _evidence_text(_ocr_boxes(b64))
+        boxes = _ocr_boxes(b64)
+        evidence = _evidence_text(boxes)
+        sys.path.insert(0, HERE)
+        import bind
+        geom = json.dumps(bind.bind(boxes), ensure_ascii=False)
     except Exception as e:
         # 이 경로는 **실제로 밟힌다**: VLM 서버는 OCR 없이도 도는 게 정상이라 인터프리터에
         # rapidocr가 없을 수 있다(실측: 라이브의 시스템 python3). 그때 심판은 무판정으로
         # 물러나고 추출은 계속돼야 한다 — 여기서 죽으면 추출 전체가 죽는다(실측 사고).
-        print(f"· evidence OCR 없음 — broker 심판 생략({type(e).__name__}: {e})")
-        evidence = None
-    return raw, evidence
+        print(f"· evidence OCR 없음 — broker 심판·수량 되메꿈 생략({type(e).__name__}: {e})")
+        evidence, geom = None, None
+    return raw, evidence, geom
 
 
 def extract_batch(images, capture_dt, on_screen=None, on_stage=None, engine=None, names=None):
@@ -867,8 +875,9 @@ def extract_batch(images, capture_dt, on_screen=None, on_stage=None, engine=None
     n = len(images)
     raws = [None] * n                             # 입력 순서 보존(행→화면 귀속 불변) — as_completed여도 자리에 채움
     evid = [None] * n                             # 화면별 OCR 원문 — broker 라벨의 독립 심판
+    geoms = [None] * n                            # 화면별 기하 바인딩 행(VLM 모드) — 수량 되메꿈 근거
     def _done(i, res):
-        raw, raws[i], evid[i] = res[0], res[0], res[1]
+        raw, raws[i], evid[i], geoms[i] = res[0], res[0], res[1], res[2]
         if on_screen:                             # 화면 하나 끝날 때마다 그 화면의 원시 행을 흘려보낸다(라이브)
             try:
                 rows = finalize_mod.parse_rows(raw) or []   # 단일 파서 재사용 — 게이트 전 원시값
@@ -886,7 +895,7 @@ def extract_batch(images, capture_dt, on_screen=None, on_stage=None, engine=None
             _done(i, _vision(b64, mode))
     if on_stage:                                  # 비전추출 끝 → 종합·검증 단계로(라이브 상태 전환)
         on_stage("finalizing")
-    screens = [{"file": f"img{i + 1}", "raw": raw, "evidence": evid[i],
+    screens = [{"file": f"img{i + 1}", "raw": raw, "evidence": evid[i], "geom": geoms[i],
                 "fname": (names[i] if names and i < len(names) else None)}
                for i, raw in enumerate(raws)]
     # 증권사는 **요청마다 검색으로 다시 확정한다**(디스크 캐시 없음, `resolve_broker` docstring).
@@ -903,8 +912,9 @@ def extract_batch(images, capture_dt, on_screen=None, on_stage=None, engine=None
               "model": MODEL if mode == "vlm" else f"OCR+기하({os.environ.get('OCR_ENGINE', 'rapidocr')})",
               "captureDateTime": capture_dt.isoformat(),
               "captureSource": capture_src}
-    # 개발 캡처 저장 — 화면별 raw(모델 원문)를 함께 남겨 오류를 사후 분석한다.
-    save_capture_batch(images, {**result, "raws": raws})
+    # 개발 캡처 저장 — 화면별 raw(모델 원문)와 **업로드 파일명**을 함께 남겨 오류를 사후 분석한다.
+    # (names 저장이 없어서 08-10 폰 케이스에서 '파일명이 안 왔는지'를 사후 판별 못 했다.)
+    save_capture_batch(images, {**result, "raws": raws, "names": list(names or [])})
     return result
 
 
@@ -1018,6 +1028,9 @@ class H(BaseHTTPRequestHandler):
                 b = PAGE.encode()          # index.html이 없으면 기존 MVP 페이지로 폴백
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8"); self._cors()
+            # 앱은 자주 고쳐 배포한다 — 캐시된 구버전이 새 계약(names 동봉 등)을 빠뜨리면
+            # 서버 쪽 근거 축이 조용히 죽는다(실측 08-10 의심 사례) → 매 방문 재검증 강제.
+            self.send_header("Cache-Control", "no-cache")
             self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b)
         elif self.path.split("?")[0] == "/mvp":
             b = PAGE.encode(); self.send_response(200)

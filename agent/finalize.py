@@ -311,9 +311,34 @@ def fname_brand(fname):
     증거다 — 파일명은 사용자가 바꿀 수 있다. 그래서 화면 근거(정규명·상속·화면 브랜드)가 전부
     실패한 뒤에만 쓰고, 출처를 `filename`으로 표시해 사용자 확인 대상으로 남긴다."""
     s = re.sub(r"\.[A-Za-z0-9]+$", "", str(fname or ""))
-    s = re.sub(r"(?i)screen[-_ ]?shot|kakaotalk|\bimg\b|\bimage\b", " ", s)
-    s = re.sub(r"[\d_\-]+", " ", s).strip()
+    # 구분자(숫자·밑줄)를 먼저 공백으로 — 그래야 'IMG_1234'의 IMG에 단어 경계가 생겨
+    # 아래 제거식이 잡는다(예전엔 \bimg\b가 IMG_에 안 걸려 'IMG'가 브랜드로 샜다).
+    s = re.sub(r"[\d_\-]+", " ", s)
+    s = re.sub(r"(?i)screen[-_ ]?shot|kakaotalk|\bimg\b|\bimage\b|\bphoto\b|\bpxl\b|\bdsc\b",
+               " ", s).strip()
     return s if s and not RB.is_placeholder(s) else None
+
+
+def _fill_qty_from_geom(p):
+    """VLM이 비운 **수량**을 같은 화면의 기하 바인딩 행에서 되메꾼다 — 값(평가금액)이 정확히
+    일치하는 행이 유일한 수량을 줄 때만.
+
+    실측(08-10 폰 케이스): IRP·ISA 상세 폼에서 화면에 수량이 실재하는데 VLM이 전 행
+    qty=null → 수량 사다리가 종가 역산으로 '추정' 표시. 같은 요청에서 OCR은 이미 돌고
+    있고(broker 심판) 기하 바인딩은 결정적이므로, 이것은 추정이 아니라 화면 판독이다
+    (enrich가 qty_src=screen으로 기록). VLM이 채운 수량은 절대 덮지 않는다."""
+    if not p.get("geom"):
+        return
+    by_val = {}
+    for gr in parse_rows(p["geom"]):
+        gv, gq = _num(gr.get("value")), _num(gr.get("qty"))
+        if gv and gq is not None and str(gr.get("name") or "").strip() != SCREEN_TOTAL:
+            by_val.setdefault(gv, set()).add(gq)
+    for r in p["rows"]:
+        if r.get("qty") is None and r.get("value") is not None:
+            qs = by_val.get(r["value"]) or set()
+            if len(qs) == 1:                 # 값이 같은 행이 여럿인데 수량이 갈리면 귀속 불명 → 안 채움
+                r["qty"] = next(iter(qs))
 
 
 def finalize(screens, use_llm=True):
@@ -332,6 +357,7 @@ def finalize(screens, use_llm=True):
             r["pnl"] = _num(r.get("pnl"))
         parsed.append({"file": sc.get("file"), "rows": rows, "type": classify(rows),
                        "evidence": sc.get("evidence"),    # 화면 원문 텍스트(있으면 심판)
+                       "geom": sc.get("geom"),            # 같은 화면의 기하 바인딩 행(VLM 모드)
                        "fname": sc.get("fname")})         # 업로드 원본 파일명(있으면 최후 근거)
 
     # 1) 요약화면에서 totals + 계좌 목록(계좌 → 증권사·유형) 수집
@@ -401,6 +427,7 @@ def finalize(screens, use_llm=True):
     for p in parsed:
         if p["type"] != "detail":
             continue
+        _fill_qty_from_geom(p)               # VLM이 비운 수량을 같은 화면의 기하 판독으로 되메꿈
         # 예약행(SCREEN_TOTAL)은 broker가 비어 있다 → 라벨·화면텍스트에서 제외한다.
         # 안 빼면 그 행이 첫 행일 때 label이 빈 문자열이 되어 broker 해석이 통째로 실패한다
         # (측정 20260731 실캡처: 메리츠증권 15/15 → None 15/15로 회귀).
@@ -498,7 +525,8 @@ def finalize(screens, use_llm=True):
         grp = _drop_total_rows(grp)          # 화면 제목·탭·소계가 종목처럼 섞여 나오는 것 제거
         holdings.extend(grp)
         groups.append({"file": p["file"], "sum": sum(x["value"] or 0 for x in grp),
-                       "n": len(grp), "rows": grp, "screen_total": screen_total})
+                       "n": len(grp), "rows": grp, "screen_total": screen_total,
+                       "fname": p.get("fname")})
 
     # 상세화면이 없는 '현금 계좌'(CMA 등)는 잔고 자체가 보유자산이다 — 요약에만 있다고 누락시키면
     # 총자산이 어긋난다. 단 현금 계좌라고 라벨이 말할 때만(구성을 모르는 계좌를 현금으로 단정하지 않는다).
@@ -542,6 +570,38 @@ def finalize(screens, use_llm=True):
                     h["broker"] = b
             break
 
+    # 파일명 앱 토큰 **교차 전파** — 같은 앱이 찍은 화면은 같은 증권사다. 브랜드조차 화면에
+    # 없는 캡처(mPOP ISA 상세: 계좌번호뿐)도, 파일명 토큰이 같은 형제 화면이 정규명으로
+    # 풀렸으면('현금성자산(삼성증권)' 등) 그 정규명을 받는다(실측 08-10 폰 케이스: ISA 미상).
+    # 파일명은 사용자가 바꿀 수 있는 약한 증거 → 출처는 filename으로 남겨 확인 대상 유지.
+    # 토큰 하나가 여러 증권사로 풀리면 전파하지 않는다(오염 방지).
+    tokmap = {}             # 파일명 앱 토큰 → 확인된 정규 증권사명(1순위) / 화면 브랜드(2순위)
+    brandmap = {}
+    for g in groups:
+        ft = fname_brand(g.get("fname"))
+        if not ft:
+            continue
+        for h in g["rows"]:
+            if h.get("broker_src") in ("screen", "research", "inherited") \
+                    and RB.canonical_in(str(h.get("broker") or "")):
+                tokmap.setdefault(ft, set()).add(h["broker"])
+            elif h.get("broker_src") == "brand":     # 정규명은 아니지만 화면에 실재하는 브랜드
+                brandmap.setdefault(ft, set()).add(h["broker"])
+    for g in groups:
+        ft = fname_brand(g.get("fname"))
+        # 정규명이 유일하면 그것을, 없으면 브랜드가 유일할 때 그 라벨을 전파 — 같은 앱의
+        # 화면들이 한 그룹으로 묶여 확인(정규명 승격)도 한 번이면 된다.
+        cands = tokmap.get(ft) or set()
+        if len(cands) != 1:
+            cands = brandmap.get(ft) or set() if not cands else set()
+        if len(cands) != 1:
+            continue
+        b = next(iter(cands))
+        for h in g["rows"]:
+            # 근거가 전무한 행, 또는 파일명 토큰을 라벨로 임시 채운 행만 승격.
+            if not h.get("broker") or h.get("broker_src") == "filename":
+                h["broker"], h["broker_src"] = b, "filename"
+
     repairs = _repair_digit_slips(groups, product_totals, account_totals)
     for g in groups:                     # 보정 후 합계 갱신(게이트가 보정된 값을 보게)
         g["sum"] = sum(x["value"] or 0 for x in g["rows"])
@@ -563,7 +623,8 @@ def finalize(screens, use_llm=True):
     branded = sorted({(h.get("_file") or "?", h["broker"], h["broker_src"]) for h in holdings
                       if h.get("broker_src") in ("brand", "filename")})
     unknown += [f"{f}: 증권사 정규명 미확인 — "
-                + (f"화면 브랜드 '{b}'를 그대로 씀" if src == "brand"
+                + (f"화면 브랜드 '{b}'를 그대로 씀" if src == "brand" else
+                   f"같은 앱(파일명)의 다른 화면에서 확인된 '{b}'로 추정" if RB.canonical_in(b)
                    else f"파일명의 앱 이름 '{b}'를 그대로 씀")
                 + "(계좌요약 화면을 함께 올리면 정규명으로 합쳐진다)"
                 for f, b, src in branded]
@@ -622,9 +683,14 @@ def _merge_across_screens(holdings, checks):
             k = ("anon", (h.get("accountType"), name))
             i = idx_of.get(k)
             if i is not None and out[i].get("_file") != h.get("_file"):
-                same = all(out[i].get(f) == h.get(f) for f in ("value", "qty", "cost", "pnl"))
+                # 한쪽이 비운 칸(None)은 모순이 아니다 — 같은 화면 재캡처에서 VLM이 손익을
+                # 한 번은 0, 한 번은 null로 내는 요동(실측 G9 현금잔고)이 복제를 남겼다.
+                same = all(out[i].get(f) is None or h.get(f) is None or out[i].get(f) == h.get(f)
+                           for f in ("value", "qty", "cost", "pnl")) \
+                    and out[i].get("value") == h.get("value")
                 if same:
-                    continue                 # 완전 동일 복제 — 버린다(보완할 것도 없다)
+                    fill(out[i], h)          # 동일 복제 — 빈 칸만 보완하고 버린다
+                    continue
                 warns.append(f"{out[i].get('_file')}·{h.get('_file')}: '{h.get('name')}' 중복 의심 — "
                              f"증권사 미상·같은 유형인데 값이 다름 — 둘 다 남김(확인 필요)")
         if prev_i is None:
