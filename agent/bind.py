@@ -30,13 +30,18 @@ H_COST = ("매수금액", "매입금액", "매입원금", "취득금액")
 H_PNL = ("평가손익", "손익", "평가손실")
 H_RATE = ("수익률", "손익률", "등락률")
 H_QTY = ("수량", "보유수량", "잔고수량")
-H_PRICE = ("현재가", "평균단가", "매입단가", "단가")
+# 매수 단가 열 — 현재가와 **다른 의미**다(주당 취득가). mPOP 종합잔고의 수량 모드는
+# '매수단가/현재가'를 한 밴드에 쌓는데, 둘 다 price로 매핑하면 덮어쓰기 순서 운에 걸리고
+# 매수 정보가 유실된다. 수량이 있으면 화면 자신의 산식이 성립한다:
+# cost = 수량×매수단가, value = 수량×현재가(평가금액 열이 없는 모드의 표시 값과 원단위 일치).
+H_COST_UNIT = ("매수단가", "평균단가", "매입단가", "평단")
+H_PRICE = ("현재가", "단가")
 # 분류 열 — **금액이 아니라 범주**가 들어가는 칸(값이 비거나 '매도가능' 같은 글자다).
 # 열로 잡으면 행 앵커가 망가진다: `잔고구분`이 `잔고`(H_VALUE)에 걸려 value 열이 되면
 # 밴드 깊이가 2가 되고, 한 행에 숫자가 하나뿐이라 **다음 행의 수량이 이 행의 평가금액으로**
 # 들어간다(실측 2026-08-06 mPOP 퇴직연금 화면: qty=3,146,613 / value=30).
 H_CATEGORY = ("구분", "유형", "상태")
-HEADER_VOCAB = H_NAME + H_VALUE + H_COST + H_PNL + H_RATE + H_QTY + H_PRICE
+HEADER_VOCAB = H_NAME + H_VALUE + H_COST + H_PNL + H_RATE + H_QTY + H_COST_UNIT + H_PRICE
 
 # 시장지수 표시줄 — 보유종목이 아니다(프롬프트 규칙 2).
 INDEX_TOKENS = ("코스피", "KOSPI", "코스닥", "KOSDAQ", "애프터마켓", "장마감", "장중", "다우",
@@ -54,7 +59,10 @@ ASSET_RULES = ((("나스닥", "S&P", "성장", "테크", "AI", "반도체", "휴
 
 NUM_RE = re.compile(r"^[+\-]?[\d,]+(?:\.\d+)?$")
 PCT_RE = re.compile(r"[+\-]?[\d,.]+\s*%")
-QTY_RE = re.compile(r"^([\d,]+)\s*주$")
+# 소수 수량 허용 — 소수점 매매 앱(토스 '0.056979주', 카카오페이 '0.08주')은 수량이 정수가
+# 아니다. 정수 전용이면 그 텍스트가 이름에 붙고, `\d\.\d{2}` 규칙('자기 값을 단 라벨')에
+# 걸려 **행이 통째로 사라진다**(실측 08-10: 카카오페이 4행 전수 누락).
+QTY_RE = re.compile(r"^([\d,]+(?:\.\d+)?)\s*주$")
 # 외화 예수금 — 프롬프트 규칙 (8): qty=외화 금액, value=원화 환산액.
 # '6,923.28 USD'는 숫자도 'N주'도 아니라 그냥 무시됐다(측정 160229: qty 유실).
 FX_QTY_RE = re.compile(r"^([\d,]+(?:\.\d+)?)\s*(USD|JPY|EUR|CNY|HKD)$")
@@ -94,12 +102,21 @@ def _amount_of(t):
 
     화면은 금액과 수익률을 **한 박스에** 담는다 — '-2,054,000원 |-13.54%', '0원(0%)',
     '-212,500원(-17.2%)'. '%'가 있다고 버리면 손익이 통째로 사라지고(→ cost 계산 불가)
-    회계 항등식이 깨진다. 구분자에서 잘라 앞의 금액만 취한다."""
+    회계 항등식이 깨진다. 구분자에서 잘라 앞의 금액만 취한다.
+
+    **수익률-우선 표기**('+33.28%(74,920원)' — 카카오페이·토스)는 금액이 괄호 안이다.
+    앞 조각이 %면 버리지 말고 뒤 조각에서 금액을 찾는다(부호는 앞 조각 것 — 괄호 안은
+    부호가 벗겨져 있다: '-16.71%(2,737원)'의 손익은 -2,737)."""
     s = re.sub(r"[원\s]", "", str(t))
-    s = re.split(r"[|(]", s)[0].rstrip("|")
-    if "%" in s or not s:
-        return None
-    return s if NUM_RE.match(s) else None
+    segs = [x.rstrip(")|") for x in re.split(r"[|(]", s)]
+    if segs and "%" not in segs[0] and NUM_RE.match(segs[0]):
+        return segs[0]
+    if segs and "%" in segs[0]:
+        sign = "-" if segs[0].startswith("-") else ""
+        for seg in segs[1:]:
+            if seg and "%" not in seg and NUM_RE.match(seg):
+                return sign + seg.lstrip("+-")
+    return None
 
 
 def _is_amount(t):
@@ -225,9 +242,24 @@ def group_lines(boxes, tol=0.6):
 
 
 # ── 3) 헤더 → 열 정의 ────────────────────────────────────────────────────────
+_HDR_EXACT = tuple(v.replace(" ", "") for v in HEADER_VOCAB)
+
+
+def _hdr_hit(text):
+    """이 박스가 **컬럼 헤더인가** — 괄호·공백을 벗긴 뒤 헤더 어휘와 **완전일치**해야 한다.
+
+    부분일치는 못 쓴다: 정렬·표시 토글 줄('평가금액 순'·'평가금'·'현재가' 버튼 —
+    카카오페이·토스)이 '평가'·'현재가'에 걸려 가짜 헤더가 되고, 그러면 유일한 금액 열이
+    맨오른쪽 밴드('현재가')에 붙어 **평가금액이 전부 price 칸으로** 가고 value가 비어
+    finalize가 전 행을 버린다(실측 08-10: 카카오페이 5행 → 1행, 토스 1행 → 0행).
+    진짜 헤더는 열 이름 그 자체다('종목명'·'평가금액'·'수익률(%)' — 괄호 주석까지만)."""
+    bare = re.sub(r"\(.*?\)", "", str(text)).replace(" ", "").strip()
+    return bare in _HDR_EXACT
+
+
 def find_header(lines):
-    """헤더 어휘를 2개 이상 담은 첫 줄 묶음. 헤더 자체가 세로로 쌓여 있어(평가금액 위 / 매수금액
-    아래) 인접 2줄까지 합쳐 본다. 반환: 헤더 박스 리스트 또는 None."""
+    """헤더 어휘와 완전일치하는 박스를 2개 이상 담은 첫 줄 묶음. 헤더 자체가 세로로 쌓여
+    있어(평가금액 위 / 매수금액 아래) 인접 2줄까지 합쳐 본다. 반환: 헤더 박스 리스트 또는 None."""
     # 하단 내비바가 헤더로 오인된다 — '잔고'(H_VALUE)·'현재가'(H_PRICE)가 메뉴 이름이라
     # 어휘만 보면 2히트가 난다(측정 160139: ['메뉴','HOME','국내','잔고','현재가',…]).
     # 구조로 배제한다: **진짜 헤더는 아래에 금액이 있다.** 내비바 밑에는 아무것도 없다.
@@ -237,12 +269,12 @@ def find_header(lines):
         below_amounts[i] = n_amt
         n_amt += sum(1 for b in lines[i] if _is_amount(b["text"]))
     for i, ln in enumerate(lines):
-        hits = [b for b in ln if any(v in b["text"] for v in HEADER_VOCAB)]
+        hits = [b for b in ln if _hdr_hit(b["text"])]
         if len(hits) >= 2 and below_amounts[i] >= 2:
             merged = list(ln)
             if i + 1 < len(lines):                     # 스택된 헤더 2번째 줄 흡수
                 nxt = lines[i + 1]
-                if any(any(v in b["text"] for v in HEADER_VOCAB) for b in nxt) and \
+                if any(_hdr_hit(b["text"]) for b in nxt) and \
                         not any(_is_amount(b["text"]) for b in nxt):
                     merged += nxt
             return merged
@@ -255,7 +287,8 @@ def _kind_of(text):
     if any(k in t for k in H_CATEGORY):      # 분류 열은 어떤 의미 열도 아니다 → 밴드를 만들지 않는다
         return None
     for keys, kind in ((H_PNL, "pnl"), (H_RATE, "rate"), (H_COST, "cost"), (H_VALUE, "value"),
-                       (H_QTY, "qty"), (H_PRICE, "price"), (H_NAME, "name")):
+                       (H_QTY, "qty"), (H_COST_UNIT, "cost_unit"), (H_PRICE, "price"),
+                       (H_NAME, "name")):
         if any(k in t for k in keys):
             return kind
     return None
@@ -409,7 +442,20 @@ def rows_from_list(lines, m):
               and b["x"] < m["x0"] + m["span"] * 0.5
               and not QTY_RE.match(b["text"].strip())
               and not re.search(r"\d,\d{3}|\d\.\d{2}", b["text"])
-              and not re.search(r"[›»⌄˅>]\s*$", b["text"].strip())]
+              and not re.search(r"[›»⌄˅>]\s*$", b["text"].strip())
+              # 접기/펼치기류는 어포던스 기호가 OCR에서 떨어져 나가면 맨글자로 남는다 —
+              # 라벨이 되면 예수금 화면의 시점 행 값을 훔쳐 '접기'라는 자산이 생긴다(실측 08-10).
+              and b["text"].strip() not in ("접기", "펼치기", "더보기", "더 보기")]
+    # 한 시각적 줄의 라벨은 하나다 — 종목 로고의 글자 조각('S&P'·'500' 원형 배지, 토스)이
+    # 이름 왼쪽에 따로 박스로 잡히면 최근접 분할에서 수량·손익을 훔친다(실측 08-10: SPY의
+    # 수량이 'S&P'에 붙어 유실). 같은 줄에서는 **가장 넓은 박스**(그 줄의 지배적 텍스트)만
+    # 라벨로 남긴다. 줄 묶음은 group_lines 결과를 그대로 쓴다(단일 출처).
+    keep = set()
+    for ln in lines:
+        cand = [b for b in ln if any(b is l for l in labels)]
+        if cand:
+            keep.add(id(max(cand, key=lambda b: b["w"])))
+    labels = [b for b in labels if id(b) in keep]
     # 한 화면에서 **똑같은 문구가 반복되면 UI 크롬**이다(계좌마다 붙는 '이체'·'거래내역'·'주식주문').
     # 행 이름은 화면에서 유일하다('한 자산 = 한 행' 불변식). 안 걸러내면 이 크롬이 최근접 분할에서
     # 금액을 훔쳐 가짜 행을 만들고, 화면 유형 판정까지 뒤집는다(측정: 160333이
@@ -480,6 +526,17 @@ def rows_from_list(lines, m):
         near = min(labels, key=lambda l: abs(_cy(l) - _cy(b)))
         return near if abs(_cy(near) - _cy(b)) <= limit else None
 
+    def _nearest_label_left(b):
+        """수량·외화 조각의 짝 — 이 조각들은 이름의 **아랫줄, 같은 왼쪽 정렬**에 온다
+        ('존슨앤드존슨' 밑 '0.08주'가 x까지 같다). cy만 보면 세로로 더 가까운 다른 라벨
+        (로고 조각·이웃 행)이 훔친다 → 왼쪽 끝이 정렬된(글자높이 2배 이내) 라벨을 먼저 찾고,
+        없으면 cy 최근접으로 물러난다. 금액 짝짓기는 cy만 쓴다(금액은 오른쪽 정렬이라 x가
+        원래 다르다)."""
+        aligned = [l for l in labels if abs(l["x"] - b["x"]) <= med_h * 2]
+        pool = aligned or labels
+        near = min(pool, key=lambda l: abs(_cy(l) - _cy(b)))
+        return near if abs(_cy(near) - _cy(b)) <= limit else None
+
     buckets = {}
     for a in amounts:
         near = _nearest_label(a)
@@ -487,7 +544,7 @@ def rows_from_list(lines, m):
             buckets.setdefault(id(near), (near, []))[1].append(a)
     qty_by_label = {}
     for q in qtys:
-        nq = _nearest_label(q)
+        nq = _nearest_label_left(q)
         if nq is not None:
             qty_by_label.setdefault(id(nq), q)
     fx_by_label = {}
@@ -495,7 +552,7 @@ def rows_from_list(lines, m):
         m = FX_QTY_RE.match(b["text"].strip())
         if not m or float(m.group(1).replace(",", "")) == 0:   # 잔액 0 행은 제외(규칙 8)
             continue
-        nb = _nearest_label(b)
+        nb = _nearest_label_left(b)
         if nb is not None:
             fx_by_label.setdefault(id(nb), m)
     # 외화 행의 원화 환산액은 라벨의 **아랫줄**(환율 줄)에 온다 — 최근접 분할이 그 금액을
@@ -525,12 +582,23 @@ def rows_from_list(lines, m):
     rows = []
     for key, (near, amts) in sorted(buckets.items(), key=lambda kv: _cy(kv[1][0])):
         amts.sort(key=_cy)
-        row = {"name": near["text"].strip(), "value": amts[0]["text"]}
+        # **부호 규칙** — 평가금액·잔고는 부호가 없다. '+13,339원'·'+60원(0.1%)' 같은 부호
+        # 금액은 변화량(손익)이지 값이 아니다. 부호 금액이 value 자리에 앉으면 상단 지표
+        # 카드('총 수익'·'일간 수익')가 어휘 없이는 보유행으로 둔갑한다(실측 08-10 토스).
+        # value = 첫 무부호 금액(위=평가금액 규칙 유지), pnl = 첫 부호 금액(없으면 종전대로
+        # 두 번째 무부호). 무부호가 없으면 행이 아니다 — 값 없는 행은 finalize가 버린다.
+        unsigned = [a for a in amts if not re.match(r"^[+\-]", a["text"].strip())]
+        signed = [a for a in amts if re.match(r"^[+\-]", a["text"].strip())]
+        if not unsigned:
+            continue
+        row = {"name": near["text"].strip(), "value": unsigned[0]["text"]}
         sep = _sep_above(_cy(near))
         if sep:
             row["broker"] = sep          # 정규화는 resolve_broker가 한다(여기서 판정 안 함)
-        if len(amts) > 1:
-            row["pnl"] = amts[1]["text"]
+        if signed:
+            row["pnl"] = signed[0]["text"]
+        elif len(unsigned) > 1:
+            row["pnl"] = unsigned[1]["text"]
         if key in qty_by_label:
             row["qty"] = qty_by_label[key]["text"]
         if key in fx_by_label:
@@ -541,6 +609,10 @@ def rows_from_list(lines, m):
 
 
 FIELD_LABEL_EXTRA = ("출금가능", "총자산", "총 자산", "신용", "대출", "예상금액")
+# 상단 지표 카드의 라벨 — 종목이 아니라 화면 요약 수치의 이름이다(토스 '원금·총 수익·일간 수익',
+# 카카오페이 '총 투자금'). 부분일치는 위험해서('원금'이 '원금보장 채권'을 먹는다) **완전일치만**.
+FIELD_LABEL_EXACT = ("원금", "총수익", "총 수익", "일간수익", "일간 수익", "총투자금",
+                     "총 투자금", "내투자", "내 투자", "투자금")
 
 
 def _is_field_label(name):
@@ -554,7 +626,8 @@ def _is_field_label(name):
     # 그 행을 통째로 지웠다(그 결과 파리티에서 다른 현금행과 오매칭돼 값·재현율이 연쇄로 깨졌다).
     # 필드 라벨은 그 자체가 이름인 경우만 잡는다(괄호주석 제거 후 완전일치).
     bare = re.sub(r"\(.*?\)", "", n).strip()
-    if bare in HEADER_VOCAB:
+    if bare in HEADER_VOCAB or bare.replace(" ", "") in \
+            tuple(v.replace(" ", "") for v in FIELD_LABEL_EXACT):
         return True
     # UI 어포던스 기호가 붙은 이름은 종목이 아니라 **누를 수 있는 것**이다('접기›', '더보기>').
     # 종목명에는 이 기호가 안 붙는다 — 앱별 어휘를 늘리지 않고 형태로 가른다.
@@ -588,7 +661,8 @@ def _coherent(rows):
 
 # 상단 '총액 카드'의 라벨 어휘 — 화면 자신의 총액이 실리는 자리. H_VALUE와 분리한 이유:
 # H_VALUE는 컬럼 헤더 판정에도 쓰여서 '자산'을 넣으면 '자산현황' 같은 제목이 헤더로 오인된다.
-CARD_TOTAL_VOCAB = ("자산", "총자산", "총 자산", "평가금액", "평가액", "원화예수금", "외화예수금")
+CARD_TOTAL_VOCAB = ("자산", "총자산", "총 자산", "평가금액", "평가액", "원화예수금", "외화예수금",
+                    "보유주식", "내투자", "내 투자")
 
 
 def _card_total(lines, below_y=None):
@@ -602,10 +676,17 @@ def _card_total(lines, below_y=None):
     finalize._drop_deposit_echoes의 접기 근거(어느 시점이 자산인가)가 된다."""
     top = [ln for ln in lines
            if below_y is None or max(_cy(b) for b in ln) < below_y][:8]
+    vocab = tuple(v.replace(" ", "") for v in CARD_TOTAL_VOCAB)
+
+    def _is_card_label(t):
+        bare = re.sub(r"\(.*?\)", "", t).replace(" ", "").strip()
+        # 세 글자 이상 어휘는 접두 일치 허용 — 카드 라벨엔 계좌 한정어가 붙는다
+        # ('보유주식 종합계좌', '내 투자?'). 두 글자 어휘('자산')는 완전일치만
+        # ('자산현황' 같은 섹션 제목을 총액 카드로 오인하지 않게).
+        return bare in vocab or any(len(v) >= 3 and bare.startswith(v) for v in vocab)
+
     for i, ln in enumerate(top):
-        lab = next((b for b in ln
-                    if re.sub(r"\(.*?\)", "", b["text"]).replace(" ", "").strip()
-                    in tuple(v.replace(" ", "") for v in CARD_TOTAL_VOCAB)), None)
+        lab = next((b for b in ln if _is_card_label(b["text"])), None)
         if lab is None:
             continue
         amt = next((b for b in ln if b is not lab and _is_amount(b["text"])), None)
@@ -615,6 +696,29 @@ def _card_total(lines, below_y=None):
         if amt is not None:
             v = _clean_num(amt["text"])
             if v:
+                return v
+    return None
+
+
+def _sum_match_total(lines, below_y, out_rows, m):
+    """어휘 없는 카드 총액 — 상단 영역의 금액 중 **보유행 합과 2% 이내로 일치**하는 것.
+
+    라벨 어휘(`CARD_TOTAL_VOCAB`)는 아는 앱까지만 간다. 총액의 정체는 라벨이 아니라
+    **수치 자신**이 증명한다: Σ행과 일치하는 상단 금액은 우연이 아니면 총액이다(자기검증).
+    어휘 매치가 우선이다 — 어휘 총액은 행 누락(스크롤에 잘린 화면)도 검출하지만, sum-match는
+    이미 맞는 화면에서만 성립하므로 검출력이 없다. 행 2개 미만이면 하지 않는다(행 하나의
+    화면은 그 행 값 자신과 '일치'하는 동어반복이 된다)."""
+    name_i, val_i = F.COMPACT_COLUMNS.index("name"), F.COMPACT_COLUMNS.index("value")
+    vals = [r[val_i] for r in out_rows if r[name_i] != F.SCREEN_TOTAL and r[val_i]]
+    s = sum(vals)
+    if len(vals) < 2 or s <= 0:
+        return None
+    top = [ln for ln in lines
+           if below_y is None or max(_cy(b) for b in ln) < below_y][:8]
+    for ln in top:
+        for b in ln:
+            v = _clean_num(b["text"]) if _is_amount(b["text"]) else None
+            if v and abs(v - s) / s <= 0.02:
                 return v
     return None
 
@@ -707,12 +811,24 @@ def bind(boxes):
             "pnl": _clean_num(r.get("pnl")) if r.get("pnl") else None,
             "confidence": 0.95,
         }
+        # 단가 모드 화면(mPOP '보유수량|매수단가/현재가' — 평가금액 열 없음)은 화면 자신의
+        # 산식으로 값을 완성한다: 화면이 다른 모드에서 보여주는 바로 그 수치다(실측 08-10
+        # ISA: 2×94,000=188,000, 2×138,900=277,800 — 값-모드 캡처와 원단위 일치). 값 열이
+        # 있는 화면은 건드리지 않는다. 값 없이 내보내면 finalize가 행을 버려, 수량 모드로만
+        # 찍은 계좌가 전수 누락된다.
+        cu = _clean_num(r.get("cost_unit")) if r.get("cost_unit") else None
+        if qty is not None and cu is not None and row["cost"] is None:
+            row["cost"] = round(qty * cu, 2)
+        if qty and row["price"] is not None and row["value"] is None:
+            row["value"] = round(qty * row["price"], 2)
         out.append([row[c] for c in F.COMPACT_COLUMNS])
     # 화면 자신의 총액이 행 경로에서 안 나왔으면 상단 카드에서 줍는다(mPOP 종합잔고의 '자산',
     # 예수금 탭의 '원화 예수금 (D+2)'). 이미 있으면 그대로 — 진실의 출처는 하나면 된다.
     name_i = F.COMPACT_COLUMNS.index("name")
     if not any(r[name_i] == F.SCREEN_TOTAL for r in out):
         tot = _card_total(lines, hdr_y)
+        if tot is None:
+            tot = _sum_match_total(lines, hdr_y, out, m)
         if tot:
             tr = dict.fromkeys(F.COMPACT_COLUMNS)
             tr["name"], tr["value"], tr["confidence"] = F.SCREEN_TOTAL, tot, 0.95

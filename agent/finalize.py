@@ -319,26 +319,68 @@ def fname_brand(fname):
     return s if s and not RB.is_placeholder(s) else None
 
 
-def _fill_qty_from_geom(p):
-    """VLM이 비운 **수량**을 같은 화면의 기하 바인딩 행에서 되메꾼다 — 값(평가금액)이 정확히
-    일치하는 행이 유일한 수량을 줄 때만.
+def _fill_from_geom(p):
+    """VLM이 비운 칸(수량·값·원가·단가)을 같은 화면의 기하 바인딩 행에서 되메꾼다.
 
     실측(08-10 폰 케이스): IRP·ISA 상세 폼에서 화면에 수량이 실재하는데 VLM이 전 행
-    qty=null → 수량 사다리가 종가 역산으로 '추정' 표시. 같은 요청에서 OCR은 이미 돌고
-    있고(broker 심판) 기하 바인딩은 결정적이므로, 이것은 추정이 아니라 화면 판독이다
-    (enrich가 qty_src=screen으로 기록). VLM이 채운 수량은 절대 덮지 않는다."""
+    qty=null → 수량 사다리가 종가 역산으로 '추정' 표시. 단가 모드 화면(평가금액 열 없음)은
+    반대로 VLM이 값을 못 내 행이 통째로 버려졌다. 같은 요청에서 OCR은 이미 돌고 있고
+    (broker 심판) 기하 바인딩은 결정적이므로, 이것은 추정이 아니라 화면 판독이다
+    (enrich가 qty_src=screen으로 기록). VLM이 채운 칸은 절대 덮지 않는다.
+
+    행 귀속(둘 다 유일 매치일 때만): ① 값(평가금액) 정확 일치 ② 정규화 이름 일치 +
+    수량 비모순(한쪽이 비었거나 같음) — 단가 모드처럼 VLM에 값이 없을 때의 열쇠."""
     if not p.get("geom"):
         return
-    by_val = {}
-    for gr in parse_rows(p["geom"]):
-        gv, gq = _num(gr.get("value")), _num(gr.get("qty"))
-        if gv and gq is not None and str(gr.get("name") or "").strip() != SCREEN_TOTAL:
-            by_val.setdefault(gv, set()).add(gq)
+    all_geo = parse_rows(p["geom"])
+    geo = [gr for gr in all_geo if str(gr.get("name") or "").strip() != SCREEN_TOTAL]
+    gtot = next((_num(gr.get("value")) for gr in all_geo
+                 if str(gr.get("name") or "").strip() == SCREEN_TOTAL), None)
+    for gr in geo:
+        for f in ("value", "qty", "cost", "price", "pnl"):
+            gr[f] = _num(gr.get(f))
+    # **총액 심판** — 화면 자신의 총액이 기하를 인증하고 VLM을 반증하면, 이 화면의 값 축은
+    # 기하가 맞다. 실측(08-10 단가모드 ISA): VLM이 매수단가를 value로, 현재가를 cost로
+    # 오배정(합 181,985 vs 총액 1,020,352 — 82% 오차), 기하는 화면 산식으로 0.7% 일치.
+    # 판정은 어휘가 아니라 수치가 한다. USD 네이티브 화면(외화예수금)은 제외 — VLM은 설계상
+    # 외화 금액을 네이티브로 내므로 원화 총액과 어긋나는 게 정상이다(이중환산 방지).
+    rows_v = [r for r in p["rows"] if str(r.get("name") or "").strip() != SCREEN_TOTAL]
+    vsum = sum(_num(r.get("value")) or 0 for r in rows_v)
+    gsum = sum(gr["value"] or 0 for gr in geo)
+    krw_only = all(str(r.get("currency") or "KRW") == "KRW" for r in rows_v)
+    if gtot and geo and krw_only and abs(gsum - gtot) / gtot <= 0.02 \
+            and (not vsum or abs(vsum - gtot) / gtot > 0.10):
+        nn_geo = {}
+        for gr in geo:
+            nn_geo.setdefault(_norm_ev(gr.get("name")), []).append(gr)
+        for r in rows_v:
+            cands = nn_geo.get(_norm_ev(r.get("name")))
+            if cands and len(cands) == 1:    # 이름 유일 매치 행만 — 못 맞춘 행은 VLM 값 유지
+                for f in ("qty", "value", "cost", "price", "pnl"):
+                    r[f] = cands[0].get(f)
+    by_val, by_name = {}, {}
+    for gr in geo:
+        if gr["value"]:
+            by_val.setdefault(gr["value"], []).append(gr)
+        nn = _norm_ev(gr.get("name"))
+        if nn:
+            by_name.setdefault(nn, []).append(gr)
     for r in p["rows"]:
-        if r.get("qty") is None and r.get("value") is not None:
-            qs = by_val.get(r["value"]) or set()
-            if len(qs) == 1:                 # 값이 같은 행이 여럿인데 수량이 갈리면 귀속 불명 → 안 채움
-                r["qty"] = next(iter(qs))
+        g = None
+        cands = by_val.get(_num(r.get("value"))) if r.get("value") is not None else None
+        if cands and len(cands) == 1:
+            g = cands[0]
+        else:
+            cands = by_name.get(_norm_ev(r.get("name")))
+            if cands and len(cands) == 1:
+                rq, gq = _num(r.get("qty")), cands[0].get("qty")
+                if rq is None or gq is None or rq == gq:   # 수량이 모순이면 다른 행이다
+                    g = cands[0]
+        if g is None:
+            continue
+        for f in ("qty", "value", "cost", "price", "pnl"):
+            if r.get(f) is None and g.get(f) is not None:
+                r[f] = g[f]
 
 
 def finalize(screens, use_llm=True):
@@ -427,7 +469,7 @@ def finalize(screens, use_llm=True):
     for p in parsed:
         if p["type"] != "detail":
             continue
-        _fill_qty_from_geom(p)               # VLM이 비운 수량을 같은 화면의 기하 판독으로 되메꿈
+        _fill_from_geom(p)                   # VLM이 비운 칸을 같은 화면의 기하 판독으로 되메꿈
         # 예약행(SCREEN_TOTAL)은 broker가 비어 있다 → 라벨·화면텍스트에서 제외한다.
         # 안 빼면 그 행이 첫 행일 때 label이 빈 문자열이 되어 broker 해석이 통째로 실패한다
         # (측정 20260731 실캡처: 메리츠증권 15/15 → None 15/15로 회귀).
