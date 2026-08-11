@@ -1496,14 +1496,30 @@
     /* 반영/취소 — 표가 37행이어도 손에 닿게 카드 바닥에 붙인다. sticky 는 flow 안에 그대로 있어
        높이가 변하지 않는다 — 스크롤로 '접는' 것과 다르다(그건 점프를 만든다). */
     .pf-review-bar{position:sticky;bottom:0;z-index:7;background:var(--bg-surface,#fff);border-top:1px solid var(--border-default,#dfdfe8);border-radius:0 0 8px 8px;}
+    /* 소개·프라이버시 — 스크롤 최상단. 첫 화면에서 '무엇을 해 주는 앱인가'와 '내 사진은 어디로 가나'
+       두 가지만 답한다. 프라이버시 문구는 톤이 아니라 **사실**이 갈려서 갈린다(privacyNote 참고). */
+    .pf-intro{font-size:12.5px;line-height:1.5;color:var(--text-secondary,#6e6e6e);}
+    .pf-priv{display:flex;align-items:center;gap:6px;border:none;background:transparent;padding:0;font-size:11.5px;font-weight:600;cursor:pointer;text-align:left;line-height:1.4;}
+    .pf-priv-body{margin-top:5px;display:flex;flex-direction:column;gap:3px;font-size:11.5px;line-height:1.5;color:var(--text-tertiary,#999);}
     /* ── STEP 섹션 뼈대(카드·라벨·제목·설명이 5개 섹션에 반복) ── */
     /* overflow:visible — sticky 섹션 제목이 카드 안에 갇히지 않고 페이지 기준으로 고정되게 */
     .pf-card{background:var(--bg-surface,#fff);border:1px solid var(--border-default,#dfdfe8);border-radius:10px;overflow:visible;}
     .pf-step{font-size:11px;font-weight:700;letter-spacing:1px;color:var(--text-tertiary,#999);}
     .pf-step-title{font-size:15px;font-weight:700;}
     .pf-step-desc{font-size:12px;color:var(--text-secondary,#6e6e6e);}
+    /* 단계 설명은 두 줄이다 — 이 단계가 **해 주는 것**(회색)과 사용자가 **하실 일**(진하게).
+       둘을 한 줄에 이어 붙이면 어디까지가 설명이고 어디부터가 내 차례인지 안 보인다. */
+    .pf-todo{display:flex;align-items:baseline;gap:7px;font-size:12px;line-height:1.5;color:var(--text-primary,#000);}
+    .pf-todo-lbl{flex:none;font-size:10px;font-weight:700;letter-spacing:0.3px;color:var(--ig-blue-deep,#004c8b);background:#eaf4ff;border:1px solid #cfe6ff;border-radius:4px;padding:1px 6px;}
+    /* 빈 단계 자리 — 데이터가 없으면 설명 두 줄이 곧 그 섹션의 전부다. 빈 표·0짜리 도넛을 그리지 않는다
+       (실측: 그것들이 모바일에서 2100px 를 먹고 있었다). */
+    .pf-empty-pad{padding-bottom:14px;}
     /* 좁은 화면: 표 폭이 곧 정보량이라 바깥 여백(페이지 → 섹션 → 표 인셋)을 모두 최소로 접고
        종목명 최소폭도 줄인다. 카드 바깥 6px 은 카드 경계가 보이게 남기는 최소치. */
+    /* 상태줄이 버튼들과 한 줄에 못 서면 **통째로 다음 줄**로 간다. flex-basis 없이 flex:1 만 주면
+       wrap 하지 않고 짓눌린다 — 390px 실측에서 폭 42px·높이 180px 짜리 기둥이 됐다(버튼 3개가 316px).
+       인라인이 아니라 클래스여야 한다: 인라인 style 은 어떤 선택자도 못 이긴다. */
+    .pf-trackline{flex:1 1 240px;min-width:0;display:flex;flex-direction:column;gap:2px;}
     @media (max-width:640px){
       .pf-analysis{grid-template-columns:1fr;}
       :root{--pf-page-pad:6px;--pf-sec-pad:8px;}
@@ -1511,6 +1527,7 @@
       .pf-hold-row{--pf-name-w:104px;}
       .pf-header-inner{padding:10px 12px;gap:10px;}
       .pf-legend{flex-direction:column;align-items:flex-start;gap:6px;}
+      .pf-main{gap:10px;}
     }
   </style>
 </helmet>
@@ -1541,8 +1558,8 @@
           </div>
         </sc-if>
       </div>
-      <!-- 개발 도구 — 실사용 동선에 섞이면 안 되는 것들만 여기 모은다(예시 데이터·데모 스트림·추출 경로
-           ·초기화). 본문에 두면 실사용 버튼과 무게가 같아 보여, 무엇을 눌러야 할지가 흐려진다. -->
+      <!-- 개발 도구 — 실사용 동선에 섞이면 안 되는 것만 남긴다(추출 경로·초기화). 예시 둘러보기는
+           여기서 뺐다: 첫 방문자가 "써 보고 싶다"가 되는 자리는 STEP1 이지 설정 팝오버가 아니다. -->
       <div style="position:relative;flex:none;">
         <button class="pf-chip pf-tap" onclick="{{ onDevToggle }}" title="개발 도구" style="width:29px;height:29px;justify-content:center;padding:0;font-size:13px;">⚙</button>
         <sc-if value="{{ devOpen }}" hint-placeholder-val="{{ false }}">
@@ -1558,9 +1575,7 @@
                 </div>
               </div>
             </sc-if>
-            <button class="pf-dev-btn" disabled="{{ extracting }}" onclick="{{ onLoadDemo }}">예시 데이터로 둘러보기</button>
-            <button class="pf-dev-btn" disabled="{{ extracting }}" onclick="{{ onDemoStream }}" title="에이전트 없이 라이브 추출·게이트 자릿수 보정 흐름을 예시로 재생">▶ 라이브 추출·게이트 보정 예시</button>
-            <button class="pf-dev-btn" onclick="{{ onResetAll }}" title="이 브라우저에 저장된 값과 캐시를 지우고 처음 상태로 다시 시작" style="color:var(--ig-red-heart,#ed4956);border-color:#f3c2c7;">저장·캐시 초기화</button>
+            <button class="pf-dev-btn" onclick="{{ onResetAll }}" title="이 브라우저에 저장된 보유 데이터를 지우고 STEP 1부터 다시 시작" style="color:var(--ig-red-heart,#ed4956);border-color:#f3c2c7;">보유 데이터 초기화</button>
           </div>
         </sc-if>
       </div>
@@ -1568,14 +1583,28 @@
     </div>
   </header>
 
-  <main class="pf-main" style="max-width:1060px;margin:0 auto;padding:20px var(--pf-page-pad,20px) 60px;display:flex;flex-direction:column;gap:20px;">
+  <main class="pf-main" style="max-width:1060px;margin:0 auto;padding:14px var(--pf-page-pad,20px) 60px;display:flex;flex-direction:column;gap:14px;">
 
-    <!-- ── 0. 다음 할 일 ─────────────────────── -->
-    <!-- 상태가 무엇이든 **한 줄은 항상 있다**(문구만 갈린다) — 조건부로 없어지면 아래가 통째로 튄다.
-         문구의 단일 출처는 nextAction() 하나다: 여기 적힌 것과 화면이 어긋날 수 없게. -->
-    <div class="pf-next">
-      <span style="font-size:14px;flex:none;">{{ nextIcon }}</span>
-      <span style="min-width:0;">{{ nextText }}</span>
+    <!-- ── 0. 이게 무슨 앱인가 · 내 사진은 어디로 가나 · 다음 할 일 ─────────────────────── -->
+    <!-- 소개와 프라이버시는 처음 온 사람이 스크롤하기 전에 답을 얻어야 하는 두 가지다.
+         다음 할 일은 상태가 무엇이든 **한 줄이 항상 있다**(문구만 갈린다) — 조건부로 없어지면
+         아래가 통째로 튄다. 문구의 단일 출처는 nextAction()/privacyNote() 각각 하나다. -->
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <div style="display:flex;flex-direction:column;gap:7px;padding:12px 13px;border:1px solid var(--border-default,#dfdfe8);border-radius:8px;background:var(--bg-surface,#fff);">
+        <span class="pf-intro"><b style="color:var(--text-primary,#000);">증권사 앱 캡처 몇 장으로 흩어진 주식을 한 표에 모읍니다.</b> 최신 환율·주가로 확인·트래킹하고, 목표 배분에 맞춰 무엇을 사고팔면 좋을지 제안합니다.</span>
+        <div>
+          <button class="pf-priv" onclick="{{ onPriv }}" style="color:{{ privColor }};"><span>{{ privLine }}</span><span style="color:var(--text-tertiary,#999);font-weight:600;">{{ privCaret }} 자세히</span></button>
+          <sc-if value="{{ privOpen }}" hint-placeholder-val="{{ false }}">
+            <div class="pf-priv-body">
+              <sc-for list="{{ privDetail }}" as="p" hint-placeholder-count="3"><span>· {{ p.text }}</span></sc-for>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+      <div class="pf-next">
+        <span style="font-size:14px;flex:none;">{{ nextIcon }}</span>
+        <span style="min-width:0;">{{ nextText }}</span>
+      </div>
     </div>
 
     <!-- ── 1. Upload ─────────────────────────── -->
@@ -1584,33 +1613,21 @@
         <span class="pf-step">STEP 1</span>
         <span class="pf-step-title">스크린샷 업로드</span>
       </div>
-      <!-- 설명문은 고정 밴드 **밖**이다 — 안에 두면 좁은 화면에서 랩되며 밴드를 60px 로 부풀려
+      <!-- 설명 두 줄은 고정 밴드 **밖**이다 — 안에 두면 좁은 화면에서 랩되며 밴드를 60px 로 부풀려
            (실측: 포함 60 / 제외 37) 표를 덮는다. 한 번 읽는 안내이므로 그냥 같이 스크롤돼 사라진다.
            스크롤 상태로 숨기는 방식은 쓰지 않는다 — 그러면 이번엔 이 밴드가 튄다(헤더와 같은 병). -->
-      <div style="padding:8px var(--pf-sec-pad,18px) 0;">
-        <span class="pf-step-desc">스크린샷이 그 계좌의 현재 스냅샷 — 화면에 없는 종목은 자동 제거됩니다</span>
+      <div style="padding:8px var(--pf-sec-pad,18px) 0;display:flex;flex-direction:column;gap:5px;">
+        <span class="pf-step-desc">증권사 앱 캡처 화면을 종합해, 가진 종목을 한 번에 파악할 수 있게 데이터화합니다.</span>
+        <span class="pf-todo"><span class="pf-todo-lbl">하실 일</span><span>사용하는 증권사 앱의 보유 화면을 캡처해 한 번에 올리고, 추출 결과에 잘못 읽은 값이 없는지 확인합니다. <span style="color:var(--text-secondary,#6e6e6e);">(수량·평가금액(매수금액)이 보이는 화면이면 좋아요.)</span></span></span>
       </div>
       <div style="padding:14px var(--pf-sec-pad,18px) 18px;">
         <!-- 추출 중엔 이 영역이 입력을 받지 않는다(pointer-events:none) — 실제 차단은 extractFiles
-             진입부 한 줄이고(파일선택·드롭·프로그램 호출이 다 거기로 모인다), 여기는 어포던스다. -->
-        <label class="pf-drop" data-busy="{{ extracting }}" ondrop="{{ onDrop }}" ondragover="{{ onDragOver }}" style="display:flex;align-items:center;justify-content:center;gap:12px;border:1.5px dashed var(--border-strong,#c4c4c4);border-radius:8px;padding:26px 16px;cursor:pointer;background:var(--bg-app,#fafafa);" style-hover="border-color:var(--ig-blue,#1fa1ff);background:#f4faff;">
-          <input type="file" accept="image/*" multiple="" onchange="{{ onFiles }}" style="display:none;">
-          <sc-if value="{{ extracting }}" hint-placeholder-val="{{ false }}">
-            <span style="width:18px;height:18px;border:2px solid var(--ig-blue,#1fa1ff);border-top-color:transparent;border-radius:50%;animation:pfspin 0.8s linear infinite;flex:none;"></span>
-            <span style="display:flex;flex-direction:column;gap:2px;">
-              <span style="font-size:13px;font-weight:600;color:var(--ig-blue,#1fa1ff);">{{ extractStatus }}</span>
-              <span style="font-size:11.5px;color:var(--text-tertiary,#999);">끝나면 새 화면을 추가할 수 있어요</span>
-            </span>
-          </sc-if>
-          <sc-if value="{{ notExtracting }}" hint-placeholder-val="{{ true }}">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-tertiary,#999);"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><path d="M21 15l-5-5L5 21"></path></svg>
-            <span style="font-size:13px;color:var(--text-secondary,#6e6e6e);"><b style="color:var(--ig-blue-link,#3897f0);">클릭해서 선택</b>하거나 이미지를 끌어다 놓으세요 · 여러 장·여러 번 담고 <b style="color:var(--text-primary,#000);">분석</b>을 누르세요</span>
-          </sc-if>
-        </label>
-        <!-- 보조 진입 — 파일명이 살아 오는 경로. 위 드롭존은 accept="image/*" 라서 안드로이드가 항상
-             photo picker 를 띄우고, 그 URI 의 DISPLAY_NAME 은 원본 이름이 아니라 미디어 ID다
-             ('1000045629.jpg'). 여긴 문서 선택기로 보내 'Screenshot_20260810_155901_앱이름.jpg' 를
-             그대로 받는다 → 증권사 근거가 된다.
+             진입부 한 줄이고(파일선택·드롭·프로그램 호출이 다 거기로 모인다), 여기는 어포던스다.
+
+             진입은 **하나**다. 예전엔 '드롭존(전부 image)' + '📁 파일 앱에서 선택(image+pdf)' 둘이었는데,
+             탭하면 안드로이드가 어차피 앱 선택 화면을 띄우므로 같은 선택을 페이지가 한 번 더 물은 셈이었다.
+             남기는 쪽은 파일명이 살아 오는 accept 다 — 갤러리 photo picker 로 가면 DISPLAY_NAME 이 원본이
+             아니라 미디어 ID('1000045629.jpg')여서 증권사 근거가 사라진다.
 
              accept 를 왜 저렇게 쓰는지(Chromium SelectFileDialog 의 두 판정을 동시에 만족시켜야 한다):
                · shouldUsePhotoPicker() = 타입이 **전부** image/·video/ → photo picker(이름이 죽는다).
@@ -1619,11 +1636,35 @@
                  그런데 acceptsType 은 `mMimeTypes.isEmpty() → true` 라, accept 를 아예 비우면 셋 다
                  붙는다(실측: '음성 녹음' 항목 + 마이크 권한 팝업, 다중 선택도 막힘). 그래서 비우지 않는다.
              즉 '이미지 + 이미지 아닌 것 하나, 오디오·비디오는 없이'가 조건이다. 지우거나 image 만
-             남기지 말 것. (Chrome 이 규칙을 바꾸면 여기가 썩는다.) -->
-        <label class="pf-drop" data-busy="{{ extracting }}" style="display:flex;align-items:center;gap:6px;margin-top:8px;padding:2px 2px;cursor:pointer;font-size:12px;color:var(--text-tertiary,#999);" style-hover="color:var(--ig-blue,#1fa1ff);">
+             남기지 말 것. (Chrome 이 규칙을 바꾸면 여기가 썩는다.) pdf 를 실제로 고를 수 있게 되므로
+             비이미지는 enqueue 가 걸러 문구로 알린다 — 조용히 사라지면 안 된다. -->
+        <label class="pf-drop" data-busy="{{ extracting }}" ondrop="{{ onDrop }}" ondragover="{{ onDragOver }}" style="display:flex;align-items:center;justify-content:center;gap:12px;border:1.5px dashed var(--border-strong,#c4c4c4);border-radius:8px;padding:20px 14px;cursor:pointer;background:var(--bg-app,#fafafa);" style-hover="border-color:var(--ig-blue,#1fa1ff);background:#f4faff;">
           <input type="file" accept="image/*,application/pdf" multiple="" onchange="{{ onFiles }}" style="display:none;">
-          <span>📁 <b style="color:var(--text-secondary,#6e6e6e);font-weight:600;">파일 앱에서 선택</b> — 파일명 유지(증권사 자동 인식)</span>
+          <sc-if value="{{ extracting }}" hint-placeholder-val="{{ false }}">
+            <span style="width:18px;height:18px;border:2px solid var(--ig-blue,#1fa1ff);border-top-color:transparent;border-radius:50%;animation:pfspin 0.8s linear infinite;flex:none;"></span>
+            <span style="display:flex;flex-direction:column;gap:2px;">
+              <span style="font-size:13px;font-weight:600;color:var(--ig-blue,#1fa1ff);">{{ extractStatus }}</span>
+              <span style="font-size:11.5px;color:var(--text-tertiary,#999);">끝나면 새 화면을 추가할 수 있어요</span>
+            </span>
+          </sc-if>
+          <sc-if value="{{ notExtracting }}" hint-placeholder-val="{{ true }}">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-tertiary,#999);flex:none;"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><path d="M21 15l-5-5L5 21"></path></svg>
+            <span style="display:flex;flex-direction:column;gap:3px;min-width:0;">
+              <span style="font-size:13px;color:var(--text-secondary,#6e6e6e);"><b style="color:var(--ig-blue-link,#3897f0);">클릭해서 선택</b>하거나 이미지를 끌어다 놓으세요 · 여러 장·여러 번 담아 한 번에 분석합니다</span>
+              <span style="font-size:11px;color:var(--text-tertiary,#999);">파일 앱에서 고르면 파일명이 남아 증권사를 자동으로 인식합니다</span>
+            </span>
+          </sc-if>
         </label>
+
+        <!-- 예시로 먼저 — 올릴 화면이 아직 없는 사람에게 '이런 게 나옵니다'를 보여주는 자리다.
+             ▶ 쪽은 추출·게이트 보정이 흐르는 그대로라, 첫 방문자가 STEP1→STEP5 전체를 겪는다. -->
+        <sc-if value="{{ showDemoEntry }}" hint-placeholder-val="{{ true }}">
+          <div style="margin-top:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <button class="pf-btn-ghost" disabled="{{ extracting }}" onclick="{{ onDemoStream }}" title="예시 화면으로 추출·보정 과정을 그대로 재생합니다">▶ 예시로 분석해 보기</button>
+            <button class="pf-btn-ghost" disabled="{{ extracting }}" onclick="{{ onLoadDemo }}">예시 데이터 바로 보기</button>
+            <span style="font-size:11.5px;color:var(--text-tertiary,#999);">직접 올리기 전에 먼저 둘러볼 수 있습니다.</span>
+          </div>
+        </sc-if>
 
         <!-- 첨부 큐 — 여러 번 나눠 담아도 **한 배치**로 분석한다. 화면 간 교차검증(계좌합계 대조·
              수량 사다리)이 배치 안에서만 도므로, 나눠 보내면 그 근거가 배치 경계에서 끊긴다. -->
@@ -1649,8 +1690,8 @@
           <button onclick="{{ onGuide }}" style="border:none;background:transparent;padding:0;font-size:11.5px;font-weight:600;color:var(--text-secondary,#6e6e6e);cursor:pointer;">{{ guideCaret }} 어떤 화면을 올리면 좋나요</button>
           <sc-if value="{{ guideOpen }}" hint-placeholder-val="{{ true }}">
             <div style="margin-top:6px;font-size:12px;line-height:1.55;color:var(--text-secondary,#6e6e6e);background:var(--bg-app,#fafafa);border:1px solid var(--border-default,#dfdfe8);border-radius:8px;padding:10px 12px;">
-              📸 <b>종목명·수량·매수금액</b>(또는 <b>평가손익</b>)이 보이는 화면이 가장 정확해요. 없는 값은 시세로 <span style="color:var(--ig-blue,#1fa1ff);font-weight:600;">자동 추정</span>합니다.
-              <span style="color:var(--text-tertiary,#999);">연금 등 수량이 안 보이는 화면은 종목별/잔고 화면을 함께 올리면 채워져요.</span>
+              화면에 없는 값은 시세로 <span style="color:var(--ig-blue,#1fa1ff);font-weight:600;">자동 추정</span>합니다. 연금처럼 수량이 안 보이는 화면은 종목별·잔고 화면을 함께 올리면 채워집니다.
+              <span style="color:var(--text-tertiary,#999);">한 계좌를 여러 화면으로 나눠 캡처했다면 그 화면들을 같이 담아 주세요 — 한 번에 분석해야 서로 대조됩니다.</span>
             </div>
           </sc-if>
         </div>
@@ -1789,22 +1830,31 @@
         <span class="pf-step">STEP 2</span>
         <span class="pf-step-title">통합 보유 현황</span>
         <!-- 총자산은 계좌칩과 같은 문법으로 그 줄 맨 앞에 둔다(색만 반전) — 고정 밴드라 표를 스크롤하는
-             내내 보인다. 평가손익 '금액'은 칩을 한 줄로 유지하려고 data-tip 으로 뺀다(_tip 재사용). -->
-        <span class="pf-tap" data-tip="{{ plTip }}" tabindex="0" style="display:inline-flex;align-items:baseline;gap:6px;background:var(--text-primary,#000);border-radius:999px;padding:4px 11px;font-size:11.5px;color:#fff;cursor:pointer;">
-          <span style="opacity:0.6;">총자산</span><b class="pf-money pf-num">{{ totalStr }}</b><span style="font-weight:700;color:{{ plChipColor }};">{{ plPct }}</span>
-        </span>
-        <sc-for list="{{ acctChips }}" as="c" hint-placeholder-count="2">
-          <span style="display:inline-flex;align-items:baseline;gap:5px;background:var(--bg-secondary,#efefef);border-radius:999px;padding:4px 10px;font-size:11.5px;">
-            <b>{{ c.label }}</b><span class="pf-money" style="color:var(--text-secondary,#6e6e6e);">{{ c.value }}</span>
+             내내 보인다. 평가손익 '금액'은 칩을 한 줄로 유지하려고 data-tip 으로 뺀다(_tip 재사용).
+             보유가 없으면 ₩0 짜리 칩은 정보가 아니라 잡음이라 통째로 빠진다. -->
+        <sc-if value="{{ hasHoldings }}" hint-placeholder-val="{{ true }}">
+          <span class="pf-tap" data-tip="{{ plTip }}" tabindex="0" style="display:inline-flex;align-items:baseline;gap:6px;background:var(--text-primary,#000);border-radius:999px;padding:4px 11px;font-size:11.5px;color:#fff;cursor:pointer;">
+            <span style="opacity:0.6;">총자산</span><b class="pf-money pf-num">{{ totalStr }}</b><span style="font-weight:700;color:{{ plChipColor }};">{{ plPct }}</span>
           </span>
-        </sc-for>
+          <sc-for list="{{ acctChips }}" as="c" hint-placeholder-count="2">
+            <span style="display:inline-flex;align-items:baseline;gap:5px;background:var(--bg-secondary,#efefef);border-radius:999px;padding:4px 10px;font-size:11.5px;">
+              <b>{{ c.label }}</b><span class="pf-money" style="color:var(--text-secondary,#6e6e6e);">{{ c.value }}</span>
+            </span>
+          </sc-for>
+        </sc-if>
       </div>
+      <!-- 설명 두 줄도 고정 밴드 밖(STEP1 과 같은 이유). 데이터가 없으면 이 두 줄이 섹션의 전부다. -->
+      <div style="padding:0 var(--pf-sec-pad,18px) 12px;display:flex;flex-direction:column;gap:5px;">
+        <span class="pf-step-desc">계좌마다 흩어진 종목을 한 표로 모으고, 현재 환율·주가로 업데이트하며 트래킹합니다.</span>
+        <span class="pf-todo"><span class="pf-todo-lbl">하실 일</span><span>값이 다르면 표에서 직접 고칩니다. 수량·매수금액도 그 자리에서 조정합니다. <span style="color:var(--text-secondary,#6e6e6e);">(다시 올 때는 [현재가·환율 갱신]을 한 번 눌러 주세요.)</span></span></span>
+      </div>
+      <sc-if value="{{ hasHoldings }}" hint-placeholder-val="{{ true }}">
       <!-- 툴바는 고정 밴드(.pf-sec-head) **밖**이다 — 좁은 화면에서 3~4줄로 랩되면서 고정 높이를
            120px+ 로 부풀려 표를 덮었다. 고정되는 건 제목·계좌칩까지, 조작 줄은 같이 스크롤된다.
            이 단은 '지속 트래킹'의 전부다: 왼쪽은 **지금 상태**(언제 잰 값인가), 오른쪽은 **주 액션**
            (다시 재기) 하나. 파라미터(환율 수동·기준시점)는 고급으로 접는다 — 매번 보는 것이 아니다. -->
       <div style="padding:0 var(--pf-sec-pad,18px) 10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:11.5px;">
-        <div style="display:flex;flex-direction:column;gap:2px;min-width:0;flex:1;">
+        <div class="pf-trackline">
           <span style="color:var(--text-secondary,#6e6e6e);">{{ trackStatus }}</span>
           <span style="font-size:11px;color:{{ trackDeltaColor }};">{{ trackDelta }}</span>
         </div>
@@ -1903,6 +1953,7 @@
           </div>
           <span style="white-space:nowrap;">합계 <b class="pf-num pf-money" style="color:var(--text-primary,#000);font-size:12.5px;">{{ totalStr }}</b></span>
         </div>
+      </sc-if>
     </section>
 
     <!-- ── 3. Target ─────────────────────────── -->
@@ -1910,13 +1961,19 @@
       <div class="pf-sec-head" style="padding:14px var(--pf-sec-pad,18px) 10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
         <span class="pf-step">STEP 3</span>
         <span class="pf-step-title">목표 포트폴리오</span>
-        <span class="pf-step-desc">추천안을 고른 뒤 비중을 직접 조정하세요</span>
+        <!-- 합계는 제목줄 칩으로 — 입력 줄 끝에 두면 좁은 화면에서 한 줄(≈60px)을 통째로 더 쓰고,
+             정작 '100%인가'는 입력하는 동안 눈에서 멀어진다. -->
+        <span class="pf-num" style="font-size:11.5px;font-weight:700;color:{{ sumColor }};background:var(--bg-secondary,#efefef);border-radius:999px;padding:3px 10px;">합계 {{ targetSum }}%</span>
         <div style="flex:1;"></div>
         <sc-for list="{{ presets }}" as="pr" hint-placeholder-count="3">
           <button onclick="{{ pr.onApply }}" style="border:1px solid {{ pr.bd }};background:{{ pr.bg }};color:{{ pr.fg }};border-radius:999px;padding:5px 13px;font-size:12px;font-weight:600;cursor:pointer;">{{ pr.label }}</button>
         </sc-for>
       </div>
-      <div style="display:flex;gap:10px;padding:4px var(--pf-sec-pad,18px) 16px;flex-wrap:wrap;align-items:flex-end;">
+      <div style="padding:0 var(--pf-sec-pad,18px) 10px;display:flex;flex-direction:column;gap:5px;">
+        <span class="pf-step-desc">목표로 정할 포트폴리오 기준치를 고릅니다.</span>
+        <span class="pf-todo"><span class="pf-todo-lbl">하실 일</span><span>추천 기준을 선택하거나 비중을 직접 설정합니다. <span style="color:var(--text-secondary,#6e6e6e);">(합계가 100%여야 해요.)</span></span></span>
+      </div>
+      <div style="display:flex;gap:10px;padding:0 var(--pf-sec-pad,18px) 16px;flex-wrap:wrap;align-items:flex-end;">
         <sc-for list="{{ targetRows }}" as="t" hint-placeholder-count="6">
           <div style="display:flex;flex-direction:column;gap:5px;min-width:104px;flex:1;">
             <span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;"><span style="width:9px;height:9px;border-radius:2px;background:{{ t.color }};"></span>{{ t.label }}</span>
@@ -1926,10 +1983,6 @@
             </div>
           </div>
         </sc-for>
-        <div style="display:flex;flex-direction:column;gap:5px;min-width:88px;">
-          <span style="font-size:12px;font-weight:600;color:var(--text-tertiary,#999);">합계</span>
-          <span class="pf-num" style="font-size:15px;font-weight:700;padding:7px 0;color:{{ sumColor }};">{{ targetSum }}%</span>
-        </div>
       </div>
     </section>
 
@@ -1938,8 +1991,12 @@
       <div class="pf-sec-head" style="padding:14px var(--pf-sec-pad,18px) 6px;display:flex;align-items:baseline;gap:10px;">
         <span class="pf-step">STEP 4</span>
         <span class="pf-step-title">자산배분 분석</span>
-        <span class="pf-step-desc">혼합형 펀드는 배당주 50% · 채권 50%로 분해해 집계</span>
       </div>
+      <div class="pf-empty-pad" style="padding:2px var(--pf-sec-pad,18px) 0;display:flex;flex-direction:column;gap:5px;">
+        <span class="pf-step-desc">지금 배분이 목표에서 얼마나 벌어졌는지 자산군별로 계산합니다.</span>
+        <span class="pf-todo"><span class="pf-todo-lbl">하실 일</span><span>색 막대(지금)와 회색 막대(목표)의 차이를 봅니다. <span style="color:var(--text-secondary,#6e6e6e);">(혼합형 펀드는 배당주·채권 반반으로 나눠 집계돼요.)</span></span></span>
+      </div>
+      <sc-if value="{{ hasHoldings }}" hint-placeholder-val="{{ true }}">
       <div class="pf-analysis" style="padding:12px var(--pf-sec-pad,18px) 20px;align-items:start;">
         <div style="display:flex;flex-direction:column;align-items:center;gap:12px;">
           <div style="position:relative;width:190px;height:190px;">
@@ -1980,6 +2037,7 @@
           </sc-for>
         </div>
       </div>
+      </sc-if>
     </section>
 
     <!-- ── 5. Actions ────────────────────────── -->
@@ -1987,9 +2045,13 @@
       <div class="pf-sec-head" style="padding:14px var(--pf-sec-pad,18px) 8px;display:flex;align-items:baseline;gap:10px;">
         <span class="pf-step">STEP 5</span>
         <span class="pf-step-title">리밸런싱 액션</span>
-        <span class="pf-step-desc">이탈 ±{{ bandStr }}%p 이상만 · 이탈 큰 순</span>
       </div>
-      <div style="padding:4px var(--pf-sec-pad,18px) 14px;display:flex;flex-direction:column;gap:8px;">
+      <div class="pf-empty-pad" style="padding:0 var(--pf-sec-pad,18px) 0;display:flex;flex-direction:column;gap:5px;">
+        <span class="pf-step-desc">목표에 맞추려면 무엇을 얼마나 사고팔면 되는지 정리합니다.</span>
+        <span class="pf-todo"><span class="pf-todo-lbl">하실 일</span><span>제안을 확인하고, 실제 매매는 증권사 앱에서 진행합니다. <span style="color:var(--text-secondary,#6e6e6e);">(차이가 ±{{ bandStr }}%p 안이면 제안에 넣지 않아요.)</span></span></span>
+      </div>
+      <sc-if value="{{ hasHoldings }}" hint-placeholder-val="{{ true }}">
+      <div style="padding:10px var(--pf-sec-pad,18px) 14px;display:flex;flex-direction:column;gap:8px;">
         <sc-if value="{{ noActions }}" hint-placeholder-val="{{ false }}">
           <div style="display:flex;align-items:center;gap:10px;padding:16px;border:1px solid var(--border-default,#dfdfe8);border-radius:8px;background:var(--bg-app,#fafafa);">
             <span style="font-size:16px;">✓</span>
@@ -2016,6 +2078,7 @@
           <span style="font-size:12.5px;color:var(--text-secondary,#6e6e6e);">· 확대는 신규 매수 대신 <b>배당·분배금 재투자와 월 적립금 배정</b>으로 먼저 채우면 거래비용이 줄어요</span>
         </div>
       </div>
+      </sc-if>
     </section>
 
   </main>
@@ -2069,6 +2132,7 @@ class Component extends DCLogic {
       // {id, file, name, url} — url 은 objectURL 이라 빼거나 비울 때 반드시 revoke 한다.
       queue: [],
       guideOpen: false,           // '어떤 화면을 올리면 좋나요' — 첫 사용(보유 0·큐 0)에만 펼침
+      privOpen: false,            // '사진은 어디서 읽히나' 상세 — 접힌 한 줄이 기본
       devOpen: false,             // 헤더 ⚙ — 개발 전용 도구는 전부 여기 안에만 있다
       advOpen: false,             // STEP2 고급(환율 수동·기준시점)
       // 지속 트래킹 — 직전 갱신 시점의 총자산. 재평가 직전에 찍어 '직전 대비 변화'를 만든다(저장됨).
@@ -2125,23 +2189,21 @@ class Component extends DCLogic {
         prevTotal: (saved && saved.prevTotal != null) ? saved.prevTotal : null,
         prevAt: (saved && saved.prevAt) || null });
     } else {
-      // 빈 시작 — 첫 방문자에게 아무것도 자동 노출하지 않는다. 데모는 ⚙ '예시 데이터로 둘러보기'로만.
-      // 안내는 이때만 펼친다(두 번째부터는 읽을 것이 아니라 지나갈 것이다).
-      this.setState({ maskMoney: mask, loaded: true, guideOpen: true });
+      // 빈 시작 — 첫 방문자에게 데이터를 자동 노출하지 않는다. 대신 STEP1 의 '예시로 먼저'가 있다.
+      // 안내 박스는 접어 둔다: 필요한 것(어떤 화면을 올리나)은 이미 STEP1 설명 두 줄이 말한다.
+      this.setState({ maskMoney: mask, loaded: true });
     }
     this.fetchFx();
-    // 같은 오리진 자동 채택 — 에이전트가 이 페이지를 직접 서빙하면(엣지: 폰 안의 :8899)
-    // 사용자가 URL을 손으로 넣을 필요가 없다. 에이전트 URL의 단일 출처는 계속 localStorage이고
-    // 판정은 기존 /health 계약을 그대로 쓴다. GitHub Pages에선 /health가 404라 아무것도 채택되지
-    // 않고 기존 폴백이 보존된다 — 양쪽에서 동시에 맞는 한 줄 규칙.
-    if (!this.agentUrl()) {
-      fetch(location.origin + '/health').then(r => {
-        if (r && r.ok) { try { localStorage.setItem('pf_agent_url', location.origin); } catch (e) {} }
-      }).catch(() => {}).then(() => {
-        this.setState({ agentUrlInput: this.agentUrl() });
-        this.pingHealth();
-      });
-    }
+    // 같은 오리진 자동 채택 — 이 페이지를 서빙하는 곳이 /health 에 답하면 **그 오리진이 곧 에이전트다**.
+    // 저장값이 있어도 덮는다: 주소는 사용자가 외울 것이 아니라 지금 열려 있는 URL 이다(초기화·캐시
+    // 삭제 후에도 다시 잡히는 이유가 이것이다). GitHub Pages 에선 /health 가 404라 아무것도 채택되지
+    // 않고 손으로 넣은 터널 주소가 그대로 보존된다 — 양쪽에서 동시에 맞는 한 줄 규칙.
+    fetch(location.origin + '/health').then(r => {
+      if (r && r.ok) { try { localStorage.setItem('pf_agent_url', location.origin); } catch (e) {} }
+    }).catch(() => {}).then(() => {
+      this.setState({ agentUrlInput: this.agentUrl() });
+      this.pingHealth();
+    });
     // 에이전트 연결 상태(헤더) — 저장된 URL 반영 + 주기 핑
     this.setState({ agentUrlInput: this.agentUrl() });
     this.pingHealth();
@@ -2412,12 +2474,19 @@ class Component extends DCLogic {
   }
 
   // ---------- 첨부 큐(STEP1) ----------
-  // 세 입구(드롭존·파일 앱 진입·드래그드롭)가 전부 여기로 모인다. 같은 파일을 두 번 담는 사고는
+  // 두 입구(파일 선택·드래그드롭)가 전부 여기로 모인다. 같은 파일을 두 번 담는 사고는
   // name+size+lastModified 로 막는다(폰에서 같은 화면을 두 번 고르기 쉽다).
+  // accept 에 application/pdf 가 들어 있어(선택기 계약, 마크업 주석 참고) 이미지가 아닌 파일이
+  // 실제로 들어올 수 있다. 조용히 버리면 "골랐는데 아무 일도 안 일어난다"가 되므로 말해 준다.
   enqueue(fileList) {
     if (this.state.extracting) return;
-    const files = Array.from(fileList || []).filter(f => f.type.startsWith('image/'));
-    if (!files.length) return;
+    const all = Array.from(fileList || []);
+    const files = all.filter(f => f.type.startsWith('image/'));
+    if (!files.length) {
+      if (all.length) this.setState({ extractError: '이미지 파일만 담을 수 있어요 — PDF는 아직 지원하지 않아요' });
+      return;
+    }
+    const skipped = all.length - files.length;
     const q = this.state.queue || [];
     const key = f => (f.name || '') + '|' + f.size + '|' + (f.lastModified || 0);
     const seen = new Set(q.map(x => key(x.file)));
@@ -2428,7 +2497,8 @@ class Component extends DCLogic {
       add.push({ id: 'q' + Date.now() + Math.random().toString(36).slice(2, 6),
         file: f, name: f.name || '(이름 없음)', url: URL.createObjectURL(f) });
     });
-    if (add.length) this.setState({ queue: q.concat(add), extractError: null, extractInfo: null });
+    if (add.length) this.setState({ queue: q.concat(add), extractInfo: null,
+      extractError: skipped ? ('이미지 파일만 담을 수 있어요 — ' + skipped + '개는 뺐습니다(PDF는 아직 지원하지 않아요)') : null });
   }
 
   dequeue(id) {
@@ -2451,21 +2521,18 @@ class Component extends DCLogic {
     this.extractFiles(q.map(x => x.file)).then(ok => { if (ok) this.clearQueue(); });
   }
 
-  // 저장·캐시 초기화 — '캐시가 없던 상태'에서 다시 시작하기 위한 개발 도구. 비가역이라 한 번 묻는다.
+  // 보유 데이터 초기화 — '아무것도 없던 상태'로 되돌린다. 지우는 것은 **증권 데이터 한 덩어리**뿐:
+  // 접속 설정(에이전트 주소·API 키)까지 지우면 초기화할 때마다 주소를 다시 잡아야 한다.
+  // Cache Storage 는 건드리지 않는다 — 서비스워커가 없어 실제로 빈 동작인데, 이름만 '캐시 삭제'라
+  // 무언가 더 지워지는 것처럼 읽힌다. 비가역이라 한 번 묻는다.
   resetAll() {
-    const onPages = !String(location.origin).startsWith('http://127.0.0.1') && !String(location.origin).startsWith('http://localhost');
-    const msg = '이 브라우저에 저장된 것을 모두 지우고 처음 상태로 다시 시작합니다.\n\n' +
-      '· 보유 자산·목표 비중·환율·금액 가리기 설정\n· 에이전트 주소\n· API 키\n· 브라우저 캐시\n\n' +
-      (onPages ? '에이전트 주소는 다시 입력해야 합니다(이 페이지를 에이전트가 서빙 중이면 자동으로 다시 잡힙니다).\n\n' : '') +
-      '계속할까요?';
+    const msg = '이 브라우저에 저장된 보유 데이터를 지우고 STEP 1부터 다시 시작합니다.\n\n' +
+      '· 보유 종목·평가금액·환율·목표 비중·금액 가리기 설정\n' +
+      '· 에이전트 주소와 API 키는 그대로 둡니다\n\n' +
+      '되돌릴 수 없어요. 계속할까요?';
     if (!window.confirm(msg)) return;
-    ['pf_rebalancer_v1', 'pf_agent_url', 'pf_anthropic_key'].forEach(k => {
-      try { localStorage.removeItem(k); } catch (e) {}
-    });
-    const done = () => location.reload();
-    if (window.caches && caches.keys) {
-      caches.keys().then(ks => Promise.all(ks.map(k => caches.delete(k)))).catch(() => {}).then(done, done);
-    } else done();
+    try { localStorage.removeItem('pf_rebalancer_v1'); } catch (e) {}
+    location.reload();
   }
 
   // 데모·옛 시드 행(id 's\d+') — 저장·복원에서 제외한다. applySnapshot의 isDemo와 같은 규약.
@@ -2717,6 +2784,28 @@ class Component extends DCLogic {
     const sum = this.ALLOC.reduce((s, c) => s + (S.target[c.key] || 0), 0);
     if (sum !== 100) return { icon: '🎯', text: 'STEP 3 목표 비중 합계가 ' + sum + '% 예요 — 100%로 맞춰 주세요' };
     return { icon: '✅', text: 'STEP 5 리밸런싱 액션을 확인하세요 — 이탈이 밴드를 넘은 자산군만 나옵니다' };
+  }
+
+  // 사진이 어디서 읽히는지 — 단일 출처. **말투가 아니라 사실이 갈려서** 문장이 갈린다:
+  // 에이전트가 있으면 이미지는 그 오리진의 /extract/batch/submit 으로만 가고, 없으면 extractFiles 가
+  // callClaude() 로 떨어져 api.anthropic.com 으로 나간다. 화면이 그 차이를 덮으면 거짓말이 된다.
+  // 둘째·셋째 줄(무엇이 인터넷으로 나가나 / 어디 저장되나)은 어느 경우든 같다.
+  privacyNote() {
+    const base = this.agentUrl();
+    const onDevice = !!base && base === String(location.origin).replace(/\/+$/, '') && this.state.engine !== 'orin';
+    const line = !base
+      ? { text: '⚠ 지금은 사진이 외부 AI(Anthropic)로 전송돼요', color: '#b8860b',
+          first: '에이전트가 연결되지 않으면 사진을 Anthropic API로 보내 읽습니다(직접 넣은 API 키를 씁니다). 헤더의 [에이전트] 칩에 주소를 넣으면 기기 밖으로 나가지 않아요.' }
+      : (onDevice
+        ? { text: '🔒 사진은 기기에서 바로 읽습니다 (온디바이스)', color: 'var(--text-secondary,#6e6e6e)',
+            first: '캡처한 사진은 기기 안에서 처리합니다. 인터넷으로 올리거나 외부 AI로 보내지 않습니다.' }
+        : { text: '🔒 사진은 연결한 기기에서만 읽습니다', color: 'var(--text-secondary,#6e6e6e)',
+            first: '캡처한 사진은 연결한 분석 기기까지만 갑니다. 외부 AI로는 보내지 않습니다.' });
+    return { line: line.text, color: line.color, detail: [
+      { text: line.first },
+      { text: '인터넷에서 받아오는 것은 환율과 시세뿐입니다. 조회에 나가는 값은 종목명·종목코드이고, 수량·금액·계좌 정보는 나가지 않습니다.' },
+      { text: '보유 내역은 이 브라우저에만 저장합니다. 가입도, 서버에 남는 사본도 없습니다.' }
+    ] };
   }
 
   // 확인 필요 판정 — 단일 출처. 라이브 표(STEP1)·보유표(STEP2)가 같은 기준으로
@@ -3354,14 +3443,16 @@ class Component extends DCLogic {
       return map;
     })();
 
-    // 다음 할 일 한 줄(항상 있다) + STEP2 트래킹 상태 두 줄. 둘 다 여기서 문자열까지 만든다.
+    // 다음 할 일 한 줄(항상 있다) + 프라이버시 한 줄 + STEP2 트래킹 상태 두 줄. 전부 여기서 문자열까지.
     const na = this.nextAction();
+    const pv = this.privacyNote();
+    // 보유 유무는 화면 절반의 표시 여부를 가른다(STEP2·4·5 본문) — 조건을 마크업마다 쓰지 않고 하나로.
+    const hasHoldings = (S.holdings || []).length > 0;
     const lastAt = this.lastUpdatedAt(S.holdings);
     const fxTag = S.fxStatus || (S.fxUpdatedAt ? ('자동 · ' + this.timeAgo(S.fxUpdatedAt)) : '저장값');
-    const trackStatus = (S.holdings || []).length
-      ? ('마지막 갱신 ' + (lastAt ? this.timeAgo(lastAt) : '—') + ' · 환율 ' + this.fmtNum(S.fx) + ' (' + fxTag + ') · '
-         + this._summaryStr(this._tierCounts(S.holdings), 0))
-      : '아직 보유 자산이 없어요 — STEP 1에서 스크린샷을 올려 시작하세요';
+    // 보유가 없으면 이 줄은 아예 렌더되지 않는다(빈 상태의 STEP2 는 설명 두 줄이 전부).
+    const trackStatus = '마지막 갱신 ' + (lastAt ? this.timeAgo(lastAt) : '—') + ' · 환율 ' + this.fmtNum(S.fx)
+      + ' (' + fxTag + ') · ' + this._summaryStr(this._tierCounts(S.holdings), 0);
     // 둘째 줄은 **항상 한 줄**이다(비면 블록 높이가 오르내린다). 먼저 걸리는 것 하나만:
     // 진행/결과 메시지 → 신선도 경고 → 직전 갱신 대비 변화 → 안내.
     let trackDelta = '갱신하면 직전 갱신 대비 변화가 여기 표시됩니다', trackDeltaColor = 'var(--text-tertiary,#999)';
@@ -3382,6 +3473,11 @@ class Component extends DCLogic {
     return {
       readingAttr: this.props.comfortReading ? 'comfort' : '',
       nextIcon: na.icon, nextText: na.text,
+      hasHoldings,
+      // 사진이 어디서 읽히는지 — 접힌 한 줄 + 펼치면 세 줄(문구는 privacyNote 하나에서 온다).
+      privLine: pv.line, privColor: pv.color, privDetail: pv.detail,
+      privOpen: S.privOpen, privCaret: S.privOpen ? '▾' : '▸',
+      onPriv: () => this.setState({ privOpen: !S.privOpen }),
       trackStatus, trackDelta, trackDeltaColor,
       fx: S.fx,
       onFxChange: e => this.set({ fx: this.parseNum(e.target.value) || S.fx }),
@@ -3416,11 +3512,14 @@ class Component extends DCLogic {
       })),
       hasQueue: (S.queue || []).length > 0,
       analyzeLabel: S.extracting ? '분석 중…' : ('분석 시작 (' + (S.queue || []).length + '장)'),
+      // 파괴적 규칙(스냅샷 대체)은 상시 설명문이 아니라 **누르기 직전**에 둔다 — 그래서 '~요'다.
       queueHint: (S.queue || []).length > 1
-        ? '한 번에 분석해 화면끼리 교차검증합니다(계좌 합계 대조·수량 채우기)'
-        : '같은 계좌의 다른 화면도 함께 담으면 빈 값이 채워져요',
+        ? '한 번에 분석해 화면끼리 교차검증합니다. (올린 화면이 그 계좌의 현재 전부가 되어, 화면에 없는 종목은 지워져요.)'
+        : '같은 계좌를 여러 화면으로 나눠 캡처했다면 함께 담아 주세요. (올린 화면이 그 계좌의 현재 전부가 돼요.)',
       onAnalyze: () => this.analyzeQueue(),
       onClearQueue: () => this.clearQueue(),
+      // 예시 진입 — 올릴 것이 아직 없을 때만 낸다(데이터가 있으면 예시는 방해다).
+      showDemoEntry: !hasHoldings && !(S.queue || []).length && !(S.streamRows || []).length,
       // 현재가 재평가(STEP2)
       capInput: S.capInput || '',
       onCapChange: e => this.setState({ capInput: e.target.value }),
