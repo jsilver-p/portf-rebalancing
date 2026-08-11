@@ -98,9 +98,11 @@ class MainActivity : AppCompatActivity() {
 
     /**
      * 웹의 두 업로드 진입을 그대로 재현한다 — 계약이 갈리면 APK만 다르게 동작한다.
-     *   · accept="image/\*" (드롭존)  → createIntent() 그대로. 사진 그리드.
-     *   · accept 없음 (파일 앱에서 선택) → ACTION_OPEN_DOCUMENT. SAF 의 DISPLAY_NAME 은 원본
-     *     파일명이라 'Screenshot_…_앱이름.jpg' 가 살아 온다(photo picker 는 미디어 ID를 준다).
+     *   · 전부 image/ (드롭존)                → createIntent() 그대로. 사진 그리드.
+     *   · image/ 아닌 타입이 섞임(파일 앱에서 선택) → ACTION_OPEN_DOCUMENT. 문서 선택기로 **바로**
+     *     들어가고(앱 고르기 단계 없음), SAF 의 DISPLAY_NAME 이 원본 파일명이라
+     *     'Screenshot_…_앱이름.jpg' 가 살아 온다(photo picker 는 미디어 ID를 준다).
+     * 받은 accept 를 EXTRA_MIME_TYPES 로 그대로 넘겨 목록을 이미지·PDF 로 좁힌다.
      * OPEN_DOCUMENT 도 SAF 라 READ_MEDIA_IMAGES 같은 저장소 권한은 여전히 필요 없다.
      */
     private fun pickerIntent(params: WebChromeClient.FileChooserParams?): Intent? {
@@ -110,7 +112,11 @@ class MainActivity : AppCompatActivity() {
             Intent(Intent.ACTION_OPEN_DOCUMENT)
                 .addCategory(Intent.CATEGORY_OPENABLE)
                 .setType("*/*")
-                .putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+                .apply { if (types.isNotEmpty()) putExtra(Intent.EXTRA_MIME_TYPES, types.toTypedArray()) }
+                .putExtra(
+                    Intent.EXTRA_ALLOW_MULTIPLE,
+                    params?.mode == WebChromeClient.FileChooserParams.MODE_OPEN_MULTIPLE
+                )
         } else {
             params?.createIntent()
         }

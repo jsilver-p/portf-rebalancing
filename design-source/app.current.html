@@ -1560,12 +1560,19 @@
         </label>
         <!-- 보조 진입 — 파일명이 살아 오는 경로. 위 드롭존은 accept="image/*" 라서 안드로이드가 항상
              photo picker 를 띄우고, 그 URI 의 DISPLAY_NAME 은 원본 이름이 아니라 미디어 ID다
-             ('1000045629.jpg'). Chromium SelectFileDialog 는 accept 가 **전부** image/·video/ 일 때만
-             photo picker 를 쓰므로, accept 를 아예 안 붙이면 문서 선택기(SAF)로 빠져
-             'Screenshot_20260810_072344_앱이름.jpg' 가 그대로 온다 → 증권사 근거가 된다.
-             즉 accept 부재가 스위치 그 자체다. 지우지 말 것. (Chrome 이 규칙을 바꾸면 여기가 썩는다.) -->
+             ('1000045629.jpg'). 여긴 문서 선택기로 보내 'Screenshot_20260810_155901_앱이름.jpg' 를
+             그대로 받는다 → 증권사 근거가 된다.
+
+             accept 를 왜 저렇게 쓰는지(Chromium SelectFileDialog 의 두 판정을 동시에 만족시켜야 한다):
+               · shouldUsePhotoPicker() = 타입이 **전부** image/·video/ → photo picker(이름이 죽는다).
+                 그래서 image/ 아닌 타입이 최소 하나 필요하다(application/pdf).
+               · showExternalPicker() 는 acceptsType(AUDIO/VIDEO) 이면 녹음기·캠코더를 선택지에 끼운다.
+                 그런데 acceptsType 은 `mMimeTypes.isEmpty() → true` 라, accept 를 아예 비우면 셋 다
+                 붙는다(실측: '음성 녹음' 항목 + 마이크 권한 팝업, 다중 선택도 막힘). 그래서 비우지 않는다.
+             즉 '이미지 + 이미지 아닌 것 하나, 오디오·비디오는 없이'가 조건이다. 지우거나 image 만
+             남기지 말 것. (Chrome 이 규칙을 바꾸면 여기가 썩는다.) -->
         <label class="pf-drop" data-busy="{{ extracting }}" style="display:flex;align-items:center;gap:6px;margin-top:8px;padding:2px 2px;cursor:pointer;font-size:12px;color:var(--text-tertiary,#999);" style-hover="color:var(--ig-blue,#1fa1ff);">
-          <input type="file" multiple="" onchange="{{ onFiles }}" style="display:none;">
+          <input type="file" accept="image/*,application/pdf" multiple="" onchange="{{ onFiles }}" style="display:none;">
           <span>📁 <b style="color:var(--text-secondary,#6e6e6e);font-weight:600;">파일 앱에서 선택</b> — 파일명으로 증권사 자동 인식 <span style="color:var(--text-tertiary,#999);">(갤러리에서 고르면 파일명이 지워져 '미상'이 됩니다)</span></span>
         </label>
         <div style="margin-top:10px;font-size:12px;line-height:1.55;color:var(--text-secondary,#6e6e6e);background:var(--bg-app,#fafafa);border:1px solid var(--border-default,#dfdfe8);border-radius:8px;padding:10px 12px;">
