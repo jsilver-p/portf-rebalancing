@@ -7,7 +7,8 @@
          추출 경로(ML Kit → bind.py → finalize 게이트)에는 네트워크 호출이 없다. -->
     <uses-permission android:name="android.permission.INTERNET" />
 
-    <!-- 스크린샷은 photo picker로 받는다 → READ_MEDIA_IMAGES 같은 저장소 권한이 필요 없다. -->
+    <!-- 스크린샷은 photo picker / SAF(ACTION_OPEN_DOCUMENT)로 받는다 → READ_MEDIA_IMAGES 같은
+         저장소 권한이 필요 없다. -->
 
     <application
         android:label="@string/app_name"

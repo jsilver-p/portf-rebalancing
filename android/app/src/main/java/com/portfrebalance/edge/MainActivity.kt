@@ -1,5 +1,6 @@
 package com.portfrebalance.edge
 
+import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.webkit.ValueCallback
@@ -28,7 +29,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var web: WebView
     private var filePathCallback: ValueCallback<Array<Uri>>? = null
 
-    // 스크린샷 선택 — photo picker라 저장소 권한이 필요 없다.
+    // 스크린샷 선택 — photo picker / SAF 라 저장소 권한이 필요 없다(pickerIntent 참고).
     private val pickFiles = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -72,7 +73,7 @@ class MainActivity : AppCompatActivity() {
                 ): Boolean {
                     filePathCallback?.onReceiveValue(null)
                     filePathCallback = callback
-                    pickFiles.launch(params?.createIntent() ?: return false)
+                    pickFiles.launch(pickerIntent(params) ?: return false)
                     return true
                 }
             }
@@ -92,6 +93,26 @@ class MainActivity : AppCompatActivity() {
             runOnUiThread {
                 web.loadData("<h3>에이전트가 뜨지 않았습니다</h3>", "text/html; charset=utf-8", null)
             }
+        }
+    }
+
+    /**
+     * 웹의 두 업로드 진입을 그대로 재현한다 — 계약이 갈리면 APK만 다르게 동작한다.
+     *   · accept="image/\*" (드롭존)  → createIntent() 그대로. 사진 그리드.
+     *   · accept 없음 (파일 앱에서 선택) → ACTION_OPEN_DOCUMENT. SAF 의 DISPLAY_NAME 은 원본
+     *     파일명이라 'Screenshot_…_앱이름.jpg' 가 살아 온다(photo picker 는 미디어 ID를 준다).
+     * OPEN_DOCUMENT 도 SAF 라 READ_MEDIA_IMAGES 같은 저장소 권한은 여전히 필요 없다.
+     */
+    private fun pickerIntent(params: WebChromeClient.FileChooserParams?): Intent? {
+        val types = params?.acceptTypes?.filter { it.isNotBlank() } ?: emptyList()
+        val wantsAnyFile = types.isEmpty() || types.any { !it.startsWith("image/") }
+        return if (wantsAnyFile) {
+            Intent(Intent.ACTION_OPEN_DOCUMENT)
+                .addCategory(Intent.CATEGORY_OPENABLE)
+                .setType("*/*")
+                .putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+        } else {
+            params?.createIntent()
         }
     }
 
