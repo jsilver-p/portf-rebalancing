@@ -1481,9 +1481,10 @@
     .pf-dev-btn{border:1px solid var(--border-default,#dfdfe8);background:var(--bg-surface,#fff);border-radius:6px;padding:7px 11px;font-size:12px;font-weight:600;cursor:pointer;color:var(--text-secondary,#6e6e6e);text-align:left;white-space:nowrap;}
     .pf-dev-btn:hover{border-color:var(--ig-blue,#1fa1ff);color:var(--ig-blue,#1fa1ff);}
     .pf-dev-lbl{font-size:10.5px;font-weight:600;letter-spacing:0.3px;color:var(--text-tertiary,#999);}
-    /* 다음 할 일 — **항상 한 줄**이다. 조건부로 나타났다 사라지면 아래 내용 전체가 그만큼 튄다
-       (헤더를 접었다 폈을 때와 같은 병). 그래서 문구만 갈리고 요소는 늘 있다. */
-    .pf-next{display:flex;align-items:center;gap:9px;padding:9px 13px;border:1px solid var(--border-default,#dfdfe8);border-radius:8px;background:var(--bg-surface,#fff);font-size:12.5px;line-height:1.4;}
+    /* 다음 할 일 — **할 일이 있을 때만** 뜬다. 빈 상태에선 히어로가 이미 '여기서 시작한다'를 말하므로
+       같은 말을 한 줄 더 두지 않는다. 상태가 바뀌면 어차피 화면 전체가 갈리므로 점프 걱정은 없다
+       (금지된 것은 **같은 상태에서** 스크롤 따위로 접었다 폈다 하는 쪽이다). */
+    .pf-next{display:flex;align-items:center;gap:9px;padding:10px 14px;border:1px solid #cfe6ff;border-radius:10px;background:#f2f8ff;box-shadow:0 1px 2px rgba(16,42,67,0.05);font-size:12.5px;line-height:1.45;}
     /* 첨부 큐 — 분석 전에 쌓아두는 화면들. 파일명을 그대로 보여주는 게 핵심이다: 갤러리로 고르면
        '1000045629.jpg', 파일 앱으로 고르면 'Screenshot_…_앱이름.jpg' 라 증권사 자동 인식이 될지
        누르기 전에 보인다(아래 보조 진입 주석 참고). */
@@ -1496,14 +1497,24 @@
     /* 반영/취소 — 표가 37행이어도 손에 닿게 카드 바닥에 붙인다. sticky 는 flow 안에 그대로 있어
        높이가 변하지 않는다 — 스크롤로 '접는' 것과 다르다(그건 점프를 만든다). */
     .pf-review-bar{position:sticky;bottom:0;z-index:7;background:var(--bg-surface,#fff);border-top:1px solid var(--border-default,#dfdfe8);border-radius:0 0 8px 8px;}
-    /* 소개·프라이버시 — 스크롤 최상단. 첫 화면에서 '무엇을 해 주는 앱인가'와 '내 사진은 어디로 가나'
-       두 가지만 답한다. 프라이버시 문구는 톤이 아니라 **사실**이 갈려서 갈린다(privacyNote 참고). */
-    .pf-intro{font-size:12.5px;line-height:1.5;color:var(--text-secondary,#6e6e6e);}
-    .pf-priv{display:flex;align-items:center;gap:6px;border:none;background:transparent;padding:0;font-size:11.5px;font-weight:600;cursor:pointer;text-align:left;line-height:1.4;}
-    .pf-priv-body{margin-top:5px;display:flex;flex-direction:column;gap:3px;font-size:11.5px;line-height:1.5;color:var(--text-tertiary,#999);}
+    /* 히어로 — 스크롤 최상단에서 '이게 무슨 앱인가'만 답한다. 단계 카드와 **다른 옷**을 입힌다
+       (연한 파랑 그라데이션 + 큰 첫 문장): 같은 흰 카드로 두면 STEP 하나로 읽히고 눈에 안 들어온다.
+       한 줄이 너무 길면 눈이 되돌아올 자리를 잃으므로 본문에 max-width 를 준다(56em ≈ 45자). */
+    .pf-hero{background:linear-gradient(180deg,#f3f9ff 0%,var(--bg-surface,#fff) 78%);border:1px solid #dceaf8;border-radius:12px;box-shadow:0 1px 2px rgba(16,42,67,0.05),0 8px 20px rgba(16,42,67,0.05);padding:17px var(--pf-sec-pad,18px);display:flex;flex-direction:column;gap:10px;}
+    .pf-hero-h{font-size:17px;font-weight:800;line-height:1.4;letter-spacing:-0.2px;color:var(--text-primary,#000);}
+    .pf-hero-p{font-size:13px;line-height:1.6;color:var(--text-secondary,#6e6e6e);max-width:56em;}
+    .pf-hero-flow{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:11.5px;color:var(--text-secondary,#6e6e6e);}
+    .pf-hero-flow span{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;}
+    .pf-hero-flow b{background:var(--bg-surface,#fff);border:1px solid #dceaf8;border-radius:999px;padding:4px 10px;font-weight:700;white-space:nowrap;}
+    .pf-hero-flow i{font-style:normal;color:var(--ig-gray-40,#b4b4b4);}
+    /* 보안 — 흩어두지 않고 **한 곳**에 모은다(사진이 어디서 읽히나 · 무엇이 인터넷으로 나가나 ·
+       어디에 저장되나). 접힌 한 줄이 기본이고, 문구는 톤이 아니라 **사실**이 갈려서 갈린다(privacyNote). */
+    .pf-sec-card{display:flex;flex-direction:column;gap:7px;background:var(--bg-surface,#fff);border:1px solid var(--border-default,#dfdfe8);border-radius:10px;box-shadow:0 1px 2px rgba(16,42,67,0.05);padding:12px var(--pf-sec-pad,18px);}
+    .pf-priv{display:flex;align-items:center;gap:7px;border:none;background:transparent;padding:0;font-size:12px;font-weight:700;cursor:pointer;text-align:left;line-height:1.45;width:100%;}
+    .pf-priv-body{display:flex;flex-direction:column;gap:5px;font-size:11.5px;line-height:1.55;color:var(--text-secondary,#6e6e6e);border-top:1px dashed var(--border-default,#dfdfe8);padding-top:8px;}
     /* ── STEP 섹션 뼈대(카드·라벨·제목·설명이 5개 섹션에 반복) ── */
     /* overflow:visible — sticky 섹션 제목이 카드 안에 갇히지 않고 페이지 기준으로 고정되게 */
-    .pf-card{background:var(--bg-surface,#fff);border:1px solid var(--border-default,#dfdfe8);border-radius:10px;overflow:visible;}
+    .pf-card{background:var(--bg-surface,#fff);border:1px solid var(--border-default,#dfdfe8);border-radius:12px;overflow:visible;box-shadow:0 1px 2px rgba(16,42,67,0.05),0 6px 16px rgba(16,42,67,0.04);}
     .pf-step{font-size:11px;font-weight:700;letter-spacing:1px;color:var(--text-tertiary,#999);}
     .pf-step-title{font-size:15px;font-weight:700;}
     /* 단계 안내는 카드 하나다 — **할 일**(굵게) 다음 줄에 **그래서 얻는 것**(회색).
@@ -1581,6 +1592,9 @@
                 </div>
               </div>
             </sc-if>
+            <!-- 체험은 히어로의 [▶ 예시 이미지로 체험하기] 하나가 사용자 동선이다. 여기 것은 그 재생을
+                 기다리지 않고 결과 표만 바로 얹는 지름길이라 개발 도구로 남긴다. -->
+            <button class="pf-dev-btn" disabled="{{ extracting }}" onclick="{{ onLoadDemo }}">예시 데이터 바로 얹기</button>
             <button class="pf-dev-btn" onclick="{{ onResetAll }}" title="이 브라우저에 저장된 보유 데이터를 지우고 STEP 1부터 다시 시작" style="color:var(--ig-red-heart,#ed4956);border-color:#f3c2c7;">보유 데이터 초기화</button>
           </div>
         </sc-if>
@@ -1591,27 +1605,40 @@
 
   <main class="pf-main" style="max-width:1060px;margin:0 auto;padding:14px var(--pf-page-pad,20px) 60px;display:flex;flex-direction:column;gap:14px;">
 
-    <!-- ── 0. 이게 무슨 앱인가 · 내 사진은 어디로 가나 · 다음 할 일 ─────────────────────── -->
-    <!-- 소개와 프라이버시는 처음 온 사람이 스크롤하기 전에 답을 얻어야 하는 두 가지다.
-         다음 할 일은 상태가 무엇이든 **한 줄이 항상 있다**(문구만 갈린다) — 조건부로 없어지면
-         아래가 통째로 튄다. 문구의 단일 출처는 nextAction()/privacyNote() 각각 하나다. -->
-    <div style="display:flex;flex-direction:column;gap:10px;">
-      <div style="display:flex;flex-direction:column;gap:7px;padding:12px 13px;border:1px solid var(--border-default,#dfdfe8);border-radius:8px;background:var(--bg-surface,#fff);">
-        <span class="pf-intro"><b style="color:var(--text-primary,#000);">증권사 앱 캡처 몇 장으로 흩어진 주식을 한 표에 모읍니다.</b> 최신 환율·주가로 확인·트래킹하고, 목표 배분에 맞춰 무엇을 사고팔면 좋을지 제안합니다.</span>
+    <!-- ── 0. 이게 무슨 앱인가 · 보안 · 다음 할 일 ─────────────────────── -->
+    <!-- 히어로는 '무엇을 해 주는가'만, 보안 카드는 '내 사진은 어디로 가나'만 맡는다. 섞어 두면
+         첫 화면에서 두 가지가 서로를 가린다. 문구의 단일 출처는 nextAction()/privacyNote() 각각 하나다. -->
+    <section class="pf-hero">
+      <span class="pf-hero-h">증권사 캡처 몇 장이면, 흩어진 주식이 한 표로 모입니다.</span>
+      <span class="pf-hero-p">계좌마다 따로 보던 종목·수량·평가금액을 하나로 합쳐, 최신 주가와 환율로 계속 확인합니다.
+        목표 비중에서 얼마나 벌어졌는지, 무엇을 얼마나 사고팔면 되는지까지 계산해 드립니다.</span>
+      <!-- 화살표는 앞 칩에 **붙여서** 한 덩어리로 접는다 — 따로 두면 좁은 화면에서 줄 맨 앞에
+           덩그러니 '→' 만 남는다(390px 실측). -->
+      <span class="pf-hero-flow"><span><b>📸 캡처 올리기</b><i>→</i></span><span><b>🔄 한 표로 확인</b><i>→</i></span><span><b>🎯 목표 정하기</b><i>→</i></span><b>🧭 매매 제안</b></span>
+      <!-- 체험 버튼은 여기 하나만 둔다 — 캡처가 없는 사람이 가장 먼저 만나는 자리이고,
+           STEP1 에 또 두면 같은 제안을 두 번 하게 된다. -->
+      <sc-if value="{{ showDemoEntry }}" hint-placeholder-val="{{ true }}">
         <div>
-          <button class="pf-priv" onclick="{{ onPriv }}" style="color:{{ privColor }};"><span>{{ privLine }}</span><span style="color:var(--text-tertiary,#999);font-weight:600;">{{ privCaret }} 자세히</span></button>
-          <sc-if value="{{ privOpen }}" hint-placeholder-val="{{ false }}">
-            <div class="pf-priv-body">
-              <sc-for list="{{ privDetail }}" as="p" hint-placeholder-count="3"><span>· {{ p.text }}</span></sc-for>
-            </div>
-          </sc-if>
+          <button class="pf-btn-primary" disabled="{{ extracting }}" onclick="{{ onDemoStream }}" title="예시 캡처로 추출·보정 과정을 그대로 재생합니다">▶ 예시 이미지로 체험하기</button>
         </div>
-      </div>
+      </sc-if>
+    </section>
+
+    <div class="pf-sec-card">
+      <button class="pf-priv" onclick="{{ onPriv }}" style="color:{{ privColor }};"><span style="font-size:14px;flex:none;">{{ privIcon }}</span><span style="min-width:0;">{{ privLine }}</span><div style="flex:1;"></div><span style="color:var(--text-tertiary,#999);font-weight:600;font-size:11px;white-space:nowrap;">{{ privCaret }} 자세히</span></button>
+      <sc-if value="{{ privOpen }}" hint-placeholder-val="{{ false }}">
+        <div class="pf-priv-body">
+          <sc-for list="{{ privDetail }}" as="p" hint-placeholder-count="3"><span>· {{ p.text }}</span></sc-for>
+        </div>
+      </sc-if>
+    </div>
+
+    <sc-if value="{{ hasNext }}" hint-placeholder-val="{{ false }}">
       <div class="pf-next">
         <span style="font-size:14px;flex:none;">{{ nextIcon }}</span>
         <span style="min-width:0;">{{ nextText }}</span>
       </div>
-    </div>
+    </sc-if>
 
     <!-- ── 1. Upload ─────────────────────────── -->
     <section class="pf-card">
@@ -1662,20 +1689,11 @@
           <sc-if value="{{ notExtracting }}" hint-placeholder-val="{{ true }}">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-tertiary,#999);flex:none;"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><path d="M21 15l-5-5L5 21"></path></svg>
             <span style="display:flex;flex-direction:column;gap:3px;min-width:0;">
-              <span style="font-size:13px;color:var(--text-secondary,#6e6e6e);"><b style="color:var(--ig-blue-link,#3897f0);">클릭해서 선택</b>하거나 이미지를 끌어다 놓으세요 · 여러 장·여러 번 담아 한 번에 분석합니다</span>
+              <span style="font-size:13px;color:var(--text-secondary,#6e6e6e);"><b style="color:var(--ig-blue-link,#3897f0);">클릭해서 선택</b>하거나 이미지를 끌어다 놓으세요</span>
               <span style="font-size:11px;color:var(--text-tertiary,#999);">파일 앱에서 고르면 파일명이 남아 증권사를 자동으로 인식합니다</span>
             </span>
           </sc-if>
         </label>
-
-        <!-- 예시로 먼저 — 올릴 화면이 아직 없는 사람에게 '이런 게 나옵니다'를 보여주는 자리다.
-             ▶ 쪽은 추출·게이트 보정이 흐르는 그대로라, 첫 방문자가 STEP1→STEP5 전체를 겪는다. -->
-        <sc-if value="{{ showDemoEntry }}" hint-placeholder-val="{{ true }}">
-          <div style="margin-top:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-            <button class="pf-btn-ghost" disabled="{{ extracting }}" onclick="{{ onDemoStream }}" title="예시 화면으로 추출·보정 과정을 그대로 재생합니다">▶ 예시로 분석해 보기</button>
-            <button class="pf-btn-ghost" disabled="{{ extracting }}" onclick="{{ onLoadDemo }}">예시 데이터 바로 보기</button>
-          </div>
-        </sc-if>
 
         <!-- 첨부 큐 — 여러 번 나눠 담아도 **한 배치**로 분석한다. 화면 간 교차검증(계좌합계 대조·
              수량 사다리)이 배치 안에서만 도므로, 나눠 보내면 그 근거가 배치 경계에서 끊긴다. -->
@@ -1702,7 +1720,6 @@
           <sc-if value="{{ guideOpen }}" hint-placeholder-val="{{ true }}">
             <div style="margin-top:6px;font-size:12px;line-height:1.55;color:var(--text-secondary,#6e6e6e);background:var(--bg-app,#fafafa);border:1px solid var(--border-default,#dfdfe8);border-radius:8px;padding:10px 12px;">
               화면에 없는 값은 시세로 <span style="color:var(--ig-blue,#1fa1ff);font-weight:600;">자동 추정</span>합니다. 연금처럼 수량이 안 보이는 화면은 종목별·잔고 화면을 함께 올리면 채워집니다.
-              <span style="color:var(--text-tertiary,#999);">한 계좌를 여러 화면으로 나눠 캡처했다면 그 화면들을 같이 담아 주세요 — 한 번에 분석해야 서로 대조됩니다.</span>
             </div>
           </sc-if>
         </div>
@@ -2814,9 +2831,9 @@ class Component extends DCLogic {
     if (S.extracting) return { icon: '⏳', text: S.extractStatus || '분석 중…' };
     if (S.streamStage === 'review') return { icon: '👀', text: '추출 결과를 확인하고 [STEP 2에 반영]을 누르세요 — 값은 표에서 바로 고칠 수 있어요' };
     if ((S.queue || []).length) return { icon: '📎', text: '스크린샷 ' + S.queue.length + '장 담김 — 더 담거나 [분석 시작]을 누르세요' };
-    // 빈 상태에서는 **어디로 가라**만 말한다 — 무엇을 어떻게 올리는지는 STEP1 안내 카드가 말하고,
-    // 같은 말을 두 곳에 두면 화면 위쪽이 두 번 같은 소리를 한다.
-    if (!(S.holdings || []).length) return { icon: '📷', text: '아래 STEP 1부터 시작하세요 — 캡처가 없으면 예시로 먼저 둘러볼 수 있어요' };
+    // 빈 상태에는 줄 자체를 내지 않는다(null) — 히어로가 이미 무엇을 하는 앱인지와 체험 버튼을
+    // 보여주고, STEP1 카드가 무엇을 올릴지 말한다. 여기 한 줄을 더하면 화면 위가 세 번 같은 소리를 한다.
+    if (!(S.holdings || []).length) return null;
     if (this.isStale(S.holdings)) return { icon: '🔄', text: '시세가 하루 넘게 지났어요 — STEP 2에서 [현재가·환율 갱신]을 눌러 주세요' };
     const sum = this.ALLOC.reduce((s, c) => s + (S.target[c.key] || 0), 0);
     if (sum !== 100) return { icon: '🎯', text: 'STEP 3 목표 비중 합계가 ' + sum + '% 예요 — 100%로 맞춰 주세요' };
@@ -2831,14 +2848,14 @@ class Component extends DCLogic {
     const base = this.agentUrl();
     const onDevice = !!base && base === String(location.origin).replace(/\/+$/, '') && this.state.engine !== 'orin';
     const line = !base
-      ? { text: '⚠ 지금은 사진이 외부 AI(Anthropic)로 전송돼요', color: '#b8860b',
+      ? { icon: '⚠', text: '지금은 사진이 외부 AI(Anthropic)로 전송돼요', color: '#b8860b',
           first: '에이전트가 연결되지 않으면 사진을 Anthropic API로 보내 읽습니다(직접 넣은 API 키를 씁니다). 헤더의 [에이전트] 칩에 주소를 넣으면 기기 밖으로 나가지 않아요.' }
       : (onDevice
-        ? { text: '🔒 사진은 기기에서 바로 읽습니다 (온디바이스)', color: 'var(--text-secondary,#6e6e6e)',
+        ? { icon: '🔒', text: '사진은 기기에서 바로 읽습니다 (온디바이스)', color: 'var(--text-primary,#000)',
             first: '캡처한 사진은 기기 안에서 처리합니다. 인터넷으로 올리거나 외부 AI로 보내지 않습니다.' }
-        : { text: '🔒 사진은 연결한 기기에서만 읽습니다', color: 'var(--text-secondary,#6e6e6e)',
+        : { icon: '🔒', text: '사진은 연결한 기기에서만 읽습니다', color: 'var(--text-primary,#000)',
             first: '캡처한 사진은 연결한 분석 기기까지만 갑니다. 외부 AI로는 보내지 않습니다.' });
-    return { line: line.text, color: line.color, detail: [
+    return { line: line.text, icon: line.icon, color: line.color, detail: [
       { text: line.first },
       { text: '인터넷에서 받아오는 것은 환율과 시세뿐입니다. 조회에 나가는 값은 종목명·종목코드이고, 수량·금액·계좌 정보는 나가지 않습니다.' },
       { text: '보유 내역은 이 브라우저에만 저장합니다. 가입도, 서버에 남는 사본도 없습니다.' }
@@ -3509,10 +3526,11 @@ class Component extends DCLogic {
 
     return {
       readingAttr: this.props.comfortReading ? 'comfort' : '',
-      nextIcon: na.icon, nextText: na.text,
+      // 다음 할 일 — 빈 상태에선 nextAction() 이 null 이라 줄 자체가 없다(히어로가 그 자리다).
+      hasNext: !!na, nextIcon: na ? na.icon : '', nextText: na ? na.text : '',
       hasHoldings,
-      // 사진이 어디서 읽히는지 — 접힌 한 줄 + 펼치면 세 줄(문구는 privacyNote 하나에서 온다).
-      privLine: pv.line, privColor: pv.color, privDetail: pv.detail,
+      // 보안 — 접힌 한 줄 + 펼치면 세 줄(문구는 privacyNote 하나에서 온다).
+      privLine: pv.line, privIcon: pv.icon, privColor: pv.color, privDetail: pv.detail,
       privOpen: S.privOpen, privCaret: S.privOpen ? '▾' : '▸',
       onPriv: () => this.setState({ privOpen: !S.privOpen }),
       trackStatus, trackDelta, trackDeltaColor,
