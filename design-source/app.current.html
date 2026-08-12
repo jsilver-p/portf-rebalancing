@@ -1493,6 +1493,22 @@
     /* 좁은 화면에선 안내 문장을 버린다 — 버튼 옆에서 3줄 기둥이 되고, 버튼 글자가 이미 같은 말을 한다. */
     .pf-bar-say{min-width:0;}
     .pf-bar-x:hover{color:var(--text-primary,#000);}
+    /* 튜토리얼 — 안내는 상단 바의 **같은 자리**를 쓴다(따로 띄우면 화면 위가 두 번 말한다).
+       설명문은 좁은 화면에서도 남긴다: 안내 문장과 달리 이건 튜토리얼의 본문이다. */
+    .pf-bar-tour{min-width:0;font-weight:600;color:var(--text-primary,#000);}
+    .pf-bar-step{flex:none;font-size:10.5px;font-weight:700;color:#1a6dc4;background:#dbecff;border-radius:999px;padding:2px 7px;}
+    /* 지금 볼 곳 — box-shadow 로만 그린다. 테두리·아웃라인은 자리를 먹어 레이아웃을 밀거나
+       고정 밴드에서 잘린다. position 은 여기서 손대지 않는다: 강조 대상에 고정 밴드(.pf-sec-head·
+       .pf-res-head)가 있어서, 뒤에 선언된 이 규칙이 sticky 를 relative 로 덮으면 고정 스택이 무너진다.
+       쌓임이 필요한 건 position:static 인 대상뿐이라, 그것만 JS 가 재서 pf-spot-lift 를 같이 건다. */
+    .pf-spot{border-radius:8px;animation:pfspot 1.8s ease-in-out infinite;}
+    .pf-spot-lift{position:relative;z-index:8;}   /* 표 그룹행(3)보다 위, 상단 바(19)보다 아래 */
+    @keyframes pfspot{
+      0%,100%{box-shadow:0 0 0 3px rgba(31,161,255,0.5),0 0 0 8px rgba(31,161,255,0.13);}
+      50%{box-shadow:0 0 0 3px rgba(31,161,255,0.8),0 0 0 13px rgba(31,161,255,0.04);}
+    }
+    /* 프리셋 3개는 한 덩어리로 강조된다 — 하나만 링을 두르면 '이것만 정답'으로 읽힌다. */
+    .pf-presets{display:flex;gap:6px;flex-wrap:wrap;}
     /* 첨부 큐 — 분석 전에 쌓아두는 화면들. 파일명을 그대로 보여주는 게 핵심이다: 갤러리로 고르면
        '1000045629.jpg', 파일 앱으로 고르면 'Screenshot_…_앱이름.jpg' 라 증권사 자동 인식이 될지
        누르기 전에 보인다(아래 보조 진입 주석 참고). */
@@ -1622,6 +1638,19 @@
   <sc-if value="{{ hasBar }}" hint-placeholder-val="{{ true }}">
     <div class="pf-bar">
       <div class="pf-bar-in">
+        <!-- 튜토리얼이 돌면 이 자리를 먼저 가진다 — 지금 볼 곳(파란 링)과 지금 할 말이 한 줄에 있어야
+             둘이 어긋나지 않는다. [다음]은 읽기만 하는 단계에만 나온다: 눌러야 넘어가는 단계는
+             링이 걸린 그 버튼을 누르는 것이 곧 다음이다. -->
+        <sc-if value="{{ showTour }}" hint-placeholder-val="{{ false }}">
+          <span style="font-size:14px;flex:none;">{{ tourIcon }}</span>
+          <span class="pf-bar-step">{{ tourStep }}</span>
+          <span class="pf-bar-tour">{{ tourText }}</span>
+          <div style="flex:1;"></div>
+          <sc-if value="{{ tourManual }}" hint-placeholder-val="{{ true }}">
+            <button class="pf-btn-primary" onclick="{{ onTourNext }}" style="padding:6px 13px;font-size:12px;white-space:nowrap;">{{ tourNextLabel }}</button>
+          </sc-if>
+          <button class="pf-bar-x pf-tap" onclick="{{ onTourEnd }}" title="체험 안내 끝내기">×</button>
+        </sc-if>
         <sc-if value="{{ showInvite }}" hint-placeholder-val="{{ true }}">
           <span style="font-size:14px;flex:none;">📸</span>
           <span class="pf-bar-say">올릴 캡처가 없으신가요? 예시 이미지로 먼저 체험해 보세요.</span>
@@ -1862,7 +1891,7 @@
             </sc-if>
             <sc-if value="{{ streamReview }}" hint-placeholder-val="{{ false }}">
               <div class="pf-review-bar" style="padding:10px 12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-                <button class="pf-btn-primary" onclick="{{ onConfirmStream }}" style="padding:8px 16px;">STEP 2에 반영</button>
+                <button class="pf-btn-primary" data-tour="commit" onclick="{{ onConfirmStream }}" style="padding:8px 16px;">STEP 2에 반영</button>
                 <button onclick="{{ onDiscardStream }}" style="border:1px solid var(--border-default,#dfdfe8);background:transparent;border-radius:6px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;color:var(--text-secondary,#6e6e6e);" style-hover="border-color:var(--ig-red-heart,#ed4956);color:var(--ig-red-heart,#ed4956);">취소</button>
                 <span style="font-size:11.5px;color:var(--text-tertiary,#999);">확인 전까지 아래 보유 현황은 바뀌지 않습니다</span>
               </div>
@@ -2020,9 +2049,11 @@
              정작 '100%인가'는 입력하는 동안 눈에서 멀어진다. -->
         <span class="pf-num" style="font-size:11.5px;font-weight:700;color:{{ sumColor }};background:var(--bg-secondary,#efefef);border-radius:999px;padding:3px 10px;">합계 {{ targetSum }}%</span>
         <div style="flex:1;"></div>
-        <sc-for list="{{ presets }}" as="pr" hint-placeholder-count="3">
-          <button onclick="{{ pr.onApply }}" style="border:1px solid {{ pr.bd }};background:{{ pr.bg }};color:{{ pr.fg }};border-radius:999px;padding:5px 13px;font-size:12px;font-weight:600;cursor:pointer;">{{ pr.label }}</button>
-        </sc-for>
+        <span class="pf-presets" data-tour="preset">
+          <sc-for list="{{ presets }}" as="pr" hint-placeholder-count="3">
+            <button onclick="{{ pr.onApply }}" style="border:1px solid {{ pr.bd }};background:{{ pr.bg }};color:{{ pr.fg }};border-radius:999px;padding:5px 13px;font-size:12px;font-weight:600;cursor:pointer;">{{ pr.label }}</button>
+          </sc-for>
+        </span>
       </div>
       <div class="pf-note-wrap">
         <div class="pf-note">
@@ -2085,7 +2116,7 @@
             </sc-for>
           </div>
         </div>
-        <div style="display:flex;flex-direction:column;gap:10px;padding-top:4px;">
+        <div data-tour="drift" style="display:flex;flex-direction:column;gap:10px;padding-top:4px;">
           <div style="display:grid;grid-template-columns:96px 1fr 120px;gap:10px;font-size:10.5px;font-weight:600;letter-spacing:0.4px;color:var(--text-tertiary,#999);text-transform:uppercase;">
             <span>자산군</span><span>현재 ■ vs 목표 ▢</span><span style="text-align:right;">이탈 (현재−목표)</span>
           </div>
@@ -2124,7 +2155,7 @@
         </div>
       </div>
       <sc-if value="{{ hasHoldings }}" hint-placeholder-val="{{ true }}">
-      <div style="padding:0 var(--pf-sec-pad,18px) 16px;display:flex;flex-direction:column;gap:8px;">
+      <div data-tour="actions" style="padding:0 var(--pf-sec-pad,18px) 16px;display:flex;flex-direction:column;gap:8px;">
         <sc-if value="{{ noActions }}" hint-placeholder-val="{{ false }}">
           <div style="display:flex;align-items:center;gap:10px;padding:16px;border:1px solid var(--border-default,#dfdfe8);border-radius:8px;background:var(--bg-app,#fafafa);">
             <span style="font-size:16px;">✓</span>
@@ -2189,6 +2220,26 @@ class Component extends DCLogic {
       { name: '성장형', t: { growth: 45, dividend: 15, bond: 20, gold: 5, cash: 10, realestate: 5 } },
       { name: '배당·안정형', t: { growth: 15, dividend: 30, bond: 30, gold: 10, cash: 10, realestate: 5 } }
     ];
+    // 예시 체험 = 튜토리얼. 단계 표가 단일 출처다 — 무엇을 비추고(spot), 무엇을 말하고(say),
+    // 어떻게 넘어가는지(auto)가 한 줄에 같이 있다. auto 는 '앱에서 그 일이 실제로 일어나야 넘어간다'는
+    // 뜻이고(스트리밍 끝 → 반영 누름), 그 단계엔 [다음] 버튼을 내지 않는다: 링이 걸린 버튼을 누르는
+    // 것이 곧 다음이다. 버튼을 같이 주면 안 누르고 넘어가 화면과 안내가 어긋난다.
+    this.TOUR = [
+      { key: 'read', icon: '⏳', auto: true, spot: '.pf-res-head',
+        say: '예시 캡처를 읽는 중입니다 — 화면마다 종목이 한 행씩 채워집니다.' },
+      // above: 이 단계는 **위에 있는 것**(방금 읽어낸 표)이 함께 보여야 말이 된다 — 버튼만 화면
+      // 맨 위로 올리면 '표를 훑어보고'가 가리킬 표가 화면 밖으로 밀린다.
+      { key: 'review', icon: '👀', auto: true, spot: '[data-tour="commit"]', above: true,
+        say: '자동 점검이 잘못 읽은 금액을 고쳤습니다. 표를 훑어보고 [STEP 2에 반영]을 눌러 주세요.' },
+      { key: 'table', icon: '🔄', spot: '[data-sechead="2"]',
+        say: '계좌마다 흩어져 있던 종목이 한 표로 모였습니다. 값이 다르면 표에서 바로 고칠 수 있습니다.' },
+      { key: 'target', icon: '🎯', spot: '[data-tour="preset"]',
+        say: '목표로 삼을 비중을 정합니다. 추천 기준을 눌러 보세요 — 아래 칸에 직접 넣어도 됩니다.' },
+      { key: 'drift', icon: '📊', spot: '[data-tour="drift"]',
+        say: '색 막대가 지금, 회색 막대가 목표입니다. 오른쪽 숫자가 목표에서 벌어진 정도예요.' },
+      { key: 'plan', icon: '🧭', spot: '[data-tour="actions"]',
+        say: '벌어진 만큼 되돌리는 리밸런싱 전략입니다. 여기까지가 한 바퀴예요.' }
+    ];
     this.state = {
       holdings: [],
       target: { ...this.PRESETS[0].t },
@@ -2208,6 +2259,7 @@ class Component extends DCLogic {
       privOpen: false,            // '사진은 어디서 읽히나' 상세 — 접힌 한 줄이 기본
       // 체험 안내(상단 바) — 한 번 닫으면 다시 뜨지 않는다(localStorage). 다시 보려면 ⚙ 에서 실행.
       inviteHidden: false,
+      tour: null,                 // 튜토리얼 단계 index(TOUR) — null 이면 안 돎. 저장하지 않는다.
       devOpen: false,             // 헤더 ⚙ — 개발 전용 도구는 전부 여기 안에만 있다
       advOpen: false,             // STEP2 고급(환율 수동·기준시점)
       // 지속 트래킹 — 직전 갱신 시점의 총자산. 재평가 직전에 찍어 '직전 대비 변화'를 만든다(저장됨).
@@ -2457,6 +2509,7 @@ class Component extends DCLogic {
   componentWillUnmount() {
     (this.state.queue || []).forEach(q => { try { URL.revokeObjectURL(q.url); } catch (e) {} });
     if (this._healthTimer) clearInterval(this._healthTimer);
+    if (this._tourTimer) clearInterval(this._tourTimer);
     if (this._stickyRO) this._stickyRO.disconnect();
     if (this._setSticky) window.removeEventListener('resize', this._setSticky);
     if (this._stickyMO) this._stickyMO.disconnect();
@@ -3079,6 +3132,7 @@ class Component extends DCLogic {
       streamNote: note || '',
       streamCapture: capture || ''
     });
+    this._tourDone('read');       // 튜토리얼 중이면 '읽는 중' 단계가 여기서 끝난다(아니면 무동작)
   }
 
   // 촬영 시점 라벨 — EXIF 시각이면 그대로, 아니면 기준일. 스크린샷의 시점을 사용자에게 명시.
@@ -3137,6 +3191,8 @@ class Component extends DCLogic {
         if (pending.length) this.applySnapshot(pending, note);
         // 반영 결과가 어디로 갔는지 보이게 — 프리뷰가 사라진 자리에 그대로 서 있으면 아무 일도
         // 안 일어난 것처럼 읽힌다. 다음 할 일(STEP2 확인)로 시선을 옮긴다.
+        // 튜토리얼 중이면 그 이동은 다음 단계가 한다(같은 곳으로 두 번 스크롤하지 않는다).
+        if (this.state.tour != null) { this._tourDone('review'); return; }
         const el = document.querySelector('[data-sechead="2"]');
         if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
       });
@@ -3145,6 +3201,118 @@ class Component extends DCLogic {
   discardStream() {
     this._revealQ = [];
     this.setState({ streamStage: '', streamRows: [], gateReport: null, streamPending: null, streamNote: '', streamCapture: '', extractStatus: '', extracting: false });
+    this.endTour();                                   // 취소하면 튜토리얼도 끝난다(가리킬 화면이 사라졌다)
+  }
+
+  // ── 튜토리얼 ────────────────────────────────────────────────────────────────
+  // 단계 이동은 세 갈래뿐이다: 시작(demoStream) · 앱에서 그 일이 일어남(_tourDone) · [다음](nextTour).
+  // 어느 갈래든 여기 한 곳으로 모여 '단계를 세우고 → 그 자리로 스크롤하고 → 링을 건다'를 같이 한다.
+  startTour() { this._tourGo(0); }
+
+  // auto 단계는 앱이 실제로 그 일을 마쳤을 때만 넘어간다 — 지금 단계가 그 단계일 때에 한해서.
+  // (실제 추출·다른 경로에서 같은 함수가 불려도 튜토리얼이 제멋대로 앞서지 않게 하는 자물쇠다.)
+  _tourDone(key) {
+    const i = this.state.tour;
+    if (i == null || this.TOUR[i].key !== key) return;
+    if (i + 1 >= this.TOUR.length) this.endTour(true); else this._tourGo(i + 1);
+  }
+
+  nextTour() {
+    const i = this.state.tour;
+    if (i == null) return;
+    if (i + 1 >= this.TOUR.length) this.endTour(true); else this._tourGo(i + 1);
+  }
+
+  _tourGo(i) {
+    const step = this.TOUR[i];
+    // 렌더가 끝난 뒤에 재고 건다 — 단계가 바뀌면서 비출 요소가 이제 막 생기는 경우가 있다
+    // (프리뷰 표·STEP2 본문). 리렌더로 노드가 갈릴 수 있어 링은 _tourKeep 이 계속 다시 건다.
+    // 두 번 맞춘다: 한 번은 바로(반응이 늦으면 튜토리얼이 멈춘 것처럼 보인다), 한 번은 스크롤이
+    // 끝난 뒤(그 사이 레이아웃이 바뀐다 — 프리뷰 표가 사라지고 상단 바 줄 수가 달라진다).
+    // 두 번째는 어긋난 게 8px 넘을 때만 다시 민다(맞은 자리를 또 흔들지 않는다).
+    this.setState({ tour: i }, () => {
+      setTimeout(() => this._tourFocus(step), 80);
+      setTimeout(() => this._tourFocus(step, 8), 620);
+    });
+    if (!this._tourTimer) this._tourTimer = setInterval(() => this._tourKeep(), 400);
+  }
+
+  // 스크롤 — scrollIntoView 는 고정 스택(헤더+상단 바+STEP 제목) 밑으로 밀어 넣지 못해 위가 잘린다.
+  // 덮는 높이를 실측해 그만큼 뺀다: 제목 밴드는 대상이 그 밴드 안에 있을 때는 빼지 않는다(자기 자신이다).
+  _tourFocus(step, tol) {
+    const sel = step && step.spot;
+    this._tourSpot(sel);
+    const el = sel && document.querySelector(sel);
+    if (!el) return;
+    // 상단 바 높이는 단계마다 바뀐다(안내문 길이) — 발행된 값이 한 프레임 늦으면 그만큼 어긋난 곳에
+    // 멈춘다(390px 실측: 제목 밴드가 14px 더 올라가 붙어 자기 설명을 덮었다). 재고 나서 계산한다.
+    if (this._setSticky) this._setSticky();
+    const barH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--pf-bar-h')) || 80;
+    const card = el.closest && el.closest('section.pf-card');
+    const head = card && card.querySelector('.pf-sec-head');
+    const headH = (head && head !== el && !head.contains(el)) ? head.getBoundingClientRect().height : 0;
+    const cover = barH + headH;                       // 고정 스택이 덮는 높이
+    // 대상이 제목 밴드 **안**이면 기준점은 밴드 자신이다 — 대상(예: 프리셋 줄)을 바로 밑에 붙이면
+    // 그 위의 제목 줄이 밀려 올라가 밴드가 고정되고, 밴드가 바로 아래 설명을 덮는다(390px 실측).
+    const anchor = (head && head !== el && head.contains(el)) ? head : el;
+    // 붙어 있는 동안 sticky 요소는 **자기 자리를 모른다** — rect.top 도 offsetTop 도(Gecko 실측)
+    // 붙은 자리를 돌려주므로, 그 값으로 스크롤 위치를 정하면 식이 자기를 참조해 고정점이 없다
+    // (390px 실측: 한 번 붙으면 다시 계산해도 같은 자리에 눌러앉아 제 설명을 덮었다).
+    // 재는 동안만 static 으로 되돌려 **원래 자리**를 얻는다(같은 프레임 안이라 화면에는 안 보인다).
+    const scrollY = window.scrollY || window.pageYOffset || 0;
+    const sticky = getComputedStyle(anchor).position === 'sticky';
+    let docTop;
+    if (sticky) {
+      const keep = anchor.style.position;
+      anchor.style.position = 'static';
+      docTop = anchor.getBoundingClientRect().top + scrollY;
+      anchor.style.position = keep;
+    } else {
+      docTop = anchor.getBoundingClientRect().top + scrollY;
+    }
+    const room = Math.max(120, window.innerHeight - cover);
+    // 기본은 덮개 바로 밑(위를 낭비하지 않는다). above 단계만 위쪽 맥락을 남기고 내려 붙인다.
+    const gap = step.above ? Math.max(14, Math.min(room - anchor.getBoundingClientRect().height - 14, room * 0.55)) : 14;
+    const top = docTop - cover - gap;
+    if (tol && Math.abs(scrollY - Math.max(0, top)) <= tol) return;  // 이미 제자리 — 다시 밀지 않는다
+    window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+  }
+
+  _tourSpot(sel) {
+    const cur = sel && document.querySelector(sel);
+    if (cur && cur === this._spotEl && cur.classList.contains('pf-spot')) return;   // 같은 자리 — 펄스를 되감지 않는다
+    if (this._spotEl) { this._spotEl.classList.remove('pf-spot', 'pf-spot-lift'); this._spotEl = null; }
+    this._spotSel = sel || '';
+    const el = sel && document.querySelector(sel);
+    if (!el) return;
+    el.classList.add('pf-spot');
+    // 쌓임 맥락이 없는(static) 대상만 들어올린다 — sticky 밴드의 position 을 덮으면 고정 스택이 무너진다.
+    if (getComputedStyle(el).position === 'static') el.classList.add('pf-spot-lift');
+    this._spotEl = el;
+  }
+
+  // 리렌더가 className 을 되돌리거나 노드를 통째로 갈아 끼우면 링이 조용히 사라진다 —
+  // 스크림(.pf-scrim)이 매 프레임 다시 거는 것과 같은 이유로, 여기도 주기적으로 다시 건다.
+  _tourKeep() {
+    if (this.state.tour == null || !this._spotSel) return;
+    const el = document.querySelector(this._spotSel);
+    if (!el) return;
+    if (el !== this._spotEl || !el.classList.contains('pf-spot')) this._tourSpot(this._spotSel);
+  }
+
+  endTour(done) {
+    if (this._tourTimer) { clearInterval(this._tourTimer); this._tourTimer = null; }
+    this._tourSpot('');
+    if (this.state.tour == null) return;
+    this.setState({ tour: null });
+    if (!done) return;
+    // 끝은 '이제 당신 차례'로 닫는다 — STEP1 업로드로 데려가 잠깐 링을 남긴다. 예시로 들어온 값이
+    // 표에 남는다는 사실도 여기서 말한다(안 말하면 내 데이터인 줄 안다).
+    this.setState({ extractInfo: '예시 체험이 끝났습니다 — 이제 내 캡처를 올려 보세요. 예시로 들어온 값은 ⚙ → [보유 데이터 초기화]로 지웁니다.' });
+    setTimeout(() => {
+      this._tourFocus({ spot: '.pf-drop' });
+      setTimeout(() => { if (this.state.tour == null) this._tourSpot(''); }, 4000);
+    }, 80);
   }
 
   // 데모용 더미 추출 — 에이전트 없이도 라이브 스트리밍 + 게이트 자릿수 보정을 눈으로 보게 한다.
@@ -3204,6 +3372,8 @@ class Component extends DCLogic {
       } }, delay))(i, t);
     }
     setTimeout(() => { if (this.state.streamStage === 'live') this._finishStream(finalRows, gate, pending, ''); }, t + 1000);
+    // 체험은 곧 튜토리얼이다 — 진입이 하나이므로 시작도 여기 한 곳이다(히어로 버튼·⚙ 둘 다 이리로 온다).
+    this.startTour();
   }
 
   // 로컬 에이전트 경로: 화면을 **한 번에** 보내 서버가 종합한다(화면 간 교차검증이 필요하기 때문).
@@ -3548,6 +3718,9 @@ class Component extends DCLogic {
     // 체험 안내는 '올릴 것이 아직 없고, 닫은 적도 없을 때'만. 데이터가 생기면 안내가 방해가 된다.
     const showInvite = !S.inviteHidden && !hasHoldings && !(S.queue || []).length
       && !(S.streamRows || []).length && !S.extracting;
+    // 튜토리얼이 돌면 상단 바는 그것만 낸다 — 안내·진행 상태와 같은 자리이므로 셋 중 하나만 산다.
+    const tour = S.tour != null ? this.TOUR[S.tour] : null;
+    const tourLast = S.tour != null && S.tour + 1 >= this.TOUR.length;
     const lastAt = this.lastUpdatedAt(S.holdings);
     const fxTag = S.fxStatus || (S.fxUpdatedAt ? ('자동 · ' + this.timeAgo(S.fxUpdatedAt)) : '저장값');
     // 보유가 없으면 이 줄은 아예 렌더되지 않는다(빈 상태의 STEP2 는 설명 두 줄이 전부).
@@ -3574,9 +3747,17 @@ class Component extends DCLogic {
       readingAttr: this.props.comfortReading ? 'comfort' : '',
       // 상단 바 — 안내와 진행 상태가 같은 자리를 나눠 쓴다. 안내가 우선(있으면 그것만),
       // 없으면 nextAction(). 둘 다 없으면 바 자체가 사라져 고정 스택 높이가 그만큼 준다.
-      hasBar: showInvite || !!na, showInvite, showNext: !showInvite && !!na,
+      hasBar: !!tour || showInvite || !!na,
+      showInvite: !tour && showInvite, showNext: !tour && !showInvite && !!na,
       nextIcon: na ? na.icon : '', nextText: na ? na.text : '',
       onHideInvite: () => this.hideInvite(),
+      // 튜토리얼 — 문구·비출 곳은 TOUR 표 하나에서 온다. 여기서 만드는 건 표시용 문자열뿐.
+      showTour: !!tour, tourIcon: tour ? tour.icon : '', tourText: tour ? tour.say : '',
+      tourStep: tour ? ((S.tour + 1) + '/' + this.TOUR.length) : '',
+      tourManual: !!tour && !tour.auto,
+      tourNextLabel: tourLast ? '체험 끝내기' : '다음 ▸',
+      onTourNext: () => this.nextTour(),
+      onTourEnd: () => this.endTour(),
       hasHoldings,
       // 보안 — 접힌 한 줄 + 펼치면 세 줄(문구는 privacyNote 하나에서 온다).
       privLine: pv.line, privIcon: pv.icon, privColor: pv.color, privDetail: pv.detail,
@@ -3764,7 +3945,8 @@ class Component extends DCLogic {
         bg: active ? '#1fa1ff' : 'transparent',
         fg: active ? '#fff' : 'var(--text-primary,#000)',
         bd: active ? '#1fa1ff' : 'var(--border-strong,#c4c4c4)',
-        onApply: () => this.set({ target: { ...p.t } })
+        // 튜토리얼의 '목표 정하기' 단계는 이 버튼을 누르는 것이 곧 다음이다(다른 단계와 같은 규칙).
+        onApply: () => { this.set({ target: { ...p.t } }); this._tourDone('target'); }
       };
     });
     return { targetRows, targetSum, presets };
