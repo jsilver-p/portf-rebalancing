@@ -1506,11 +1506,14 @@
     .pf-card{background:var(--bg-surface,#fff);border:1px solid var(--border-default,#dfdfe8);border-radius:10px;overflow:visible;}
     .pf-step{font-size:11px;font-weight:700;letter-spacing:1px;color:var(--text-tertiary,#999);}
     .pf-step-title{font-size:15px;font-weight:700;}
-    .pf-step-desc{font-size:12px;color:var(--text-secondary,#6e6e6e);}
-    /* 단계 설명은 두 줄이다 — 이 단계가 **해 주는 것**(회색)과 사용자가 **하실 일**(진하게).
-       둘을 한 줄에 이어 붙이면 어디까지가 설명이고 어디부터가 내 차례인지 안 보인다. */
-    .pf-todo{display:flex;align-items:baseline;gap:7px;font-size:12px;line-height:1.5;color:var(--text-primary,#000);}
-    .pf-todo-lbl{flex:none;font-size:10px;font-weight:700;letter-spacing:0.3px;color:var(--ig-blue-deep,#004c8b);background:#eaf4ff;border:1px solid #cfe6ff;border-radius:4px;padding:1px 6px;}
+    /* 단계 안내는 카드 하나다 — **할 일**(굵게) 다음 줄에 **그래서 얻는 것**(회색).
+       '하실 일' 같은 라벨을 글자로 붙이지 않는다: 파란 배경과 이모지가 이미 그 역할을 한다.
+       순서가 중요하다 — 할 일 → 얻는 것이라야 왜 해야 하는지가 붙어 읽힌다. */
+    .pf-note{display:flex;align-items:flex-start;gap:9px;background:#f2f8ff;border:1px solid #d8e9fb;border-radius:8px;padding:10px 12px;}
+    .pf-note-ico{flex:none;font-size:15px;line-height:1.4;}
+    .pf-note-do{font-size:12.5px;font-weight:700;line-height:1.45;color:var(--text-primary,#000);}
+    .pf-note-get{font-size:12px;line-height:1.5;color:var(--text-secondary,#6e6e6e);}
+    .pf-note-tip{color:var(--text-tertiary,#999);}   /* 주의·단서(~요) — 본문보다 한 단계 흐리게 */
     /* 빈 단계 자리 — 데이터가 없으면 설명 두 줄이 곧 그 섹션의 전부다. 빈 표·0짜리 도넛을 그리지 않는다
        (실측: 그것들이 모바일에서 2100px 를 먹고 있었다). */
     .pf-empty-pad{padding-bottom:14px;}
@@ -1616,9 +1619,14 @@
       <!-- 설명 두 줄은 고정 밴드 **밖**이다 — 안에 두면 좁은 화면에서 랩되며 밴드를 60px 로 부풀려
            (실측: 포함 60 / 제외 37) 표를 덮는다. 한 번 읽는 안내이므로 그냥 같이 스크롤돼 사라진다.
            스크롤 상태로 숨기는 방식은 쓰지 않는다 — 그러면 이번엔 이 밴드가 튄다(헤더와 같은 병). -->
-      <div style="padding:8px var(--pf-sec-pad,18px) 0;display:flex;flex-direction:column;gap:5px;">
-        <span class="pf-step-desc">증권사 앱 캡처 화면을 종합해, 가진 종목을 한 번에 파악할 수 있게 데이터화합니다.</span>
-        <span class="pf-todo"><span class="pf-todo-lbl">하실 일</span><span>사용하는 증권사 앱의 보유 화면을 캡처해 한 번에 올리고, 추출 결과에 잘못 읽은 값이 없는지 확인합니다. <span style="color:var(--text-secondary,#6e6e6e);">(수량·평가금액(매수금액)이 보이는 화면이면 좋아요.)</span></span></span>
+      <div style="padding:8px var(--pf-sec-pad,18px) 0;">
+        <div class="pf-note">
+          <span class="pf-note-ico">📸</span>
+          <div style="display:flex;flex-direction:column;gap:3px;min-width:0;">
+            <span class="pf-note-do">사용하는 증권사 앱의 보유 화면을 캡처해 한 번에 올려 주세요.</span>
+            <span class="pf-note-get">→ 흩어진 계좌의 종목·수량·평가금액이 한 표로 정리됩니다. <span class="pf-note-tip">(수량과 평가금액(매수금액)이 보이는 화면일수록 정확해요.)</span></span>
+          </div>
+        </div>
       </div>
       <div style="padding:14px var(--pf-sec-pad,18px) 18px;">
         <!-- 추출 중엔 이 영역이 입력을 받지 않는다(pointer-events:none) — 실제 차단은 extractFiles
@@ -1662,7 +1670,6 @@
           <div style="margin-top:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
             <button class="pf-btn-ghost" disabled="{{ extracting }}" onclick="{{ onDemoStream }}" title="예시 화면으로 추출·보정 과정을 그대로 재생합니다">▶ 예시로 분석해 보기</button>
             <button class="pf-btn-ghost" disabled="{{ extracting }}" onclick="{{ onLoadDemo }}">예시 데이터 바로 보기</button>
-            <span style="font-size:11.5px;color:var(--text-tertiary,#999);">직접 올리기 전에 먼저 둘러볼 수 있습니다.</span>
           </div>
         </sc-if>
 
@@ -1844,9 +1851,14 @@
         </sc-if>
       </div>
       <!-- 설명 두 줄도 고정 밴드 밖(STEP1 과 같은 이유). 데이터가 없으면 이 두 줄이 섹션의 전부다. -->
-      <div style="padding:0 var(--pf-sec-pad,18px) 12px;display:flex;flex-direction:column;gap:5px;">
-        <span class="pf-step-desc">계좌마다 흩어진 종목을 한 표로 모으고, 현재 환율·주가로 업데이트하며 트래킹합니다.</span>
-        <span class="pf-todo"><span class="pf-todo-lbl">하실 일</span><span>값이 다르면 표에서 직접 고칩니다. 수량·매수금액도 그 자리에서 조정합니다. <span style="color:var(--text-secondary,#6e6e6e);">(다시 올 때는 [현재가·환율 갱신]을 한 번 눌러 주세요.)</span></span></span>
+      <div style="padding:0 var(--pf-sec-pad,18px) 12px;">
+        <div class="pf-note">
+          <span class="pf-note-ico">🔄</span>
+          <div style="display:flex;flex-direction:column;gap:3px;min-width:0;">
+            <span class="pf-note-do">값이 다르면 표에서 바로 고치고, 다시 올 때 [현재가·환율 갱신]을 눌러 주세요.</span>
+            <span class="pf-note-get">→ 모든 계좌가 최신 주가·환율로 다시 계산돼, 지금 총자산과 계좌별 비중이 한눈에 보입니다. <span class="pf-note-tip">(수량·매수금액도 그 자리에서 조정돼요.)</span></span>
+          </div>
+        </div>
       </div>
       <sc-if value="{{ hasHoldings }}" hint-placeholder-val="{{ true }}">
       <!-- 툴바는 고정 밴드(.pf-sec-head) **밖**이다 — 좁은 화면에서 3~4줄로 랩되면서 고정 높이를
@@ -1969,9 +1981,14 @@
           <button onclick="{{ pr.onApply }}" style="border:1px solid {{ pr.bd }};background:{{ pr.bg }};color:{{ pr.fg }};border-radius:999px;padding:5px 13px;font-size:12px;font-weight:600;cursor:pointer;">{{ pr.label }}</button>
         </sc-for>
       </div>
-      <div style="padding:0 var(--pf-sec-pad,18px) 10px;display:flex;flex-direction:column;gap:5px;">
-        <span class="pf-step-desc">목표로 정할 포트폴리오 기준치를 고릅니다.</span>
-        <span class="pf-todo"><span class="pf-todo-lbl">하실 일</span><span>추천 기준을 선택하거나 비중을 직접 설정합니다. <span style="color:var(--text-secondary,#6e6e6e);">(합계가 100%여야 해요.)</span></span></span>
+      <div style="padding:0 var(--pf-sec-pad,18px) 10px;">
+        <div class="pf-note">
+          <span class="pf-note-ico">🎯</span>
+          <div style="display:flex;flex-direction:column;gap:3px;min-width:0;">
+            <span class="pf-note-do">추천 기준을 고르거나 비중을 직접 설정해 주세요.</span>
+            <span class="pf-note-get">→ 내가 원하는 자산 구성이 기준이 되어, 아래 분석과 매매 제안이 전부 이 기준으로 계산됩니다. <span class="pf-note-tip">(합계가 100%여야 해요.)</span></span>
+          </div>
+        </div>
       </div>
       <div style="display:flex;gap:10px;padding:0 var(--pf-sec-pad,18px) 16px;flex-wrap:wrap;align-items:flex-end;">
         <sc-for list="{{ targetRows }}" as="t" hint-placeholder-count="6">
@@ -1992,9 +2009,14 @@
         <span class="pf-step">STEP 4</span>
         <span class="pf-step-title">자산배분 분석</span>
       </div>
-      <div class="pf-empty-pad" style="padding:2px var(--pf-sec-pad,18px) 0;display:flex;flex-direction:column;gap:5px;">
-        <span class="pf-step-desc">지금 배분이 목표에서 얼마나 벌어졌는지 자산군별로 계산합니다.</span>
-        <span class="pf-todo"><span class="pf-todo-lbl">하실 일</span><span>색 막대(지금)와 회색 막대(목표)의 차이를 봅니다. <span style="color:var(--text-secondary,#6e6e6e);">(혼합형 펀드는 배당주·채권 반반으로 나눠 집계돼요.)</span></span></span>
+      <div class="pf-empty-pad" style="padding:2px var(--pf-sec-pad,18px) 0;">
+        <div class="pf-note">
+          <span class="pf-note-ico">📊</span>
+          <div style="display:flex;flex-direction:column;gap:3px;min-width:0;">
+            <span class="pf-note-do">색 막대(지금)와 회색 막대(목표)의 차이를 확인해 주세요.</span>
+            <span class="pf-note-get">→ 어느 자산군이 얼마나 넘치고 모자란지 %p로 나옵니다. <span class="pf-note-tip">(혼합형 펀드는 배당주·채권 반반으로 나눠 집계돼요.)</span></span>
+          </div>
+        </div>
       </div>
       <sc-if value="{{ hasHoldings }}" hint-placeholder-val="{{ true }}">
       <div class="pf-analysis" style="padding:12px var(--pf-sec-pad,18px) 20px;align-items:start;">
@@ -2046,9 +2068,14 @@
         <span class="pf-step">STEP 5</span>
         <span class="pf-step-title">리밸런싱 액션</span>
       </div>
-      <div class="pf-empty-pad" style="padding:0 var(--pf-sec-pad,18px) 0;display:flex;flex-direction:column;gap:5px;">
-        <span class="pf-step-desc">목표에 맞추려면 무엇을 얼마나 사고팔면 되는지 정리합니다.</span>
-        <span class="pf-todo"><span class="pf-todo-lbl">하실 일</span><span>제안을 확인하고, 실제 매매는 증권사 앱에서 진행합니다. <span style="color:var(--text-secondary,#6e6e6e);">(차이가 ±{{ bandStr }}%p 안이면 제안에 넣지 않아요.)</span></span></span>
+      <div class="pf-empty-pad" style="padding:0 var(--pf-sec-pad,18px) 0;">
+        <div class="pf-note">
+          <span class="pf-note-ico">🧭</span>
+          <div style="display:flex;flex-direction:column;gap:3px;min-width:0;">
+            <span class="pf-note-do">제안을 확인하고, 실제 매매는 증권사 앱에서 진행해 주세요.</span>
+            <span class="pf-note-get">→ 무엇을 얼마나 사고팔면 목표 비중에 닿는지 금액까지 정리됩니다. <span class="pf-note-tip">(차이가 ±{{ bandStr }}%p 안이면 제안에 넣지 않아요.)</span></span>
+          </div>
+        </div>
       </div>
       <sc-if value="{{ hasHoldings }}" hint-placeholder-val="{{ true }}">
       <div style="padding:10px var(--pf-sec-pad,18px) 14px;display:flex;flex-direction:column;gap:8px;">
@@ -2779,7 +2806,9 @@ class Component extends DCLogic {
     if (S.extracting) return { icon: '⏳', text: S.extractStatus || '분석 중…' };
     if (S.streamStage === 'review') return { icon: '👀', text: '추출 결과를 확인하고 [STEP 2에 반영]을 누르세요 — 값은 표에서 바로 고칠 수 있어요' };
     if ((S.queue || []).length) return { icon: '📎', text: '스크린샷 ' + S.queue.length + '장 담김 — 더 담거나 [분석 시작]을 누르세요' };
-    if (!(S.holdings || []).length) return { icon: '📷', text: '증권사 앱 보유 화면을 캡처해 올려 주세요 — 여러 계좌를 한 번에 담을 수 있어요' };
+    // 빈 상태에서는 **어디로 가라**만 말한다 — 무엇을 어떻게 올리는지는 STEP1 안내 카드가 말하고,
+    // 같은 말을 두 곳에 두면 화면 위쪽이 두 번 같은 소리를 한다.
+    if (!(S.holdings || []).length) return { icon: '📷', text: '아래 STEP 1부터 시작하세요 — 캡처가 없으면 예시로 먼저 둘러볼 수 있어요' };
     if (this.isStale(S.holdings)) return { icon: '🔄', text: '시세가 하루 넘게 지났어요 — STEP 2에서 [현재가·환율 갱신]을 눌러 주세요' };
     const sum = this.ALLOC.reduce((s, c) => s + (S.target[c.key] || 0), 0);
     if (sum !== 100) return { icon: '🎯', text: 'STEP 3 목표 비중 합계가 ' + sum + '% 예요 — 100%로 맞춰 주세요' };
