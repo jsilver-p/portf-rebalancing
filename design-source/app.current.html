@@ -1513,7 +1513,10 @@
     .pf-note-ico{flex:none;font-size:15px;line-height:1.4;}
     .pf-note-do{font-size:12.5px;font-weight:700;line-height:1.45;color:var(--text-primary,#000);}
     .pf-note-get{font-size:12px;line-height:1.5;color:var(--text-secondary,#6e6e6e);}
-    .pf-note-tip{color:var(--text-tertiary,#999);}   /* 주의·단서(~요) — 본문보다 한 단계 흐리게 */
+    /* 주의·단서(~요)는 **줄 앞에 ! 를 달아** 따로 세운다 — 괄호로 문장 끝에 붙이면 읽는 사람이
+       그냥 지나간다. 색은 배지 범례의 앰버와 같은 어휘(#b8860b)를 쓴다. */
+    .pf-note-tip{display:flex;align-items:baseline;gap:5px;font-size:11.5px;line-height:1.5;color:#96701a;}
+    .pf-bang{flex:none;font-weight:800;color:#b8860b;}
     /* 빈 단계 자리 — 데이터가 없으면 설명 두 줄이 곧 그 섹션의 전부다. 빈 표·0짜리 도넛을 그리지 않는다
        (실측: 그것들이 모바일에서 2100px 를 먹고 있었다). */
     .pf-empty-pad{padding-bottom:14px;}
@@ -1624,7 +1627,8 @@
           <span class="pf-note-ico">📸</span>
           <div style="display:flex;flex-direction:column;gap:3px;min-width:0;">
             <span class="pf-note-do">사용하는 증권사 앱의 보유 화면을 캡처해 한 번에 올려 주세요.</span>
-            <span class="pf-note-get">→ 흩어진 계좌의 종목·수량·평가금액이 한 표로 정리됩니다. <span class="pf-note-tip">(수량과 평가금액(매수금액)이 보이는 화면일수록 정확해요.)</span></span>
+            <span class="pf-note-get">→ 흩어진 계좌의 종목·수량·평가금액이 한 표로 정리됩니다.</span>
+            <span class="pf-note-tip"><b class="pf-bang">!</b><span>수량과 평가금액(매수금액)이 보이는 화면일수록 정확해요.</span></span>
           </div>
         </div>
       </div>
@@ -1688,7 +1692,7 @@
           <div style="margin-top:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
             <button class="pf-btn-primary" disabled="{{ extracting }}" onclick="{{ onAnalyze }}">{{ analyzeLabel }}</button>
             <button class="pf-btn-ghost" disabled="{{ extracting }}" onclick="{{ onClearQueue }}">모두 빼기</button>
-            <span style="font-size:11.5px;color:var(--text-tertiary,#999);">{{ queueHint }}</span>
+            <span class="pf-note-tip"><b class="pf-bang">!</b><span>{{ queueHint }}</span></span>
           </div>
         </sc-if>
 
@@ -1856,7 +1860,8 @@
           <span class="pf-note-ico">🔄</span>
           <div style="display:flex;flex-direction:column;gap:3px;min-width:0;">
             <span class="pf-note-do">값이 다르면 표에서 바로 고치고, 다시 올 때 [현재가·환율 갱신]을 눌러 주세요.</span>
-            <span class="pf-note-get">→ 모든 계좌가 최신 주가·환율로 다시 계산돼, 지금 총자산과 계좌별 비중이 한눈에 보입니다. <span class="pf-note-tip">(수량·매수금액도 그 자리에서 조정돼요.)</span></span>
+            <span class="pf-note-get">→ 모든 계좌가 최신 주가·환율로 다시 계산돼, 지금 총자산과 계좌별 비중이 한눈에 보입니다. 수량·매수금액도 그 자리에서 조정됩니다.</span>
+            <span class="pf-note-tip"><b class="pf-bang">!</b><span>갱신은 에이전트가 연결돼 있어야 돌아가요. 연결 상태는 헤더의 [에이전트] 칩에서 볼 수 있어요.</span></span>
           </div>
         </div>
       </div>
@@ -1986,7 +1991,8 @@
           <span class="pf-note-ico">🎯</span>
           <div style="display:flex;flex-direction:column;gap:3px;min-width:0;">
             <span class="pf-note-do">추천 기준을 고르거나 비중을 직접 설정해 주세요.</span>
-            <span class="pf-note-get">→ 내가 원하는 자산 구성이 기준이 되어, 아래 분석과 매매 제안이 전부 이 기준으로 계산됩니다. <span class="pf-note-tip">(합계가 100%여야 해요.)</span></span>
+            <span class="pf-note-get">→ 내가 원하는 자산 구성이 기준이 되어, 아래 분석과 매매 제안이 전부 이 기준으로 계산됩니다.</span>
+            <span class="pf-note-tip"><b class="pf-bang">!</b><span>합계가 100%여야 아래 계산이 맞아요.</span></span>
           </div>
         </div>
       </div>
@@ -2014,7 +2020,8 @@
           <span class="pf-note-ico">📊</span>
           <div style="display:flex;flex-direction:column;gap:3px;min-width:0;">
             <span class="pf-note-do">색 막대(지금)와 회색 막대(목표)의 차이를 확인해 주세요.</span>
-            <span class="pf-note-get">→ 어느 자산군이 얼마나 넘치고 모자란지 %p로 나옵니다. <span class="pf-note-tip">(혼합형 펀드는 배당주·채권 반반으로 나눠 집계돼요.)</span></span>
+            <span class="pf-note-get">→ 어느 자산군이 얼마나 넘치고 모자란지 %p로 나옵니다.</span>
+            <span class="pf-note-tip"><b class="pf-bang">!</b><span>혼합형 펀드는 배당주·채권 반반으로 나눠 집계돼요.</span></span>
           </div>
         </div>
       </div>
@@ -2073,7 +2080,8 @@
           <span class="pf-note-ico">🧭</span>
           <div style="display:flex;flex-direction:column;gap:3px;min-width:0;">
             <span class="pf-note-do">제안을 확인하고, 실제 매매는 증권사 앱에서 진행해 주세요.</span>
-            <span class="pf-note-get">→ 무엇을 얼마나 사고팔면 목표 비중에 닿는지 금액까지 정리됩니다. <span class="pf-note-tip">(차이가 ±{{ bandStr }}%p 안이면 제안에 넣지 않아요.)</span></span>
+            <span class="pf-note-get">→ 무엇을 얼마나 사고팔면 목표 비중에 닿는지 금액까지 정리됩니다.</span>
+            <span class="pf-note-tip"><b class="pf-bang">!</b><span>차이가 ±{{ bandStr }}%p 안이면 제안에 넣지 않아요. 세금·수수료는 계산에 넣지 않습니다.</span></span>
           </div>
         </div>
       </div>
@@ -3541,10 +3549,11 @@ class Component extends DCLogic {
       })),
       hasQueue: (S.queue || []).length > 0,
       analyzeLabel: S.extracting ? '분석 중…' : ('분석 시작 (' + (S.queue || []).length + '장)'),
-      // 파괴적 규칙(스냅샷 대체)은 상시 설명문이 아니라 **누르기 직전**에 둔다 — 그래서 '~요'다.
+      // 파괴적 규칙(스냅샷 대체)은 상시 설명문이 아니라 **누르기 직전**에 둔다. 마크업에서 앞에
+      // ! 가 붙으므로 여기 문장은 주의 내용만 담는다(정적 안내의 주의 = '!', 지금 상태의 경고 = '⚠').
       queueHint: (S.queue || []).length > 1
-        ? '한 번에 분석해 화면끼리 교차검증합니다. (올린 화면이 그 계좌의 현재 전부가 되어, 화면에 없는 종목은 지워져요.)'
-        : '같은 계좌를 여러 화면으로 나눠 캡처했다면 함께 담아 주세요. (올린 화면이 그 계좌의 현재 전부가 돼요.)',
+        ? '올린 화면이 그 계좌의 현재 전부가 되어, 화면에 없는 종목은 지워져요. 한 번에 분석하니 화면끼리 교차검증됩니다.'
+        : '올린 화면이 그 계좌의 현재 전부가 돼요. 같은 계좌를 나눠 캡처했다면 함께 담아 주세요.',
       onAnalyze: () => this.analyzeQueue(),
       onClearQueue: () => this.clearQueue(),
       // 예시 진입 — 올릴 것이 아직 없을 때만 낸다(데이터가 있으면 예시는 방해다).
