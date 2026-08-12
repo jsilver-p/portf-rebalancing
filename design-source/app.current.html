@@ -1528,9 +1528,11 @@
        그냥 지나간다. 색은 배지 범례의 앰버와 같은 어휘(#b8860b)를 쓴다. */
     .pf-note-tip{display:flex;align-items:baseline;gap:5px;font-size:11.5px;line-height:1.5;color:#96701a;}
     .pf-bang{flex:none;font-weight:800;color:#b8860b;}
-    /* 빈 단계 자리 — 데이터가 없으면 설명 두 줄이 곧 그 섹션의 전부다. 빈 표·0짜리 도넛을 그리지 않는다
-       (실측: 그것들이 모바일에서 2100px 를 먹고 있었다). */
-    .pf-empty-pad{padding-bottom:14px;}
+    /* 안내 카드의 바깥 여백은 **여기 한 곳**에서만 정한다. 전에는 다섯 섹션이 인라인으로 제각각이었고
+       (실측 하단 0/12/10/0/0px), 0인 STEP4·5 는 카드가 데이터 없이 안내로 끝나는 자리라 안내 카드의
+       각진 아래 모서리가 섹션 카드의 둥근 모서리를 덮어 모서리가 안 닫혀 보였다.
+       인라인 padding 은 클래스를 이기므로 래퍼에서 인라인을 **지워야** 이 값이 산다. */
+    .pf-note-wrap{padding:10px var(--pf-sec-pad,18px) 14px;}
     /* 좁은 화면: 표 폭이 곧 정보량이라 바깥 여백(페이지 → 섹션 → 표 인셋)을 모두 최소로 접고
        종목명 최소폭도 줄인다. 카드 바깥 6px 은 카드 경계가 보이게 남기는 최소치. */
     /* 상태줄이 버튼들과 한 줄에 못 서면 **통째로 다음 줄**로 간다. flex-basis 없이 flex:1 만 주면
@@ -1649,7 +1651,7 @@
       <!-- 설명 두 줄은 고정 밴드 **밖**이다 — 안에 두면 좁은 화면에서 랩되며 밴드를 60px 로 부풀려
            (실측: 포함 60 / 제외 37) 표를 덮는다. 한 번 읽는 안내이므로 그냥 같이 스크롤돼 사라진다.
            스크롤 상태로 숨기는 방식은 쓰지 않는다 — 그러면 이번엔 이 밴드가 튄다(헤더와 같은 병). -->
-      <div style="padding:8px var(--pf-sec-pad,18px) 0;">
+      <div class="pf-note-wrap">
         <div class="pf-note">
           <span class="pf-note-ico">📸</span>
           <div style="display:flex;flex-direction:column;gap:3px;min-width:0;">
@@ -1659,7 +1661,7 @@
           </div>
         </div>
       </div>
-      <div style="padding:14px var(--pf-sec-pad,18px) 18px;">
+      <div style="padding:0 var(--pf-sec-pad,18px) 16px;">
         <!-- 추출 중엔 이 영역이 입력을 받지 않는다(pointer-events:none) — 실제 차단은 extractFiles
              진입부 한 줄이고(파일선택·드롭·프로그램 호출이 다 거기로 모인다), 여기는 어포던스다.
 
@@ -1854,7 +1856,7 @@
 
     <!-- ── 2. Holdings table ─────────────────── -->
     <section class="pf-card">
-      <div class="pf-sec-head" data-sechead="2" style="padding:14px var(--pf-sec-pad,18px) 10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <div class="pf-sec-head" data-sechead="2" style="padding:14px var(--pf-sec-pad,18px) 0;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
         <span class="pf-step">STEP 2</span>
         <span class="pf-step-title">통합 보유 현황</span>
         <!-- 총자산은 계좌칩과 같은 문법으로 그 줄 맨 앞에 둔다(색만 반전) — 고정 밴드라 표를 스크롤하는
@@ -1872,7 +1874,7 @@
         </sc-if>
       </div>
       <!-- 설명 두 줄도 고정 밴드 밖(STEP1 과 같은 이유). 데이터가 없으면 이 두 줄이 섹션의 전부다. -->
-      <div style="padding:0 var(--pf-sec-pad,18px) 12px;">
+      <div class="pf-note-wrap">
         <div class="pf-note">
           <span class="pf-note-ico">🔄</span>
           <div style="display:flex;flex-direction:column;gap:3px;min-width:0;">
@@ -1992,7 +1994,7 @@
 
     <!-- ── 3. Target ─────────────────────────── -->
     <section class="pf-card">
-      <div class="pf-sec-head" style="padding:14px var(--pf-sec-pad,18px) 10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <div class="pf-sec-head" style="padding:14px var(--pf-sec-pad,18px) 0;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
         <span class="pf-step">STEP 3</span>
         <span class="pf-step-title">목표 포트폴리오</span>
         <!-- 합계는 제목줄 칩으로 — 입력 줄 끝에 두면 좁은 화면에서 한 줄(≈60px)을 통째로 더 쓰고,
@@ -2003,7 +2005,7 @@
           <button onclick="{{ pr.onApply }}" style="border:1px solid {{ pr.bd }};background:{{ pr.bg }};color:{{ pr.fg }};border-radius:999px;padding:5px 13px;font-size:12px;font-weight:600;cursor:pointer;">{{ pr.label }}</button>
         </sc-for>
       </div>
-      <div style="padding:0 var(--pf-sec-pad,18px) 10px;">
+      <div class="pf-note-wrap">
         <div class="pf-note">
           <span class="pf-note-ico">🎯</span>
           <div style="display:flex;flex-direction:column;gap:3px;min-width:0;">
@@ -2013,7 +2015,7 @@
           </div>
         </div>
       </div>
-      <div style="display:flex;gap:10px;padding:0 var(--pf-sec-pad,18px) 16px;flex-wrap:wrap;align-items:flex-end;">
+      <div style="display:flex;gap:10px;padding:0 var(--pf-sec-pad,18px) 18px;flex-wrap:wrap;align-items:flex-end;">
         <sc-for list="{{ targetRows }}" as="t" hint-placeholder-count="6">
           <div style="display:flex;flex-direction:column;gap:5px;min-width:104px;flex:1;">
             <span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;"><span style="width:9px;height:9px;border-radius:2px;background:{{ t.color }};"></span>{{ t.label }}</span>
@@ -2028,11 +2030,11 @@
 
     <!-- ── 4. Analysis ───────────────────────── -->
     <section class="pf-card">
-      <div class="pf-sec-head" style="padding:14px var(--pf-sec-pad,18px) 6px;display:flex;align-items:baseline;gap:10px;">
+      <div class="pf-sec-head" style="padding:14px var(--pf-sec-pad,18px) 0;display:flex;align-items:baseline;gap:10px;">
         <span class="pf-step">STEP 4</span>
         <span class="pf-step-title">자산배분 분석</span>
       </div>
-      <div class="pf-empty-pad" style="padding:2px var(--pf-sec-pad,18px) 0;">
+      <div class="pf-note-wrap">
         <div class="pf-note">
           <span class="pf-note-ico">📊</span>
           <div style="display:flex;flex-direction:column;gap:3px;min-width:0;">
@@ -2043,7 +2045,7 @@
         </div>
       </div>
       <sc-if value="{{ hasHoldings }}" hint-placeholder-val="{{ true }}">
-      <div class="pf-analysis" style="padding:12px var(--pf-sec-pad,18px) 20px;align-items:start;">
+      <div class="pf-analysis" style="padding:0 var(--pf-sec-pad,18px) 20px;align-items:start;">
         <div style="display:flex;flex-direction:column;align-items:center;gap:12px;">
           <div style="position:relative;width:190px;height:190px;">
             <svg viewBox="0 0 200 200" style="width:100%;height:100%;">
@@ -2088,11 +2090,11 @@
 
     <!-- ── 5. Actions ────────────────────────── -->
     <section class="pf-card">
-      <div class="pf-sec-head" style="padding:14px var(--pf-sec-pad,18px) 8px;display:flex;align-items:baseline;gap:10px;">
+      <div class="pf-sec-head" style="padding:14px var(--pf-sec-pad,18px) 0;display:flex;align-items:baseline;gap:10px;">
         <span class="pf-step">STEP 5</span>
         <span class="pf-step-title">리밸런싱 액션</span>
       </div>
-      <div class="pf-empty-pad" style="padding:0 var(--pf-sec-pad,18px) 0;">
+      <div class="pf-note-wrap">
         <div class="pf-note">
           <span class="pf-note-ico">🧭</span>
           <div style="display:flex;flex-direction:column;gap:3px;min-width:0;">
@@ -2103,7 +2105,7 @@
         </div>
       </div>
       <sc-if value="{{ hasHoldings }}" hint-placeholder-val="{{ true }}">
-      <div style="padding:10px var(--pf-sec-pad,18px) 14px;display:flex;flex-direction:column;gap:8px;">
+      <div style="padding:0 var(--pf-sec-pad,18px) 16px;display:flex;flex-direction:column;gap:8px;">
         <sc-if value="{{ noActions }}" hint-placeholder-val="{{ false }}">
           <div style="display:flex;align-items:center;gap:10px;padding:16px;border:1px solid var(--border-default,#dfdfe8);border-radius:8px;background:var(--bg-app,#fafafa);">
             <span style="font-size:16px;">✓</span>
