@@ -1488,15 +1488,25 @@
        둘 다 없으면 요소 자체가 사라져 높이가 0 이 된다 — 그래서 높이를 상수로 못 박지 않고
        _setSticky 가 실측해 --pf-bar-h(=헤더+이 바)로 발행한다. 아랫단들은 그 합만 본다. */
     .pf-bar{position:sticky;top:var(--pf-hdr-h,62px);z-index:19;background:#f2f8ff;border-bottom:1px solid #cfe6ff;}
-    .pf-bar-in{max-width:1060px;margin:0 auto;padding:9px var(--pf-page-pad,20px);display:flex;align-items:center;gap:10px;font-size:12.5px;line-height:1.45;}
+    /* wrap 을 켠다 — 튜토리얼 줄은 문장+버튼 3개라 좁은 화면에서 한 줄에 못 선다. 접히면
+       문장이 제 줄을 갖고 버튼은 다음 줄 오른쪽(.pf-tut-nav 의 margin-left:auto)으로 간다. */
+    .pf-bar-in{max-width:1060px;margin:0 auto;padding:9px var(--pf-page-pad,20px);display:flex;align-items:center;flex-wrap:wrap;gap:8px 10px;font-size:12.5px;line-height:1.45;}
     .pf-bar-x{flex:none;border:none;background:transparent;color:var(--text-tertiary,#999);font-size:15px;line-height:1;cursor:pointer;padding:2px 4px;}
     /* 좁은 화면에선 안내 문장을 버린다 — 버튼 옆에서 3줄 기둥이 되고, 버튼 글자가 이미 같은 말을 한다. */
     .pf-bar-say{min-width:0;}
     .pf-bar-x:hover{color:var(--text-primary,#000);}
     /* 튜토리얼 — 안내는 상단 바의 **같은 자리**를 쓴다(따로 띄우면 화면 위가 두 번 말한다).
-       설명문은 좁은 화면에서도 남긴다: 안내 문장과 달리 이건 튜토리얼의 본문이다. */
-    .pf-bar-tour{min-width:0;font-weight:600;color:var(--text-primary,#000);}
-    .pf-bar-step{flex:none;font-size:10.5px;font-weight:700;color:#1a6dc4;background:#dbecff;border-radius:999px;padding:2px 7px;}
+       색은 앱의 파랑과 **다른 계열**이어야 한다: 주 액션·링크·강조가 전부 파랑이라, 안내까지
+       파랑이면 인터페이스에 묻혀 어디가 안내인지 안 보인다(사용자 지적). 보라 한 계열로 통일하고
+       그 색은 튜토리얼 밖에서는 쓰지 않는다 — 색 자체가 '이건 안내다'라는 표시가 된다. */
+    .pf-bar[data-tut="1"]{background:#f8f2fe;border-bottom-color:#e2d2f2;}
+    /* 설명문은 좁은 화면에서도 남긴다(안내 문장과 달리 이건 튜토리얼의 본문이다). basis 260 —
+       버튼들과 한 줄에 못 서면 **압축되지 말고 통째로 제 줄**을 갖는다(42px 기둥 사건과 같은 처방). */
+    .pf-bar-tour{flex:1 1 260px;min-width:0;font-weight:600;color:#3d1259;line-height:1.55;}
+    .pf-bar-step{flex:none;font-size:10.5px;font-weight:700;color:#5b1f80;background:#ecdcfa;border-radius:999px;padding:2px 7px;}
+    .pf-tut-nav{flex:none;margin-left:auto;display:flex;align-items:center;gap:7px;}
+    .pf-tut-btn{border:none;background:#8134af;color:#fff;border-radius:6px;padding:7px 14px;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap;}
+    .pf-tut-ghost{border:1px solid #d9c2ee;background:transparent;color:#5b1f80;border-radius:6px;padding:6px 11px;font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap;}
     /* 지금 볼 곳 — box-shadow 로만 그린다. 테두리·아웃라인은 자리를 먹어 레이아웃을 밀거나
        고정 밴드에서 잘린다. position 은 여기서 손대지 않는다: 강조 대상에 고정 밴드(.pf-sec-head·
        .pf-res-head)가 있어서, 뒤에 선언된 이 규칙이 sticky 를 relative 로 덮으면 고정 스택이 무너진다.
@@ -1504,8 +1514,8 @@
     .pf-spot{border-radius:8px;animation:pfspot 1.8s ease-in-out infinite;}
     .pf-spot-lift{position:relative;z-index:8;}   /* 표 그룹행(3)보다 위, 상단 바(19)보다 아래 */
     @keyframes pfspot{
-      0%,100%{box-shadow:0 0 0 3px rgba(31,161,255,0.5),0 0 0 8px rgba(31,161,255,0.13);}
-      50%{box-shadow:0 0 0 3px rgba(31,161,255,0.8),0 0 0 13px rgba(31,161,255,0.04);}
+      0%,100%{box-shadow:0 0 0 3px rgba(129,52,175,0.5),0 0 0 8px rgba(129,52,175,0.12);}
+      50%{box-shadow:0 0 0 3px rgba(129,52,175,0.85),0 0 0 13px rgba(129,52,175,0.04);}
     }
     /* 프리셋 3개는 한 덩어리로 강조된다 — 하나만 링을 두르면 '이것만 정답'으로 읽힌다. */
     .pf-presets{display:flex;gap:6px;flex-wrap:wrap;}
@@ -1514,7 +1524,11 @@
        누르기 전에 보인다(아래 보조 진입 주석 참고). */
     .pf-q{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px;}
     .pf-q-item{position:relative;width:92px;display:flex;flex-direction:column;gap:3px;}
-    .pf-q-thumb{width:92px;height:92px;object-fit:cover;border-radius:6px;border:1px solid var(--border-default,#dfdfe8);background:var(--bg-app,#fafafa);display:block;}
+    /* 썸네일은 <img> 가 아니라 배경으로 그린다 — 마크업의 src="{{ q.url }}" 는 런타임이 값을 채우기
+       전에 **브라우저가 그대로 한 번 가져간다**(실측: GET /%7B%7B%20q.url%20%7D%7D → 404 → error
+       이벤트 → 번들 로더의 오류 싱크가 '[bundle] error' 빨간 띠를 띄웠다). 배경 url() 은 치환 전
+       토큰이 CSS 문법에 안 맞아 선언 자체가 버려져 요청이 아예 안 나간다. src 바인딩 금지. */
+    .pf-q-thumb{width:92px;height:92px;border-radius:6px;border:1px solid var(--border-default,#dfdfe8);background:var(--bg-app,#fafafa) center/cover no-repeat;display:block;}
     .pf-q-name{font-size:9.5px;line-height:1.3;color:var(--text-tertiary,#999);overflow-wrap:anywhere;max-height:2.6em;overflow:hidden;}
     .pf-q-x{position:absolute;top:-7px;right:-7px;width:20px;height:20px;border-radius:50%;border:1px solid var(--border-default,#dfdfe8);background:var(--bg-surface,#fff);color:var(--text-secondary,#6e6e6e);font-size:12px;line-height:1;cursor:pointer;padding:0;}
     .pf-q-x:hover{color:var(--ig-red-heart,#ed4956);border-color:var(--ig-red-heart,#ed4956);}
@@ -1572,7 +1586,11 @@
       .pf-legend{flex-direction:column;align-items:flex-start;gap:6px;}
       .pf-main{gap:10px;}
       .pf-bar-say{display:none;}
-      .pf-bar-in{padding:7px var(--pf-page-pad,20px);}
+      .pf-bar-in{padding:8px 12px;}
+      /* 좁은 화면에선 안내문이 **통째로 제 줄**을 갖는다 — 버튼 옆에 끼면 폭이 반토막 나
+         한 줄에 서너 글자짜리 기둥이 된다(사용자 지적: 글이 좁게 보이면 안 된다). */
+      .pf-bar-tour{flex:1 1 100%;font-size:12.5px;}
+      .pf-bar-step{order:-1;}
     }
   </style>
 </helmet>
@@ -1636,26 +1654,32 @@
        **같은 자리**를 쓴다: 둘 다 '지금 무엇을 하면 되는가'라 화면에 두 줄로 있을 이유가 없다.
        스크롤해도 보이므로 표를 한참 내려도 진행 상태가 손에 닿는다. -->
   <sc-if value="{{ hasBar }}" hint-placeholder-val="{{ true }}">
-    <div class="pf-bar">
+    <div class="pf-bar" data-tut="{{ tutAttr }}">
       <div class="pf-bar-in">
-        <!-- 튜토리얼이 돌면 이 자리를 먼저 가진다 — 지금 볼 곳(파란 링)과 지금 할 말이 한 줄에 있어야
+        <!-- 튜토리얼이 돌면 이 자리를 먼저 가진다 — 지금 볼 곳(보라 링)과 지금 할 말이 한 줄에 있어야
              둘이 어긋나지 않는다. [다음]은 읽기만 하는 단계에만 나온다: 눌러야 넘어가는 단계는
-             링이 걸린 그 버튼을 누르는 것이 곧 다음이다. -->
+             링이 걸린 그 버튼을 누르는 것이 곧 다음이다. 아이콘은 문장과 **한 덩어리**로 둔다 —
+             따로 세우면 좁은 화면에서 아이콘만 남은 줄이 생긴다. -->
         <sc-if value="{{ showTour }}" hint-placeholder-val="{{ false }}">
-          <span style="font-size:14px;flex:none;">{{ tourIcon }}</span>
           <span class="pf-bar-step">{{ tourStep }}</span>
-          <span class="pf-bar-tour">{{ tourText }}</span>
-          <div style="flex:1;"></div>
-          <sc-if value="{{ tourManual }}" hint-placeholder-val="{{ true }}">
-            <button class="pf-btn-primary" onclick="{{ onTourNext }}" style="padding:6px 13px;font-size:12px;white-space:nowrap;">{{ tourNextLabel }}</button>
-          </sc-if>
-          <button class="pf-bar-x pf-tap" onclick="{{ onTourEnd }}" title="체험 안내 끝내기">×</button>
+          <span class="pf-bar-tour">{{ tourIcon }} {{ tourText }}</span>
+          <div class="pf-tut-nav">
+            <sc-if value="{{ tourHasPrev }}" hint-placeholder-val="{{ true }}">
+              <button class="pf-tut-ghost" onclick="{{ onTourPrev }}">◂ 이전</button>
+            </sc-if>
+            <sc-if value="{{ tourManual }}" hint-placeholder-val="{{ true }}">
+              <button class="pf-tut-btn" onclick="{{ onTourNext }}">{{ tourNextLabel }}</button>
+            </sc-if>
+            <button class="pf-bar-x pf-tap" onclick="{{ onTourEnd }}" title="체험 안내 끝내기">×</button>
+          </div>
         </sc-if>
         <sc-if value="{{ showInvite }}" hint-placeholder-val="{{ true }}">
           <span style="font-size:14px;flex:none;">📸</span>
           <span class="pf-bar-say">올릴 캡처가 없으신가요? 예시 이미지로 먼저 체험해 보세요.</span>
           <div style="flex:1;"></div>
-          <button class="pf-btn-primary" disabled="{{ extracting }}" onclick="{{ onDemoStream }}" style="padding:6px 13px;font-size:12px;">▶ 예시 이미지로 체험하기</button>
+          <!-- 체험 진입도 튜토리얼 색이다 — 이 버튼이 여는 것이 곧 안내이고, 옆의 파란 주 액션들과
+               구별돼야 눈에 걸린다. -->
+          <button class="pf-tut-btn" disabled="{{ extracting }}" onclick="{{ onDemoStream }}" style="padding:6px 13px;font-size:12px;">▶ 예시 이미지로 체험하기</button>
           <button class="pf-bar-x pf-tap" onclick="{{ onHideInvite }}" title="닫기 — 다시 보려면 ⚙ 개발 도구에서">×</button>
         </sc-if>
         <sc-if value="{{ showNext }}" hint-placeholder-val="{{ false }}">
@@ -1751,7 +1775,7 @@
           <div class="pf-q">
             <sc-for list="{{ queue }}" as="q" hint-placeholder-count="2">
               <div class="pf-q-item">
-                <img class="pf-q-thumb" src="{{ q.url }}" alt="{{ q.name }}">
+                <div class="pf-q-thumb" role="img" aria-label="{{ q.name }}" style="background-image:url({{ q.url }});"></div>
                 <button class="pf-q-x pf-tap" onclick="{{ q.onRemove }}" title="빼기">×</button>
                 <span class="pf-q-name" data-tip="{{ q.name }}" tabindex="0">{{ q.short }}</span>
               </div>
@@ -1782,7 +1806,7 @@
 
         <!-- 라이브 추출 프리뷰 — 화면별로 행이 써지듯 뜨고, 게이트 보정이 보인다. 확인 시 STEP2 반영 -->
         <sc-if value="{{ streamHasRows }}" hint-placeholder-val="{{ false }}">
-          <div style="margin-top:14px;border:1px solid var(--border-default,#dfdfe8);border-radius:8px;overflow:visible;">
+          <div data-tour="preview" style="margin-top:14px;border:1px solid var(--border-default,#dfdfe8);border-radius:8px;overflow:visible;">
             <div class="pf-res-head" style="padding:8px 12px;background:var(--bg-app,#fafafa);border-bottom:1px solid var(--border-default,#dfdfe8);border-radius:8px 8px 0 0;display:flex;align-items:center;gap:8px;">
               <span style="font-size:12px;font-weight:700;">추출 결과</span>
               <span style="font-size:11px;color:var(--text-tertiary,#999);">{{ streamStatusText }}</span>
@@ -1937,7 +1961,7 @@
            120px+ 로 부풀려 표를 덮었다. 고정되는 건 제목·계좌칩까지, 조작 줄은 같이 스크롤된다.
            이 단은 '지속 트래킹'의 전부다: 왼쪽은 **지금 상태**(언제 잰 값인가), 오른쪽은 **주 액션**
            (다시 재기) 하나. 파라미터(환율 수동·기준시점)는 고급으로 접는다 — 매번 보는 것이 아니다. -->
-      <div style="padding:0 var(--pf-sec-pad,18px) 10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:11.5px;">
+      <div data-tour="tools" style="padding:0 var(--pf-sec-pad,18px) 10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:11.5px;">
         <div class="pf-trackline">
           <span style="color:var(--text-secondary,#6e6e6e);">{{ trackStatus }}</span>
           <span style="font-size:11px;color:{{ trackDeltaColor }};">{{ trackDelta }}</span>
@@ -2224,21 +2248,33 @@ class Component extends DCLogic {
     // 어떻게 넘어가는지(auto)가 한 줄에 같이 있다. auto 는 '앱에서 그 일이 실제로 일어나야 넘어간다'는
     // 뜻이고(스트리밍 끝 → 반영 누름), 그 단계엔 [다음] 버튼을 내지 않는다: 링이 걸린 버튼을 누르는
     // 것이 곧 다음이다. 버튼을 같이 주면 안 누르고 넘어가 화면과 안내가 어긋난다.
+    //
+    // 말하는 것은 **사용자가 얻는 것**이다. 내부 사정(게이트가 자릿수를 보정했다 같은)은 빼는데,
+    // 그건 사용자가 올린 원본이 아니라 우리가 읽어내는 과정의 문제라 알 이유가 없기 때문이다.
+    // 누를 것만이 아니라 **볼 것**(방금 만들어진 표·합쳐진 총자산·이탈 막대)도 한 단계씩 준다 —
+    // 실제로 쓰게 될 순서를 그대로 한 바퀴 도는 것이 이 체험의 목적이다.
+    //
+    // back:false = 이 단계로는 되돌아갈 수 없다. 추출 프리뷰는 반영하는 순간 사라지므로,
+    // 되돌린다고 말해 놓고 가리킬 것이 없는 상태를 만들지 않는다(있는 그대로 [이전]을 감춘다).
     this.TOUR = [
-      { key: 'read', icon: '⏳', auto: true, spot: '.pf-res-head',
-        say: '예시 캡처를 읽는 중입니다 — 화면마다 종목이 한 행씩 채워집니다.' },
+      { key: 'read', icon: '📸', auto: true, back: false, spot: '[data-tour="preview"]',
+        say: '예시 캡처를 읽는 중입니다 — 화면마다 종목·수량·금액이 한 행씩 채워집니다.' },
+      { key: 'rows', icon: '📋', back: false, spot: '[data-tour="preview"]',
+        say: '캡처에 있던 종목·수량·매수금액을 전부 뽑아냈습니다. 이제 포트폴리오를 숫자로 관리할 수 있어요.' },
       // above: 이 단계는 **위에 있는 것**(방금 읽어낸 표)이 함께 보여야 말이 된다 — 버튼만 화면
-      // 맨 위로 올리면 '표를 훑어보고'가 가리킬 표가 화면 밖으로 밀린다.
-      { key: 'review', icon: '👀', auto: true, spot: '[data-tour="commit"]', above: true,
-        say: '자동 점검이 잘못 읽은 금액을 고쳤습니다. 표를 훑어보고 [STEP 2에 반영]을 눌러 주세요.' },
-      { key: 'table', icon: '🔄', spot: '[data-sechead="2"]',
-        say: '계좌마다 흩어져 있던 종목이 한 표로 모였습니다. 값이 다르면 표에서 바로 고칠 수 있습니다.' },
+      // 맨 위로 올리면 확인하라고 한 표가 화면 밖으로 밀린다.
+      { key: 'commit', icon: '✅', auto: true, back: false, spot: '[data-tour="commit"]', above: true,
+        say: '확인이 끝나면 [STEP 2에 반영]을 눌러 내 포트폴리오에 넣습니다.' },
+      { key: 'total', icon: '💰', spot: '[data-sechead="2"]',
+        say: '흩어져 있던 계좌가 하나로 합쳐졌습니다. 총자산과 계좌별 금액이 한눈에 보여요.' },
+      { key: 'track', icon: '🔄', spot: '[data-tour="tools"]',
+        say: '표의 값은 언제든 고칠 수 있어요. [현재가·환율 갱신]을 누르면 최신 시세로 다시 계산합니다.' },
       { key: 'target', icon: '🎯', spot: '[data-tour="preset"]',
-        say: '목표로 삼을 비중을 정합니다. 추천 기준을 눌러 보세요 — 아래 칸에 직접 넣어도 됩니다.' },
+        say: '목표로 삼을 자산 비중을 정합니다. 추천 기준을 눌러 보세요 — 직접 넣어도 됩니다.' },
       { key: 'drift', icon: '📊', spot: '[data-tour="drift"]',
-        say: '색 막대가 지금, 회색 막대가 목표입니다. 오른쪽 숫자가 목표에서 벌어진 정도예요.' },
+        say: '지금 비중(색)과 목표(회색)의 차이입니다. 어느 자산군이 넘치고 모자란지 %p로 나옵니다.' },
       { key: 'plan', icon: '🧭', spot: '[data-tour="actions"]',
-        say: '벌어진 만큼 되돌리는 리밸런싱 전략입니다. 여기까지가 한 바퀴예요.' }
+        say: '그 차이를 되돌리는 리밸런싱 전략입니다. 자산군별 조정 규모까지 나옵니다.' }
     ];
     this.state = {
       holdings: [],
@@ -3192,7 +3228,7 @@ class Component extends DCLogic {
         // 반영 결과가 어디로 갔는지 보이게 — 프리뷰가 사라진 자리에 그대로 서 있으면 아무 일도
         // 안 일어난 것처럼 읽힌다. 다음 할 일(STEP2 확인)로 시선을 옮긴다.
         // 튜토리얼 중이면 그 이동은 다음 단계가 한다(같은 곳으로 두 번 스크롤하지 않는다).
-        if (this.state.tour != null) { this._tourDone('review'); return; }
+        if (this.state.tour != null) { this._tourDone('commit'); return; }
         const el = document.querySelector('[data-sechead="2"]');
         if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
       });
@@ -3209,18 +3245,32 @@ class Component extends DCLogic {
   // 어느 갈래든 여기 한 곳으로 모여 '단계를 세우고 → 그 자리로 스크롤하고 → 링을 건다'를 같이 한다.
   startTour() { this._tourGo(0); }
 
-  // auto 단계는 앱이 실제로 그 일을 마쳤을 때만 넘어간다 — 지금 단계가 그 단계일 때에 한해서.
-  // (실제 추출·다른 경로에서 같은 함수가 불려도 튜토리얼이 제멋대로 앞서지 않게 하는 자물쇠다.)
+  // 앱에서 그 일이 실제로 일어났을 때 부른다. **앱이 이긴다** — 안내를 아직 안 읽고 버튼부터
+  // 눌렀어도(읽는 중에 [반영]) 그 단계 다음으로 건너뛴다. 이미 지난 일이면 아무것도 하지 않는다.
   _tourDone(key) {
     const i = this.state.tour;
-    if (i == null || this.TOUR[i].key !== key) return;
-    if (i + 1 >= this.TOUR.length) this.endTour(true); else this._tourGo(i + 1);
+    if (i == null) return;
+    let j = -1;
+    this.TOUR.forEach((s, k) => { if (s.key === key) j = k; });
+    if (j < 0 || i > j) return;
+    if (j + 1 >= this.TOUR.length) this.endTour(true); else this._tourGo(j + 1);
   }
 
   nextTour() {
     const i = this.state.tour;
     if (i == null) return;
     if (i + 1 >= this.TOUR.length) this.endTour(true); else this._tourGo(i + 1);
+  }
+
+  // 되돌아갈 수 있는 가장 가까운 앞 단계(back:false 인 단계는 건너뛴다 — 그 화면은 이미 없다).
+  _tourPrevIdx(i) {
+    for (let k = (i == null ? -1 : i) - 1; k >= 0; k--) if (this.TOUR[k].back !== false) return k;
+    return -1;
+  }
+
+  prevTour() {
+    const k = this._tourPrevIdx(this.state.tour);
+    if (k >= 0) this._tourGo(k);
   }
 
   _tourGo(i) {
@@ -3321,17 +3371,17 @@ class Component extends DCLogic {
   // 예수금 한 행만 자릿수 오독(1,000,000→100,000)으로 흘려 계좌합계 대조 게이트가 복원하는 걸 보여준다.
   demoStream() {
     if (this.state.streamStage === 'live') return;
-    const SLIP = '예수금';                            // 이 행만 자릿수 오독으로 흘리고 게이트가 보정
     const sample = this.sampleData();                 // STEP2 예시 데이터와 동일
     const toRaw = h => ({
       broker: h.broker, accountType: h.accountType, name: h.name, cls: h.cls,
       currency: h.currency, qty: h.qty, price: h.price,
-      value: h.name === SLIP ? 100000 : h.value, cost: h.cost, confidence: 'high'
+      value: h.value, cost: h.cost, confidence: 'high'
     });
-    // 최종(게이트 보정 완료) — 예수금 값 복원 + '보정' 태그. 나머지는 원시와 동일.
-    const finalRows = sample.map(h => h.name === SLIP
-      ? { ...toRaw(h), value: h.value, value_src: 'screen(계좌합계 대조로 자릿수 보정)' }
-      : toRaw(h));
+    // 예전엔 예수금 한 행을 일부러 자릿수 오독으로 흘려 게이트가 복원하는 걸 보여줬다. 뺐다 —
+    // 그건 우리가 읽어내는 과정의 사정이지 사용자가 올린 캡처의 문제가 아니고, 체험에서 보여줄 것은
+    // '내 자산이 이렇게 정리된다'이지 '우리 파이프라인이 실수를 고친다'가 아니다(사용자 지적).
+    // 게이트·보정 표시는 실추출 경로에서 그대로 살아 있다(buildGateReport).
+    const finalRows = sample.map(toRaw);
     // 커밋용 pending — 추출 pending 형태(확인 시 applySnapshot이 실자산으로 병합)
     const pending = sample.map((h, j) => ({
       id: 'p' + Date.now() + '_' + j,
@@ -3340,15 +3390,10 @@ class Component extends DCLogic {
       price: h.price != null ? Number(h.price) : null,
       value: h.value != null ? Number(h.value) : null,
       cost: h.cost != null ? Number(h.cost) : null,
-      value_src: h.name === SLIP ? 'screen(계좌합계 대조로 자릿수 보정)' : '',
+      value_src: '',
       confidence: 0.9, checkFail: false
     }));
-    // 게이트 로그 — 예수금이 속한 계좌의 합계로 자릿수 복원
-    const acct = sample.filter(h => h.broker === '예시증권' && h.accountType === '연금저축');
-    const acctTotal = acct.reduce((s, h) => s + (h.value != null ? h.value : (h.qty || 0) * (h.price || 0)), 0);
-    const repair = '예시증권 연금저축: 예수금 평가금액 100,000 → 1,000,000 (계좌합계 ' +
-      acctTotal.toLocaleString('ko-KR') + '와 일치하도록 자릿수 보정 — 오독 교정)';
-    const gate = { warnings: [repair], repairs: [repair] };
+    const gate = null;                                 // 보여줄 내부 점검 로그가 없다
     // 화면(=증권사·계좌) 단위로 나눠 흘려보낸다
     const waves = [];
     sample.forEach(h => {
@@ -3755,8 +3800,11 @@ class Component extends DCLogic {
       showTour: !!tour, tourIcon: tour ? tour.icon : '', tourText: tour ? tour.say : '',
       tourStep: tour ? ((S.tour + 1) + '/' + this.TOUR.length) : '',
       tourManual: !!tour && !tour.auto,
+      tourHasPrev: !!tour && this._tourPrevIdx(S.tour) >= 0,
       tourNextLabel: tourLast ? '체험 끝내기' : '다음 ▸',
+      tutAttr: tour ? '1' : '',
       onTourNext: () => this.nextTour(),
+      onTourPrev: () => this.prevTour(),
       onTourEnd: () => this.endTour(),
       hasHoldings,
       // 보안 — 접힌 한 줄 + 펼치면 세 줄(문구는 privacyNote 하나에서 온다).
