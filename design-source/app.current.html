@@ -1503,6 +1503,8 @@
     /* 설명문은 좁은 화면에서도 남긴다(안내 문장과 달리 이건 튜토리얼의 본문이다). basis 260 —
        버튼들과 한 줄에 못 서면 **압축되지 말고 통째로 제 줄**을 갖는다(42px 기둥 사건과 같은 처방). */
     .pf-bar-tour{flex:1 1 260px;min-width:0;font-weight:600;color:#3d1259;line-height:1.55;}
+    /* 진행 상태 한 줄 — 아이콘까지 한 덩어리다(위 마크업 주석). 폭을 다 쓰게 두어야 두 줄 안에 든다. */
+    .pf-bar-next{flex:1 1 100%;min-width:0;line-height:1.5;}
     .pf-bar-step{flex:none;font-size:10.5px;font-weight:700;color:#5b1f80;background:#ecdcfa;border-radius:999px;padding:2px 7px;}
     .pf-tut-nav{flex:none;margin-left:auto;display:flex;align-items:center;gap:7px;}
     .pf-tut-btn{border:none;background:#8134af;color:#fff;border-radius:6px;padding:7px 14px;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap;}
@@ -1565,11 +1567,15 @@
     .pf-card{background:var(--bg-surface,#fff);border:1px solid var(--border-default,#dfdfe8);border-radius:12px;overflow:visible;box-shadow:0 1px 2px rgba(16,42,67,0.05),0 6px 16px rgba(16,42,67,0.04);}
     .pf-step{font-size:11px;font-weight:700;letter-spacing:1px;color:var(--text-tertiary,#999);}
     .pf-step-title{font-size:15px;font-weight:700;}
-    /* 단계 안내는 카드 하나다 — **할 일**(굵게) 다음 줄에 **그래서 얻는 것**(회색).
-       '하실 일' 같은 라벨을 글자로 붙이지 않는다: 파란 배경과 이모지가 이미 그 역할을 한다.
-       순서가 중요하다 — 할 일 → 얻는 것이라야 왜 해야 하는지가 붙어 읽힌다. */
-    .pf-note{display:flex;align-items:flex-start;gap:9px;background:#f2f8ff;border:1px solid #d8e9fb;border-radius:8px;padding:10px 12px;}
-    .pf-note-ico{flex:none;font-size:15px;line-height:1.4;}
+    /* 이 단계가 **무엇을 해 주는가** — 제목 바로 아랫줄. 고정 밴드(.pf-sec-head) 안이 아니라 밖이다:
+       안에 넣으면 좁은 화면에서 랩되며 밴드가 부풀어(실측 37→60px) 표를 그만큼 영구히 덮는다.
+       설명 카드(할 일)와 역할이 다르다 — 이건 얻는 것이라 제목에 붙고, 카드는 시키는 말이라 따로 선다. */
+    .pf-goal{padding:7px var(--pf-sec-pad,18px) 0;font-size:12.5px;line-height:1.5;color:var(--text-secondary,#6e6e6e);}
+    /* 단계 안내 카드 = **할 일**(굵게) + 주의. '하실 일' 같은 글자 라벨은 붙이지 않는다(파란 배경과
+       이모지가 이미 그 역할이다). 아이콘은 **글 흐름 안**의 첫 인라인이다 — 예전처럼 별도 flex 열로
+       두면 둘째 줄부터도 아이콘 폭만큼 들여쓰여(실측 카드 왼쪽에서 50px) 계단이 생겼다. */
+    .pf-note{display:flex;flex-direction:column;gap:3px;background:#f2f8ff;border:1px solid #d8e9fb;border-radius:8px;padding:10px 12px;}
+    .pf-note-ico{font-size:15px;line-height:1.4;margin-right:5px;}
     .pf-note-do{font-size:12.5px;font-weight:700;line-height:1.45;color:var(--text-primary,#000);}
     .pf-note-get{font-size:12px;line-height:1.5;color:var(--text-secondary,#6e6e6e);}
     /* 주의·단서(~요)는 **줄 앞에 ! 를 달아** 따로 세운다 — 괄호로 문장 끝에 붙이면 읽는 사람이
@@ -1593,6 +1599,9 @@
       .pf-tbl-1{--pf-tbl-pad:6px;}
       .pf-hold-row{--pf-name-w:104px;}
       .pf-header-inner{padding:10px 12px;gap:10px;}
+      /* 부제는 좁은 화면에서 접는다 — 제목 폭을 정하는 것이 이 줄이라(실측 148px), 남겨두면
+         칩 하나(👁)가 제 줄로 밀려 **상시 고정**인 헤더가 97px 이 된다(합 416 > 390). */
+      .pf-title-2{display:none;}
       .pf-legend{flex-direction:column;align-items:flex-start;gap:6px;}
       .pf-main{gap:10px;}
       .pf-bar-say{display:none;}
@@ -1725,9 +1734,10 @@
           <button class="pf-tut-btn" disabled="{{ extracting }}" onclick="{{ onDemoStream }}" style="padding:6px 13px;font-size:12px;">▶ 예시 이미지로 체험하기</button>
           <button class="pf-bar-x pf-tap" onclick="{{ onHideInvite }}" title="닫기 — 다시 보려면 설정(⚙)에서">×</button>
         </sc-if>
+        <!-- 아이콘은 문장 **안**의 첫 인라인이다 — 따로 세우면(flex:none) 긴 문장이 다음 줄로 밀려
+             아이콘만 남은 줄이 생겨 이 고정 바가 좁은 화면에서 82px 이 된다(실측). -->
         <sc-if value="{{ showNext }}" hint-placeholder-val="{{ false }}">
-          <span style="font-size:14px;flex:none;">{{ nextIcon }}</span>
-          <span style="min-width:0;">{{ nextText }}</span>
+          <span class="pf-bar-next">{{ nextIcon }} {{ nextText }}</span>
         </sc-if>
       </div>
     </div>
@@ -1741,17 +1751,14 @@
         <span class="pf-step">STEP 1</span>
         <span class="pf-step-title">스크린샷 업로드</span>
       </div>
-      <!-- 설명 두 줄은 고정 밴드 **밖**이다 — 안에 두면 좁은 화면에서 랩되며 밴드를 60px 로 부풀려
-           (실측: 포함 60 / 제외 37) 표를 덮는다. 한 번 읽는 안내이므로 그냥 같이 스크롤돼 사라진다.
+      <!-- 목표 한 줄과 설명 카드 모두 고정 밴드 **밖**이다 — 안에 두면 좁은 화면에서 랩되며 밴드를
+           60px 로 부풀려(실측: 포함 60 / 제외 37) 표를 덮는다. 한 번 읽는 안내이므로 같이 스크롤돼 사라진다.
            스크롤 상태로 숨기는 방식은 쓰지 않는다 — 그러면 이번엔 이 밴드가 튄다(헤더와 같은 병). -->
+      <div class="pf-goal">계좌마다 따로 보던 종목·수량·평가금액을 한 표로 합칩니다.</div>
       <div class="pf-note-wrap">
         <div class="pf-note">
-          <span class="pf-note-ico">📸</span>
-          <div style="display:flex;flex-direction:column;gap:3px;min-width:0;">
-            <span class="pf-note-do">사용하는 증권사 앱의 보유 화면을 캡처해 한 번에 올려 주세요.</span>
-            <span class="pf-note-get">→ 계좌마다 따로 보던 종목·수량·평가금액을 한 표로 합칩니다.</span>
-            <span class="pf-note-tip"><b class="pf-bang">!</b><span>수량과 평가금액(매수금액)이 보이는 화면일수록 정확해요.</span></span>
-          </div>
+          <span class="pf-note-do"><span class="pf-note-ico">📸</span>사용하는 증권사 앱의 보유 화면을 캡처해 한 번에 올려 주세요.</span>
+          <span class="pf-note-tip"><b class="pf-bang">!</b><span>수량과 평가금액(매수금액)이 보이는 화면일수록 정확해요.</span></span>
         </div>
       </div>
       <div style="padding:0 var(--pf-sec-pad,18px) 16px;">
@@ -1785,7 +1792,7 @@
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-tertiary,#999);flex:none;"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><path d="M21 15l-5-5L5 21"></path></svg>
             <span style="display:flex;flex-direction:column;gap:3px;min-width:0;">
               <span style="font-size:13px;color:var(--text-secondary,#6e6e6e);"><b style="color:var(--ig-blue-link,#3897f0);">클릭해서 선택</b>하거나 이미지를 끌어다 놓으세요</span>
-              <span style="font-size:11px;color:var(--text-tertiary,#999);">파일 앱에서 고르면 파일명이 남아 증권사를 자동으로 인식합니다</span>
+              <span style="font-size:11.5px;color:var(--text-tertiary,#999);">파일 앱에서 고르면 파일명이 남아 증권사를 자동으로 인식합니다</span>
             </span>
           </sc-if>
         </label>
@@ -1959,21 +1966,26 @@
           <span class="pf-tap" data-tip="{{ plTip }}" tabindex="0" style="display:inline-flex;align-items:baseline;gap:6px;background:var(--text-primary,#000);border-radius:999px;padding:4px 11px;font-size:11.5px;color:#fff;cursor:pointer;">
             <span style="opacity:0.6;">총자산</span><b class="pf-money pf-num">{{ totalStr }}</b><span style="font-weight:700;color:{{ plChipColor }};">{{ plPct }}</span>
           </span>
+        </sc-if>
+      </div>
+      <!-- 계좌칩은 밴드 **밖**이다 — 좁은 화면에서 칩 4개가 세 줄로 랩되며 고정 밴드를 112px 로
+           부풀려(실측) 표를 그만큼 영구히 덮었다. 고정으로 남길 것은 표를 스크롤하는 내내 필요한
+           총자산 하나뿐이고, 계좌별 금액은 같이 스크롤돼도 된다. 튜토리얼도 여기를 가리킨다
+           (고정 밴드에 링을 걸면 밴드 모서리와 쌓임이 같이 망가진다). -->
+      <sc-if value="{{ hasHoldings }}" hint-placeholder-val="{{ true }}">
+        <div data-tour="total" style="padding:8px var(--pf-sec-pad,18px) 0;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
           <sc-for list="{{ acctChips }}" as="c" hint-placeholder-count="2">
             <span style="display:inline-flex;align-items:baseline;gap:5px;background:var(--bg-secondary,#efefef);border-radius:999px;padding:4px 10px;font-size:11.5px;">
               <b>{{ c.label }}</b><span class="pf-money" style="color:var(--text-secondary,#6e6e6e);">{{ c.value }}</span>
             </span>
           </sc-for>
-        </sc-if>
-      </div>
-      <!-- 설명 두 줄도 고정 밴드 밖(STEP1 과 같은 이유). 데이터가 없으면 이 두 줄이 섹션의 전부다. -->
+        </div>
+      </sc-if>
+      <!-- 목표 한 줄·설명 카드도 고정 밴드 밖(STEP1 과 같은 이유). 데이터가 없으면 이 둘이 섹션의 전부다. -->
+      <div class="pf-goal">최신 주가·환율로 다시 계산해, 지금 총자산과 계좌별 비중을 보여줍니다.</div>
       <div class="pf-note-wrap">
         <div class="pf-note">
-          <span class="pf-note-ico">🔄</span>
-          <div style="display:flex;flex-direction:column;gap:3px;min-width:0;">
-            <span class="pf-note-do">값이 다르면 표에서 바로 고치고, 다시 올 때 [현재가·환율 갱신]을 눌러 주세요.</span>
-            <span class="pf-note-get">→ 최신 주가·환율로 다시 계산해, 지금 총자산과 계좌별 비중을 보여줍니다.</span>
-          </div>
+          <span class="pf-note-do"><span class="pf-note-ico">🔄</span>값이 다르면 표에서 바로 고치고, 다시 올 때 [현재가·환율 갱신]을 눌러 주세요.</span>
         </div>
       </div>
       <sc-if value="{{ hasHoldings }}" hint-placeholder-val="{{ true }}">
@@ -1984,7 +1996,7 @@
       <div data-tour="tools" style="padding:0 var(--pf-sec-pad,18px) 10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:11.5px;">
         <div class="pf-trackline">
           <span style="color:var(--text-secondary,#6e6e6e);">{{ trackStatus }}</span>
-          <span style="font-size:11px;color:{{ trackDeltaColor }};">{{ trackDelta }}</span>
+          <span style="font-size:11.5px;color:{{ trackDeltaColor }};">{{ trackDelta }}</span>
         </div>
         <button class="pf-btn-primary" onclick="{{ onReprice }}" title="에이전트로 현재가·환율을 다시 불러 재평가 (수량 없는 종목은 캡처시점 종가로 역산)" style="padding:8px 14px;font-size:12.5px;">↻ 현재가·환율 갱신</button>
         <button class="pf-btn-ghost" onclick="{{ onAddManual }}">＋ 직접 추가</button>
@@ -2099,14 +2111,11 @@
           </sc-for>
         </span>
       </div>
+      <div class="pf-goal">목표로 삼을 자산 구성을 정합니다. 아래 분석과 전략이 전부 이 기준으로 계산됩니다.</div>
       <div class="pf-note-wrap">
         <div class="pf-note">
-          <span class="pf-note-ico">🎯</span>
-          <div style="display:flex;flex-direction:column;gap:3px;min-width:0;">
-            <span class="pf-note-do">추천 기준을 고르거나 비중을 직접 설정해 주세요.</span>
-            <span class="pf-note-get">→ 목표로 삼을 자산 구성을 정합니다. 아래 분석과 전략이 전부 이 기준으로 계산됩니다.</span>
-            <span class="pf-note-tip"><b class="pf-bang">!</b><span>합계가 100%여야 아래 계산이 맞아요.</span></span>
-          </div>
+          <span class="pf-note-do"><span class="pf-note-ico">🎯</span>추천 기준을 고르거나 비중을 직접 설정해 주세요.</span>
+          <span class="pf-note-tip"><b class="pf-bang">!</b><span>합계가 100%여야 아래 계산이 맞아요.</span></span>
         </div>
       </div>
       <div style="display:flex;gap:10px;padding:0 var(--pf-sec-pad,18px) 18px;flex-wrap:wrap;align-items:flex-end;">
@@ -2128,13 +2137,10 @@
         <span class="pf-step">STEP 4</span>
         <span class="pf-step-title">자산배분 분석</span>
       </div>
+      <div class="pf-goal">목표에서 얼마나 벌어졌는지 자산군별로 계산합니다.</div>
       <div class="pf-note-wrap">
         <div class="pf-note">
-          <span class="pf-note-ico">📊</span>
-          <div style="display:flex;flex-direction:column;gap:3px;min-width:0;">
-            <span class="pf-note-do">색 막대(지금)와 회색 막대(목표)의 차이를 확인해 주세요.</span>
-            <span class="pf-note-get">→ 목표에서 얼마나 벌어졌는지 자산군별로 계산합니다.</span>
-          </div>
+          <span class="pf-note-do"><span class="pf-note-ico">📊</span>색 막대(지금)와 회색 막대(목표)의 차이를 확인해 주세요.</span>
         </div>
       </div>
       <sc-if value="{{ hasHoldings }}" hint-placeholder-val="{{ true }}">
@@ -2160,7 +2166,7 @@
           </div>
         </div>
         <div data-tour="drift" style="display:flex;flex-direction:column;gap:10px;padding-top:4px;">
-          <div style="display:grid;grid-template-columns:96px 1fr 120px;gap:10px;font-size:10.5px;font-weight:600;letter-spacing:0.4px;color:var(--text-tertiary,#999);text-transform:uppercase;">
+          <div style="display:grid;grid-template-columns:96px 1fr 120px;gap:10px;font-size:11.5px;font-weight:600;letter-spacing:0.3px;color:var(--text-tertiary,#999);text-transform:uppercase;">
             <span>자산군</span><span>현재 ■ vs 목표 ▢</span><span style="text-align:right;">이탈 (현재−목표)</span>
           </div>
           <sc-for list="{{ driftRows }}" as="d" hint-placeholder-count="5">
@@ -2187,14 +2193,11 @@
         <span class="pf-step">STEP 5</span>
         <span class="pf-step-title">리밸런싱 액션</span>
       </div>
+      <div class="pf-goal">목표로 되돌리려면 무엇을 얼마나 사고팔면 되는지 정리합니다.</div>
       <div class="pf-note-wrap">
         <div class="pf-note">
-          <span class="pf-note-ico">🧭</span>
-          <div style="display:flex;flex-direction:column;gap:3px;min-width:0;">
-            <span class="pf-note-do">제안을 확인하고, 실제 매매는 증권사 앱에서 진행해 주세요.</span>
-            <span class="pf-note-get">→ 목표로 되돌리려면 무엇을 얼마나 사고팔면 되는지 정리합니다.</span>
-            <span class="pf-note-tip"><b class="pf-bang">!</b><span>차이가 ±{{ bandStr }}%p 안이면 제안에 넣지 않아요. 세금·수수료는 빠져 있어요.</span></span>
-          </div>
+          <span class="pf-note-do"><span class="pf-note-ico">🧭</span>제안을 확인하고, 실제 매매는 증권사 앱에서 진행해 주세요.</span>
+          <span class="pf-note-tip"><b class="pf-bang">!</b><span>차이가 ±{{ bandStr }}%p 안이면 제안에 넣지 않아요. 세금·수수료는 빠져 있어요.</span></span>
         </div>
       </div>
       <sc-if value="{{ hasHoldings }}" hint-placeholder-val="{{ true }}">
@@ -2284,7 +2287,10 @@ class Component extends DCLogic {
       // 맨 위로 올리면 확인하라고 한 표가 화면 밖으로 밀린다.
       { key: 'commit', icon: '✅', auto: true, back: false, spot: '[data-tour="commit"]', above: true,
         say: '확인이 끝나면 [STEP 2에 반영]을 눌러 내 포트폴리오에 넣습니다.' },
-      { key: 'total', icon: '💰', spot: '[data-sechead="2"]',
+      // 비출 곳은 **고정 밴드가 아니라 그 안의 내용**이다 — 밴드(.pf-sec-head)에 링을 걸면 링이
+      // 밴드의 모서리 반경까지 덮어써 그 자리로 뒤 내용이 비치고, 밴드가 상단 바 밑에 붙는 동안
+      // 링 위쪽이 가려져 모서리 호만 남는다(실측). 계좌칩 줄은 밴드 밖이라 그런 문제가 없다.
+      { key: 'total', icon: '💰', spot: '[data-tour="total"]',
         say: '흩어져 있던 계좌가 하나로 합쳐졌습니다. 총자산과 계좌별 금액이 한눈에 보여요.' },
       { key: 'track', icon: '🔄', spot: '[data-tour="tools"]',
         say: '표의 값은 언제든 고칠 수 있어요. [현재가·환율 갱신]을 누르면 최신 시세로 다시 계산합니다.' },
@@ -2293,7 +2299,11 @@ class Component extends DCLogic {
       { key: 'drift', icon: '📊', spot: '[data-tour="drift"]',
         say: '지금 비중(색)과 목표(회색)의 차이입니다. 어느 자산군이 넘치고 모자란지 %p로 나옵니다.' },
       { key: 'plan', icon: '🧭', spot: '[data-tour="actions"]',
-        say: '그 차이를 되돌리는 리밸런싱 전략입니다. 자산군별 조정 규모까지 나옵니다.' }
+        say: '그 차이를 되돌리는 리밸런싱 전략입니다. 자산군별 조정 규모까지 나옵니다.' },
+      // 마무리도 **한 단계**다 — 끝난 뒤 본문에 같은 말을 한 줄 더 남기면 방금 읽은 것을 두 번 읽는다.
+      // [체험 끝내기]를 누르는 그 자리에서 다시 볼 곳(⚙)과 지우는 법을 같이 말한다.
+      { key: 'done', icon: '🙌', spot: '.pf-drop',
+        say: '이제 내 캡처를 올려 보세요 — 예시 체험은 ⚙ 에서 다시 볼 수 있고, 예시 값은 [보유 데이터 초기화]로 지웁니다.' }
     ];
     this.state = {
       holdings: [],
@@ -3378,19 +3388,10 @@ class Component extends DCLogic {
     this._tourSpot('');
     if (this.state.tour == null) return;
     this.setState({ tour: null });
-    // 어떻게 끝났든 **다시 볼 곳**을 알려준다 — 안내는 한 번 사라지면 어디서 다시 여는지가
-    // 화면 어디에도 없다(상단 바의 체험 버튼은 데이터가 생기면 같이 사라진다).
-    if (!done) {
-      this.setState({ extractInfo: '예시 체험을 닫았습니다 — 다시 보시려면 ⚙ 에서 [▶ 예시 이미지로 체험하기]를 누르세요.' });
-      return;
-    }
-    // 끝은 '이제 당신 차례'로 닫는다 — STEP1 업로드로 데려가 잠깐 링을 남긴다. 예시로 들어온 값이
-    // 표에 남는다는 사실도 여기서 말한다(안 말하면 내 데이터인 줄 안다).
-    this.setState({ extractInfo: '예시 체험이 끝났습니다 — 이제 내 캡처를 올려 보세요. 다시 보시려면 ⚙ 에서 [▶ 예시 이미지로 체험하기]를, 예시 값을 지우려면 [보유 데이터 초기화]를 누르세요.' });
-    setTimeout(() => {
-      this._tourFocus({ spot: '.pf-drop' });
-      setTimeout(() => { if (this.state.tour == null) this._tourSpot(''); }, 4000);
-    }, 80);
+    // 끝까지 본 사람에게는 아무것도 남기지 않는다 — 마지막 단계(done)가 이미 '이제 당신 차례'와
+    // 다시 볼 곳(⚙)을 그 자리에서 말했고, 본문에 한 줄 더 남기면 같은 말을 두 번 하는 것이다.
+    // 중도에 닫은 사람만 그 안내를 못 봤으므로 한 줄로 알려준다.
+    if (!done) this.setState({ extractInfo: '예시 체험을 닫았습니다 — 다시 보시려면 ⚙ 에서 [▶ 예시 이미지로 체험하기]를 누르세요.' });
   }
 
   // 데모용 더미 추출 — 에이전트 없이도 라이브 스트리밍 + 게이트 자릿수 보정을 눈으로 보게 한다.
