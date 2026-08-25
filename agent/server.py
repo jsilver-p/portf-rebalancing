@@ -919,7 +919,7 @@ def extract_batch(images, capture_dt, on_screen=None, on_stage=None, engine=None
 
 
 def _batch_run(jid, images, capture_dt, engine=None, names=None):
-    seed = lambda: {"done": 0, "total": len(images), "rows": [], "stage": "extracting"}
+    seed = lambda: {"done": 0, "total": len(images), "rows": [], "stage": "extracting", "doneIdx": []}
     def on_screen(idx, rows):                     # 화면 완료 시 진행 상황에 원시 행 누적(폴링이 읽어감)
         with _JOBS_LOCK:
             j = _JOBS.get(jid)
@@ -930,6 +930,10 @@ def _batch_run(jid, images, capture_dt, engine=None, names=None):
                 r["_img"] = idx + 1
             p["rows"].extend(rows)
             p["done"] += 1
+            # **어느 장이 끝났는지**는 개수로 알 수 없다: 행이 0개인 장은 rows 에 흔적을 안 남기고,
+            # NUM_PARALLEL>1 이면 끝나는 순서도 제출 순서가 아니다. 화면이 장별 진행을 그리려면
+            # 번호 자체가 있어야 한다(없으면 UI가 그럴듯하게 지어내게 된다).
+            p.setdefault("doneIdx", []).append(idx + 1)
     def on_stage(stage):                          # 단계 전환(extracting → finalizing) 라이브 반영
         with _JOBS_LOCK:
             j = _JOBS.get(jid)
@@ -952,7 +956,7 @@ def submit_batch(body):
     jid = os.urandom(8).hex()
     with _JOBS_LOCK:
         _JOBS[jid] = {"status": "pending", "ts": time.time(),
-                      "progress": {"done": 0, "total": len(images), "rows": [], "stage": "extracting"}}
+                      "progress": {"done": 0, "total": len(images), "rows": [], "stage": "extracting", "doneIdx": []}}
     threading.Thread(target=_batch_run,
                      args=(jid, images, capture_dt, body.get("engine"), names), daemon=True).start()
     _job_gc()
@@ -969,7 +973,7 @@ def batch_result(jid):
     if j["status"] == "error":
         return {"status": "error", "error": j.get("error", "오류")}
     # 진행 중: 화면별로 도착한 원시 행을 함께 준다 → 앱이 라이브로 그린다(하위호환: 필드 추가만)
-    return {"status": "pending", "progress": j.get("progress", {"done": 0, "total": 0, "rows": [], "stage": "extracting"})}
+    return {"status": "pending", "progress": j.get("progress", {"done": 0, "total": 0, "rows": [], "stage": "extracting", "doneIdx": []})}
 
 # ── 시세 페치 (결정론적, LLM 무관) ─────────────────────────────
 def refresh_prices():
