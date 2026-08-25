@@ -1996,7 +1996,7 @@
                         <sc-if value="{{ sr.editable }}" hint-placeholder-val="{{ false }}"><select value="{{ sr.cls }}" onchange="{{ sr.onCls }}" style="border:none;background:transparent;font-size:12px;padding:3px 0;color:{{ sr.clsColor }};font-weight:600;"><option value="growth">성장주</option><option value="dividend">배당주</option><option value="bond">채권</option><option value="gold">금·원자재</option><option value="cash">현금</option><option value="realestate">부동산</option><option value="mixed">혼합(주식·채권)</option></select></sc-if>
                         <sc-if value="{{ sr.readonly }}" hint-placeholder-val="{{ true }}"><span style="font-size:12px;font-weight:600;color:{{ sr.clsColor }};white-space:nowrap;">{{ sr.clsLabel }}</span></sc-if>
                         <div style="display:flex;align-items:center;justify-content:flex-end;gap:3px;min-width:0;">
-                          <sc-if value="{{ sr.editable }}" hint-placeholder-val="{{ false }}"><input value="{{ sr.qtyInput }}" onchange="{{ sr.onQty }}" onkeydown="{{ sr.onKeyEnter }}" placeholder="—" class="pf-num" style="border:none;background:transparent;font-size:12.5px;text-align:right;padding:3px 2px;min-width:0;flex:1;color:var(--text-primary,#000);"></sc-if>
+                          <sc-if value="{{ sr.editable }}" hint-placeholder-val="{{ false }}"><input value="{{ sr.qtyInput }}" onchange="{{ sr.onQty }}" onblur="{{ sr.onQtyBlur }}" onkeydown="{{ sr.onKeyEnter }}" placeholder="—" class="pf-num" style="border:none;background:transparent;font-size:12.5px;text-align:right;padding:3px 2px;min-width:0;flex:1;color:var(--text-primary,#000);"></sc-if>
                           <sc-if value="{{ sr.readonly }}" hint-placeholder-val="{{ true }}"><span class="pf-num" style="font-size:12.5px;text-align:right;flex:1;color:var(--text-primary,#000);">{{ sr.qtyStr }}</span></sc-if>
                           <sc-if value="{{ sr.qtyBadge }}" hint-placeholder-val="{{ false }}"><span class="pf-tap" data-tip="{{ sr.qtyExplain }}" tabindex="0" style="font-size:9px;font-weight:700;color:{{ sr.qtyBadgeC }};background:{{ sr.qtyBadgeBg }};border:1px solid {{ sr.qtyBadgeBd }};padding:0 4px;border-radius:3px;flex:none;cursor:pointer;white-space:nowrap;">{{ sr.qtyBadgeText }}</span></sc-if>
                         </div>
@@ -2005,12 +2005,12 @@
                           <span style="font-size:10px;color:var(--text-tertiary,#999);flex:none;">{{ sr.cur }}</span>
                         </div>
                         <div style="display:flex;align-items:center;justify-content:flex-end;gap:3px;min-width:0;">
-                          <sc-if value="{{ sr.editable }}" hint-placeholder-val="{{ false }}"><input value="{{ sr.priceInput }}" onchange="{{ sr.onPrice }}" onkeydown="{{ sr.onKeyEnter }}" placeholder="—" class="pf-num" style="border:none;background:transparent;font-size:12.5px;text-align:right;padding:3px 0;width:100%;min-width:0;color:var(--text-primary,#000);"></sc-if>
+                          <sc-if value="{{ sr.editable }}" hint-placeholder-val="{{ false }}"><input value="{{ sr.priceInput }}" onchange="{{ sr.onPrice }}" onblur="{{ sr.onPriceBlur }}" onkeydown="{{ sr.onKeyEnter }}" placeholder="—" class="pf-num" style="border:none;background:transparent;font-size:12.5px;text-align:right;padding:3px 0;width:100%;min-width:0;color:var(--text-primary,#000);"></sc-if>
                           <sc-if value="{{ sr.readonly }}" hint-placeholder-val="{{ true }}"><span class="pf-num" style="font-size:12.5px;text-align:right;color:var(--text-primary,#000);">{{ sr.priceStr }}</span></sc-if>
                           <span style="font-size:10px;color:var(--text-tertiary,#999);flex:none;">{{ sr.cur }}</span>
                         </div>
                         <div style="display:flex;align-items:center;justify-content:flex-end;gap:4px;min-width:0;">
-                          <sc-if value="{{ sr.valueEdit }}" hint-placeholder-val="{{ false }}"><input value="{{ sr.valueInput }}" disabled="{{ sr.valueLock }}" onchange="{{ sr.onValue }}" onkeydown="{{ sr.onKeyEnter }}" class="pf-num pf-money" style="border:none;background:transparent;font-size:12.5px;font-weight:600;text-align:right;padding:3px 2px;min-width:0;flex:1;color:var(--text-primary,#000);"><span style="font-size:10px;color:var(--text-tertiary,#999);flex:none;">{{ sr.cur }}</span></sc-if>
+                          <sc-if value="{{ sr.valueEdit }}" hint-placeholder-val="{{ false }}"><input value="{{ sr.valueInput }}" disabled="{{ sr.valueLock }}" onchange="{{ sr.onValue }}" onblur="{{ sr.onValueBlur }}" onkeydown="{{ sr.onKeyEnter }}" class="pf-num pf-money" style="border:none;background:transparent;font-size:12.5px;font-weight:600;text-align:right;padding:3px 2px;min-width:0;flex:1;color:var(--text-primary,#000);"><span style="font-size:10px;color:var(--text-tertiary,#999);flex:none;">{{ sr.cur }}</span></sc-if>
                           <sc-if value="{{ sr.valueRO }}" hint-placeholder-val="{{ true }}"><span class="pf-num pf-money" style="font-size:12.5px;font-weight:600;text-align:right;flex:1;">{{ sr.valueStr }}</span></sc-if>
                           <sc-if value="{{ sr.corrected }}" hint-placeholder-val="{{ false }}"><span class="pf-tap" data-tip="{{ sr.correctedTitle }}" tabindex="0" style="font-size:9px;font-weight:700;color:#2e7d32;background:#e7f4e8;border:1px solid #b6dcb9;padding:0 4px;border-radius:3px;flex:none;cursor:pointer;">✓ 보정</span></sc-if>
                         </div>
@@ -2164,21 +2164,21 @@
                   <option value="growth">성장주</option><option value="dividend">배당주</option><option value="bond">채권</option><option value="gold">금·원자재</option><option value="cash">현금</option><option value="realestate">부동산</option><option value="mixed">혼합(주식·채권)</option>
                 </select>
                 <div style="display:flex;align-items:center;justify-content:flex-end;gap:3px;min-width:0;">
-                  <input value="{{ r.qtyInput }}" onchange="{{ r.onQty }}" onkeydown="{{ r.onKeyEnter }}" placeholder="—" class="pf-num" style="border:none;background:transparent;font-size:12.5px;text-align:right;padding:3px 2px;min-width:0;flex:1;color:var(--text-primary,#000);">
+                  <input value="{{ r.qtyInput }}" onchange="{{ r.onQty }}" onblur="{{ r.onQtyBlur }}" onkeydown="{{ r.onKeyEnter }}" placeholder="—" class="pf-num" style="border:none;background:transparent;font-size:12.5px;text-align:right;padding:3px 2px;min-width:0;flex:1;color:var(--text-primary,#000);">
                   <sc-if value="{{ r.qtyBadge }}" hint-placeholder-val="{{ false }}"><span class="pf-tap" data-tip="{{ r.qtyExplain }}" tabindex="0" style="font-size:9px;font-weight:700;color:{{ r.qtyBadgeC }};background:{{ r.qtyBadgeBg }};border:1px solid {{ r.qtyBadgeBd }};padding:0 4px;border-radius:3px;flex:none;cursor:pointer;white-space:nowrap;">{{ r.qtyBadgeText }}</span></sc-if>
                 </div>
                 <div style="display:flex;align-items:center;justify-content:flex-end;gap:3px;min-width:0;">
-                  <input value="{{ r.avgInput }}" onchange="{{ r.onAvg }}" onkeydown="{{ r.onKeyEnter }}" placeholder="—" class="pf-num" style="border:none;background:transparent;font-size:12.5px;text-align:right;padding:3px 0;width:100%;min-width:0;color:var(--text-primary,#000);">
+                  <input value="{{ r.avgInput }}" onchange="{{ r.onAvg }}" onblur="{{ r.onAvgBlur }}" onkeydown="{{ r.onKeyEnter }}" placeholder="—" class="pf-num" style="border:none;background:transparent;font-size:12.5px;text-align:right;padding:3px 0;width:100%;min-width:0;color:var(--text-primary,#000);">
                   <span style="font-size:10px;color:var(--text-tertiary,#999);flex:none;">{{ r.cur }}</span>
                 </div>
                 <div style="display:flex;align-items:center;justify-content:flex-end;gap:3px;min-width:0;">
                   <span title="{{ r.staleTitle }}" style="width:6px;height:6px;border-radius:50%;background:{{ r.staleColor }};flex:none;"></span>
-                  <input value="{{ r.priceInput }}" onchange="{{ r.onPrice }}" onkeydown="{{ r.onKeyEnter }}" placeholder="—" class="pf-num" style="border:none;background:transparent;font-size:12.5px;text-align:right;padding:3px 0;width:100%;min-width:0;color:var(--text-primary,#000);">
+                  <input value="{{ r.priceInput }}" onchange="{{ r.onPrice }}" onblur="{{ r.onPriceBlur }}" onkeydown="{{ r.onKeyEnter }}" placeholder="—" class="pf-num" style="border:none;background:transparent;font-size:12.5px;text-align:right;padding:3px 0;width:100%;min-width:0;color:var(--text-primary,#000);">
                   <span style="font-size:10px;color:var(--text-tertiary,#999);flex:none;">{{ r.cur }}</span>
                 </div>
                 <div style="display:flex;align-items:center;justify-content:flex-end;gap:3px;min-width:0;">
                   <sc-if value="{{ r.valueRO }}" hint-placeholder-val="{{ true }}"><span class="pf-num pf-money" style="font-size:12.5px;font-weight:600;text-align:right;flex:1;">{{ r.valueStr }}</span></sc-if>
-                  <sc-if value="{{ r.valueEdit }}" hint-placeholder-val="{{ false }}"><input value="{{ r.valueInput }}" disabled="{{ r.valueLock }}" onchange="{{ r.onValue }}" onkeydown="{{ r.onKeyEnter }}" class="pf-num pf-money" style="border:none;background:transparent;font-size:12.5px;font-weight:600;text-align:right;padding:3px 2px;min-width:0;flex:1;color:var(--text-primary,#000);"><span style="font-size:10px;color:var(--text-tertiary,#999);flex:none;">{{ r.cur }}</span></sc-if>
+                  <sc-if value="{{ r.valueEdit }}" hint-placeholder-val="{{ false }}"><input value="{{ r.valueInput }}" disabled="{{ r.valueLock }}" onchange="{{ r.onValue }}" onblur="{{ r.onValueBlur }}" onkeydown="{{ r.onKeyEnter }}" class="pf-num pf-money" style="border:none;background:transparent;font-size:12.5px;font-weight:600;text-align:right;padding:3px 2px;min-width:0;flex:1;color:var(--text-primary,#000);"><span style="font-size:10px;color:var(--text-tertiary,#999);flex:none;">{{ r.cur }}</span></sc-if>
                   <sc-if value="{{ r.valueReview }}" hint-placeholder-val="{{ false }}"><span class="pf-tap" data-tip="{{ r.valueTitle }}" tabindex="0" style="font-size:9px;font-weight:700;color:#b8860b;background:#fff3cd;border:1px solid #f0d48a;padding:0 3px;border-radius:3px;flex:none;cursor:pointer;">⚠</span></sc-if>
                 </div>
                 <span class="pf-num" style="font-size:12.5px;text-align:right;color:var(--text-secondary,#6e6e6e);">{{ r.weightStr }}</span>
@@ -2955,6 +2955,33 @@ class Component extends DCLogic {
     return isNaN(v) ? null : v;
   }
 
+  // 표의 숫자 칸 — **치는 동안엔 친 그대로, 손을 떼면 포맷.**
+  // 이유는 에이전트 URL 칸과 같다(이 마크업의 onchange 는 React onChange = 매 타건). 값을
+  // parseNum → fmtNum 으로 되돌리면 **포맷이 지우는 문자는 영영 못 친다** — 소수점이 그랬다:
+  // '12.345' 를 치면 점이 매번 지워지고 숫자만 붙어 '12,345' 가 됐다(실측 typing_check.py).
+  // 수량 1000배 오독이 조용히 저장되는 경로였다(해외주식 소수점 매수).
+  // 원문 버퍼는 **포커스가 있는 칸에만** 산다(state.editRaw, blur 에서 비운다) — 그래서 다른 칸·
+  // 다른 표는 늘 포맷된 값을 보고, 계산은 타건마다 parseNum 한 값으로 계속 살아 움직인다.
+  rawKey(id, f) { return String(id) + ':' + f; }
+  // 표시값: 편집 중이면 원문, 아니면 포맷.
+  rawVal(id, f, n) {
+    const r = (this.state.editRaw || {})[this.rawKey(id, f)];
+    return r != null ? r : (n == null ? '' : this.fmtNum(n));
+  }
+  // 타건: 원문을 담고, 파싱한 값으로 실제 커밋(apply)을 태운다.
+  editNum(id, f, e, apply) {
+    const t = e.target.value;
+    this.setState({ editRaw: { ...(this.state.editRaw || {}), [this.rawKey(id, f)]: t } });
+    apply(this.parseNum(t));
+  }
+  // 커밋 = blur(엔터는 onKeyEnter 가 blur 시킨다) — 버퍼를 비우면 포맷된 값으로 돌아간다.
+  endNum(id, f) {
+    const m = { ...(this.state.editRaw || {}) };
+    if (!(this.rawKey(id, f) in m)) return;
+    delete m[this.rawKey(id, f)];
+    this.setState({ editRaw: m });
+  }
+
   updateHolding(id, patch) {
     this.set({ holdings: this.state.holdings.map(h => h.id === id ? { ...h, ...patch } : h) });
   }
@@ -3329,22 +3356,26 @@ class Component extends DCLogic {
           hasQP, noQP: !hasQP,
           // 평가금액은 수량·현재가가 있으면 계산값(읽기전용) — 편집은 둘이 없는 행(현금·부동산 등)만.
           valueEdit: ed && !hasQP, valueRO: !(ed && !hasQP),
-          qtyInput: h.qty == null ? '' : this.fmtNum(h.qty),
-          priceInput: h.price == null ? '' : this.fmtNum(h.price),
-          avgInput: h.avgCost == null ? '' : this.fmtNum(h.avgCost),
+          qtyInput: this.rawVal(id, 'qty', h.qty),
+          priceInput: this.rawVal(id, 'price', h.price),
+          avgInput: this.rawVal(id, 'avg', h.avgCost),
           // 값은 항상 진짜다(가리는 건 CSS 블러). 다만 흐린 칸을 눈감고 고치는 건 막는다.
           // 잠금은 disabled 로 건다 — readonly 는 이 런타임에서 **동작하지 않는다**: React 가 아는
           // 이름은 readOnly 인데 마크업은 camelCase 를 낼 수 없고(HTML 파서가 속성명을 소문자화),
           // 소문자 readonly 는 React 가 경고하고 버린다. disabled 는 소문자가 정식 이름이라 통한다.
-          valueInput: h.value == null ? '' : this.fmtNum(h.value),
+          valueInput: this.rawVal(id, 'value', h.value),
           valueLock: mask,
           // 수동 편집은 '확인'으로 간주 — 해당 필드의 확인필요 신호를 함께 해제한다(단일 출처 규칙).
           onName:  ed ? (e => O.update(id, { name: e.target.value, symbol_note: '' })) : null,
           onCls:   ed ? (e => O.update(id, { cls: e.target.value })) : null,
-          onQty:   ed ? (e => O.update(id, { qty: this.parseNum(e.target.value), qty_src: 'manual', confidence: 1, qty_note: '' })) : null,
-          onPrice: ed ? (e => O.update(id, { price: this.parseNum(e.target.value), price_src: 'manual', updatedAt: Date.now() })) : null,
-          onAvg:   ed ? (e => O.update(id, { avgCost: this.parseNum(e.target.value), avgCost_src: 'manual' })) : null,
-          onValue: ed ? (e => O.update(id, { value: this.parseNum(e.target.value), value_src: 'manual', reprice_note: '', checkFail: false, updatedAt: Date.now() })) : null,
+          onQty:   ed ? (e => this.editNum(id, 'qty',   e, v => O.update(id, { qty: v, qty_src: 'manual', confidence: 1, qty_note: '' }))) : null,
+          onPrice: ed ? (e => this.editNum(id, 'price', e, v => O.update(id, { price: v, price_src: 'manual', updatedAt: Date.now() }))) : null,
+          onAvg:   ed ? (e => this.editNum(id, 'avg',   e, v => O.update(id, { avgCost: v, avgCost_src: 'manual' }))) : null,
+          onValue: ed ? (e => this.editNum(id, 'value', e, v => O.update(id, { value: v, value_src: 'manual', reprice_note: '', checkFail: false, updatedAt: Date.now() }))) : null,
+          onQtyBlur:   ed ? (() => this.endNum(id, 'qty'))   : null,
+          onPriceBlur: ed ? (() => this.endNum(id, 'price')) : null,
+          onAvgBlur:   ed ? (() => this.endNum(id, 'avg'))   : null,
+          onValueBlur: ed ? (() => this.endNum(id, 'value')) : null,
           hasDelete: !!O.remove, onDelete: O.remove ? (() => O.remove(id)) : null,
           onKeyEnter: e => { if (e.key === 'Enter') e.target.blur(); }
         });
