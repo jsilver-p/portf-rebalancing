@@ -1739,7 +1739,7 @@
         <sc-if value="{{ agentOpen }}" hint-placeholder-val="{{ false }}">
           <div class="pf-pop">
             <span class="pf-dev-lbl">로컬 에이전트 주소</span>
-            <input value="{{ agentUrlInput }}" onchange="{{ onAgentUrl }}" onkeydown="{{ onKeyEnter }}" placeholder="https://…trycloudflare.com" class="pf-fit16" style="width:230px;border:1px solid var(--border-default,#dfdfe8);border-radius:5px;padding:6px 9px;background:var(--bg-surface,#fff);color:var(--text-primary,#000);">
+            <input value="{{ agentUrlInput }}" onchange="{{ onAgentUrl }}" onblur="{{ onAgentCommit }}" onkeydown="{{ onKeyEnter }}" placeholder="https://…trycloudflare.com" class="pf-fit16" style="width:230px;border:1px solid var(--border-default,#dfdfe8);border-radius:5px;padding:6px 9px;background:var(--bg-surface,#fff);color:var(--text-primary,#000);">
             <span style="font-size:10.5px;font-weight:600;color:{{ connColor }};">{{ connStatus }}</span>
           </div>
         </sc-if>
@@ -2973,9 +2973,17 @@ class Component extends DCLogic {
     try { return (localStorage.getItem('pf_agent_url') || '').trim().replace(/\/+$/, ''); } catch (e) { return ''; }
   }
 
-  // 헤더의 에이전트 URL 입력 — 저장 + 연결 재확인. (fetch 인터셉트·더미키는 사이드카가 담당)
-  onAgentUrl(e) {
+  // 헤더의 에이전트 URL 입력 — **타이핑과 커밋을 나눈다.**
+  // 이 마크업의 `onchange` 는 React 의 onChange 로 remap 되어(support.js:319) **매 타건마다** 불린다.
+  // 그 안에서 정규화하고 그 결과를 controlled value 로 되돌리면, 정규화가 지우는 문자는
+  // **영영 못 친다** — 끝 슬래시를 지우는 규칙 하나 때문에 'https://…' 가 'https:…' 로 남았다
+  // (실측 agenturl_check.py: 슬래시 2개 중 0개 입력). 정규화·저장·핑은 커밋(blur/Enter)에서만 한다.
+  onAgentUrl(e) { this.setState({ agentUrlInput: e.target.value }); }
+
+  // 커밋 = blur(팝오버를 닫거나 다른 곳을 눌러도 온다) · Enter(onKeyEnter 가 blur 시킨다).
+  commitAgentUrl(e) {
     const u = (e.target.value || '').trim().replace(/\/+$/, '');
+    if (u === this.agentUrl() && u === (this.state.agentUrlInput || '').trim()) return;
     try { localStorage.setItem('pf_agent_url', u); } catch (err) {}
     this.setState({ agentUrlInput: u }, () => this.pingHealth());
   }
@@ -4096,6 +4104,7 @@ class Component extends DCLogic {
       // 에이전트 연결(헤더) — 칩에 상태, 탭하면 URL 입력 팝오버
       agentUrlInput: S.agentUrlInput || '',
       onAgentUrl: e => this.onAgentUrl(e),
+      onAgentCommit: e => this.commitAgentUrl(e),
       connStatus: S.connStatus, connColor: S.connColor,
       agentOpen: S.agentOpen, onAgentToggle: () => this.setState({ agentOpen: !S.agentOpen }),
       // 금액 가리기 — 가리는 일은 CSS 가 한다([data-mask="1"] .pf-money). 여기선 그 스위치만 낸다.
