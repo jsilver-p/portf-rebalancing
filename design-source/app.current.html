@@ -1472,19 +1472,27 @@
     .pf-hmeta{font-size:11.5px;color:var(--text-tertiary,#999);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
     .pf-hr{display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex:none;}
     .pf-hval{font-size:14px;font-weight:700;color:var(--text-primary,#000);white-space:nowrap;}
-    .pf-hpl{font-size:11.5px;font-weight:600;white-space:nowrap;}
     .pf-edit{flex:none;border:1px solid var(--border-default,#dfdfe8);background:var(--bg-surface,#fff);border-radius:10px;width:36px;height:36px;cursor:pointer;font-size:13px;color:var(--text-secondary,#6e6e6e);}
     .pf-edit:hover{border-color:var(--ig-blue,#1fa1ff);color:var(--ig-blue,#1fa1ff);}
     .pf-hbadges{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
-    /* 캡처 읽는 중 — 장별 진행 목록 */
-    .pf-shots{margin-top:12px;display:flex;flex-direction:column;gap:7px;}
-    .pf-shot{display:flex;align-items:center;gap:10px;background:var(--bg-surface,#fff);border:1px solid var(--border-default,#dfdfe8);border-radius:10px;padding:10px 12px;}
-    .pf-shot[data-done="1"]{border-color:#cfe8ff;background:#f8fcff;}
-    .pf-shot-i{flex:none;font-size:13px;width:16px;text-align:center;color:var(--ig-blue,#1fa1ff);}
-    .pf-shot-t{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1;}
-    .pf-shot-n{font-size:12.5px;font-weight:600;color:var(--text-primary,#000);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-    .pf-shot-s{font-size:11px;color:var(--text-tertiary,#999);}
-    .pf-shot-c{flex:none;font-size:11.5px;font-weight:700;color:var(--ig-blue,#1fa1ff);}
+    /* 비중 막대 — 무채색. 색은 손익의 것이고, 두 축이 같은 색을 쓰면 섞여 읽힌다. */
+    /* 트랙라인의 환율 — 읽을 땐 밑줄 점선(누를 수 있다는 표시), 누르면 그 자리가 입력이 된다. */
+    .pf-fxval{border:none;background:transparent;padding:0 1px;font:inherit;font-weight:700;color:var(--text-primary,#000);cursor:pointer;border-bottom:1px dashed var(--border-strong,#c4c4c4);}
+    .pf-fxval:hover{color:var(--ig-blue,#1fa1ff);border-bottom-color:var(--ig-blue,#1fa1ff);}
+    .pf-fxin{box-sizing:border-box;width:82px;border:1px solid var(--border-default,#dfdfe8);border-radius:6px;padding:3px 7px;font-size:12.5px;font-weight:700;text-align:right;background:var(--bg-surface,#fff);color:var(--text-primary,#000);}
+    .pf-fxbtn{border:1px solid var(--border-default,#dfdfe8);background:var(--bg-surface,#fff);border-radius:6px;width:26px;height:26px;cursor:pointer;font-size:12px;line-height:1;color:var(--text-secondary,#6e6e6e);padding:0;}
+    .pf-wbar{height:3px;border-radius:2px;background:var(--ig-gray-05,#efefef);overflow:hidden;}
+    .pf-wbar > i{display:block;height:100%;background:var(--text-secondary,#6e6e6e);border-radius:2px;}
+    .pf-hwbar{width:76px;margin-top:1px;}
+    .pf-gwbar{margin:0 14px 10px;}
+    .pf-hw{font-size:13px;font-weight:700;color:var(--text-primary,#000);white-space:nowrap;}
+    .pf-hpl{font-size:11px;font-weight:600;white-space:nowrap;}
+    .pf-gw{font-size:12.5px;font-weight:700;color:var(--text-primary,#000);white-space:nowrap;flex:none;}
+    /* 표의 비중 칸도 같은 규칙 — 숫자는 굵은 무채색, 그 밑에 같은 막대. */
+    .pf-tw{display:flex;flex-direction:column;align-items:flex-end;gap:2px;}
+    .pf-tw > span{font-size:12.5px;font-weight:700;color:var(--text-primary,#000);}
+    .pf-tw > .pf-wbar{width:100%;}
+    /* 캡처 읽는 중 — 진행은 올린 썸네일 위에 얹는다(목록을 따로 두지 않는다). */
     .pf-spin{width:15px;height:15px;border:2px solid var(--ig-blue,#1fa1ff);border-top-color:transparent;border-radius:50%;animation:pfspin 0.8s linear infinite;flex:none;}
     /* ── 자산 수정·추가 폼(시트) — 좁은 화면은 아래에서 올라오는 전면 시트, 넓은 화면은 가운데 카드.
        두 경우가 **같은 마크업**이고 위치만 다르다(폼이 하나여야 검증도 하나다). */
@@ -1618,6 +1626,14 @@
        이벤트 → 번들 로더의 오류 싱크가 '[bundle] error' 빨간 띠를 띄웠다). 배경 url() 은 치환 전
        토큰이 CSS 문법에 안 맞아 선언 자체가 버려져 요청이 아예 안 나간다. src 바인딩 금지. */
     .pf-q-thumb{width:92px;height:92px;border-radius:6px;border:1px solid var(--border-default,#dfdfe8);background:var(--bg-app,#fafafa) center/cover no-repeat;display:block;}
+    .pf-q-thumb{position:relative;}
+    .pf-q-thumb[data-ph="1"]::before{content:"🖼";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:26px;opacity:0.32;}
+    .pf-q-ov{position:absolute;inset:0;border-radius:6px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.72);}
+    .pf-q-ok{width:26px;height:26px;border-radius:50%;background:var(--ig-blue,#1fa1ff);color:#fff;font-size:15px;font-weight:700;display:flex;align-items:center;justify-content:center;}
+    .pf-q-wait{background:rgba(255,255,255,0.58);}
+    .pf-q-w{font-size:10.5px;font-weight:700;color:var(--text-tertiary,#999);}
+    .pf-q-item[data-state="done"] .pf-q-thumb{border-color:#9ad0ff;}
+    .pf-q-c{margin-left:5px;font-weight:700;color:var(--ig-blue,#1fa1ff);white-space:nowrap;}
     .pf-q-name{font-size:11.5px;line-height:1.3;color:var(--text-tertiary,#999);overflow-wrap:anywhere;max-height:2.6em;overflow:hidden;}
     .pf-q-x{position:absolute;top:-7px;right:-7px;width:20px;height:20px;border-radius:50%;border:1px solid var(--border-default,#dfdfe8);background:var(--bg-surface,#fff);color:var(--text-secondary,#6e6e6e);font-size:12px;line-height:1;cursor:pointer;padding:0;}
     .pf-q-x:hover{color:var(--ig-red-heart,#ed4956);border-color:var(--ig-red-heart,#ed4956);}
@@ -1690,6 +1706,12 @@
     .pf-fit16{font-size:13px;}
     .pf-more{display:inline-flex;align-items:center;}
     .pf-trackline{flex:1 1 240px;min-width:0;display:flex;flex-direction:column;gap:2px;}
+    /* 툴바가 세로 스택이 되면서 .pf-trackline 의 flex:1 이 **세로로** 자라 200px 빈칸을 만들었다
+       (실측). 이 자리에서는 자기 높이만 갖게 한다. 그리고 상태 문장은 한 줄짜리 행으로 감싼다 —
+       .pf-trackline 자신은 column 이라 자식 하나하나가 줄이 됐다(환율 숫자가 제 줄을 가졌다). */
+    .pf-tools{display:flex;flex-direction:column;gap:8px;}
+    .pf-tools > .pf-trackline{flex:none;}
+    .pf-trackrow{display:flex;align-items:center;gap:4px;flex-wrap:wrap;min-width:0;}
     @media (max-width:640px){
       .pf-analysis{grid-template-columns:1fr;}
       :root{--pf-page-pad:6px;--pf-sec-pad:8px;}
@@ -1927,38 +1949,34 @@
           </sc-if>
         </label>
 
-        <!-- 읽는 중 — **캡처 한 장 = 한 줄.** 어느 장이 끝났고 거기서 몇 행이 나왔는지가 보인다.
-             (3/9) 한 줄로는 "멈춘 건가"와 "느린 건가"를 구분할 수 없었다. 완료 표시는 서버가 준
-             장 번호(doneIdx)에서 온다 — 개수로 추측하면 0행짜리 장에서 틀린다. -->
-        <sc-if value="{{ hasShots }}" hint-placeholder-val="{{ false }}">
-          <div class="pf-shots">
-            <sc-for list="{{ shots }}" as="sh" hint-placeholder-count="3">
-              <div class="pf-shot" data-done="{{ sh.doneAttr }}">
-                <span class="pf-shot-i">{{ sh.icon }}</span>
-                <span class="pf-shot-t">
-                  <span class="pf-shot-n" data-tip="{{ sh.label }}" tabindex="0">{{ sh.label }}</span>
-                  <span class="pf-shot-s">{{ sh.status }}</span>
-                </span>
-                <sc-if value="{{ sh.busy }}" hint-placeholder-val="{{ false }}"><span class="pf-spin"></span></sc-if>
-                <sc-if value="{{ sh.hasCount }}" hint-placeholder-val="{{ false }}"><span class="pf-shot-c">{{ sh.count }}</span></sc-if>
-              </div>
-            </sc-for>
-          </div>
-        </sc-if>
-
         <!-- 첨부 큐 — 여러 번 나눠 담아도 **한 배치**로 분석한다. 화면 간 교차검증(계좌합계 대조·
              수량 사다리)이 배치 안에서만 도므로, 나눠 보내면 그 근거가 배치 경계에서 끊긴다. -->
         <sc-if value="{{ hasQueue }}" hint-placeholder-val="{{ true }}">
           <div class="pf-q">
             <sc-for list="{{ queue }}" as="q" hint-placeholder-count="2">
-              <div class="pf-q-item">
-                <div class="pf-q-thumb" role="img" aria-label="{{ q.name }}" style="background-image:url({{ q.url }});"></div>
-                <button class="pf-q-x pf-tap" onclick="{{ q.onRemove }}" title="빼기">×</button>
-                <span class="pf-q-name" data-tip="{{ q.name }}" tabindex="0">{{ q.short }}</span>
+              <div class="pf-q-item" data-state="{{ q.stateAttr }}">
+                <div class="pf-q-thumb" data-ph="{{ q.ph }}" role="img" aria-label="{{ q.name }}" style="background-image:url({{ q.url }});">
+                  <sc-if value="{{ q.busy }}" hint-placeholder-val="{{ false }}"><span class="pf-q-ov"><span class="pf-spin"></span></span></sc-if>
+                  <sc-if value="{{ q.done }}" hint-placeholder-val="{{ false }}"><span class="pf-q-ov"><span class="pf-q-ok">✓</span></span></sc-if>
+                  <sc-if value="{{ q.waiting }}" hint-placeholder-val="{{ false }}"><span class="pf-q-ov pf-q-wait"><span class="pf-q-w">대기</span></span></sc-if>
+                </div>
+                <sc-if value="{{ q.canRemove }}" hint-placeholder-val="{{ true }}">
+                  <button class="pf-q-x pf-tap" onclick="{{ q.onRemove }}" title="빼기">×</button>
+                </sc-if>
+                <span class="pf-q-name" data-tip="{{ q.tip }}" tabindex="0">{{ q.short }}<sc-if value="{{ q.hasCount }}" hint-placeholder-val="{{ false }}"><b class="pf-q-c">{{ q.count }}</b></sc-if></span>
               </div>
             </sc-for>
           </div>
-          <div style="margin-top:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <!-- 기준시점 — **여기가 제자리다.** 이 값이 실제로 쓰이는 곳은 제출 payload 의 captureDateTime
+               하나뿐이라(수량을 시세로 역산할 때) 분석 버튼 옆이 맞다. 예전엔 STEP2 [고급] 안에 있어서,
+               쓰는 화면과 고치는 화면이 갈려 있었다. -->
+          <div style="margin-top:12px;display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-size:11.5px;">
+            <span style="font-size:11px;font-weight:500;letter-spacing:0.3px;color:var(--text-tertiary,#999);">캡처 기준시점</span>
+            <input type="datetime-local" value="{{ capInput }}" onchange="{{ onCapChange }}" onkeydown="{{ onKeyEnter }}" style="box-sizing:border-box;border:1px solid var(--border-default,#dfdfe8);border-radius:6px;padding:5px 8px;font-size:11.5px;background:var(--bg-surface,#fff);color:var(--text-primary,#000);">
+            <span style="font-size:11px;color:var(--text-tertiary,#999);">비우면 사진의 촬영 시각(EXIF)</span>
+            <span class="pf-tap" data-tip="수량을 시세로 역산할 때 쓰는 기준 시점이에요. 비우면 스크린샷의 촬영 시각(EXIF)을 자동으로 씁니다." tabindex="0" style="font-size:11px;font-weight:700;color:var(--text-tertiary,#999);border:1px solid var(--border-default,#dfdfe8);border-radius:999px;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex:none;">i</span>
+          </div>
+          <div style="margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
             <button class="pf-btn-primary" disabled="{{ extracting }}" onclick="{{ onAnalyze }}">{{ analyzeLabel }}</button>
             <button class="pf-btn-ghost" disabled="{{ extracting }}" onclick="{{ onClearQueue }}">모두 빼기</button>
             <span class="pf-note-tip"><b class="pf-bang">!</b><span>{{ queueHint }}</span></span>
@@ -2144,46 +2162,40 @@
            120px+ 로 부풀려 표를 덮었다. 고정되는 건 제목·계좌칩까지, 조작 줄은 같이 스크롤된다.
            이 단은 '지속 트래킹'의 전부다: 왼쪽은 **지금 상태**(언제 잰 값인가), 오른쪽은 **주 액션**
            (다시 재기) 하나. 파라미터(환율 수동·기준시점)는 고급으로 접는다 — 매번 보는 것이 아니다. -->
-      <div data-tour="tools" style="padding:0 var(--pf-sec-pad,18px) 10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:11.5px;">
+      <div data-tour="tools" class="pf-tools" style="padding:0 var(--pf-sec-pad,18px) 10px;font-size:11.5px;">
+        <!-- 상태 두 줄 — 언제 잰 값인가. 환율은 **여기 있는 숫자를 눌러** 직접 고친다:
+             예전엔 같은 값이 여기 한 번, [고급] 안에 또 한 번 있었다(고칠 곳과 볼 곳이 갈려 있었다). -->
         <div class="pf-trackline">
-          <span style="color:var(--text-secondary,#6e6e6e);">{{ trackStatus }}</span>
+          <span class="pf-trackrow">
+          <span style="color:var(--text-secondary,#6e6e6e);">{{ trackPre }}</span>
+          <sc-if value="{{ fxRead }}" hint-placeholder-val="{{ true }}">
+            <button class="pf-fxval pf-tap" onclick="{{ onFxEdit }}" title="눌러서 환율을 직접 입력">{{ fxStr }}</button>
+          </sc-if>
+          <sc-if value="{{ fxEdit }}" hint-placeholder-val="{{ false }}">
+            <input type="number" value="{{ fx }}" onchange="{{ onFxChange }}" onblur="{{ onFxDone }}" onkeydown="{{ onKeyEnter }}" class="pf-fxin">
+            <button class="pf-fxbtn" onclick="{{ onFxRefresh }}" title="환율만 새로고침">↻</button>
+          </sc-if>
+          <span style="color:var(--text-secondary,#6e6e6e);">{{ trackPost }}</span>
+          </span>
           <span style="font-size:11.5px;color:{{ trackDeltaColor }};">{{ trackDelta }}</span>
         </div>
-        <button class="pf-btn-primary" onclick="{{ onReprice }}" title="에이전트로 현재가·환율을 다시 불러 재평가 (수량 없는 종목은 캡처시점 종가로 역산)" style="padding:8px 14px;font-size:12.5px;">↻ 현재가·환율 갱신</button>
-        <button class="pf-btn-ghost" onclick="{{ onAddManual }}">＋ 직접 추가</button>
-        <button class="pf-btn-ghost" onclick="{{ onAdv }}" title="환율 수동 입력·수량 역산 기준시점">{{ advCaret }} 고급</button>
-      </div>
-      <sc-if value="{{ advOpen }}" hint-placeholder-val="{{ false }}">
-        <div style="padding:0 var(--pf-sec-pad,18px) 10px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;font-size:11.5px;">
-          <span style="display:inline-flex;align-items:center;gap:6px;">
-            <span style="font-size:11px;font-weight:500;letter-spacing:0.3px;color:var(--text-tertiary,#999);">USD/KRW</span>
-            <input type="number" value="{{ fx }}" onchange="{{ onFxChange }}" onkeydown="{{ onKeyEnter }}" style="width:76px;border:1px solid var(--border-default,#dfdfe8);border-radius:6px;padding:5px 8px;font-size:13px;font-weight:600;text-align:right;background:var(--bg-surface,#fff);color:var(--text-primary,#000);">
-            <button onclick="{{ onFxRefresh }}" title="환율만 새로고침" style="border:1px solid var(--border-default,#dfdfe8);background:var(--bg-surface,#fff);border-radius:6px;width:27px;height:27px;cursor:pointer;font-size:13px;line-height:1;color:var(--text-secondary,#6e6e6e);" style-hover="color:var(--ig-blue,#1fa1ff);border-color:var(--ig-blue,#1fa1ff);">↻</button>
-          </span>
-          <span style="display:inline-flex;align-items:center;gap:5px;">
-            <span style="font-size:11px;font-weight:500;letter-spacing:0.3px;color:var(--text-tertiary,#999);">기준시점</span>
-            <input type="datetime-local" value="{{ capInput }}" onchange="{{ onCapChange }}" onkeydown="{{ onKeyEnter }}" style="border:1px solid var(--border-default,#dfdfe8);border-radius:6px;padding:4px 8px;font-size:11.5px;background:var(--bg-surface,#fff);color:var(--text-primary,#000);">
-            <span class="pf-tap" data-tip="수량을 시세로 역산할 때 쓰는 기준 시점이에요. 비우면 스크린샷의 촬영 시각(EXIF)을 자동으로 씁니다." tabindex="0" style="font-size:11px;font-weight:700;color:var(--text-tertiary,#999);border:1px solid var(--border-default,#dfdfe8);border-radius:999px;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex:none;">i</span>
-          </span>
-          <sc-if value="{{ hasRepriceSummary }}" hint-placeholder-val="{{ false }}">
-            <span style="font-size:11px;color:var(--text-tertiary,#999);">{{ repriceSummaryText }}</span>
-          </sc-if>
+        <!-- 조작 한 줄 — 주 액션(다시 재기) 하나와 추가 하나. [고급]은 해체했다: 기준시점은 실제로
+             쓰이는 STEP1 로 갔고, 환율은 위 줄에서 바로 고치며, 갱신 요약은 위 줄이 이미 말한다. -->
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <button class="pf-btn-primary" onclick="{{ onReprice }}" title="에이전트로 현재가·환율을 다시 불러 재평가 (수량 없는 종목은 캡처시점 종가로 역산)" style="padding:8px 14px;font-size:12.5px;">↻ 현재가·환율 갱신</button>
+          <button class="pf-btn-ghost" onclick="{{ onAddManual }}">＋ 직접 추가</button>
+          <div style="flex:1;"></div>
+          <div class="pf-seg">
+            <button class="{{ viewCardsCls }}" onclick="{{ onViewCards }}">카드</button>
+            <button class="{{ viewTableCls }}" onclick="{{ onViewTable }}">표</button>
+          </div>
         </div>
-      </sc-if>
-       <!-- 보기 전환 — 묶는 기준(계좌/자산군)과 보는 형태(카드/표). 둘 다 표 **바로 위**에 둔다:
-            무엇을 바꾸는 스위치인지 눈으로 이어져야 한다(툴바 끝에 두면 시세 갱신과 섞인다). -->
-       <div style="padding:0 var(--pf-sec-pad,18px) 9px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-         <div class="pf-seg">
-           <button class="{{ grpAcctCls }}" onclick="{{ onGroupAcct }}">계좌별</button>
-           <button class="{{ grpClsCls }}" onclick="{{ onGroupCls }}">자산군별</button>
-         </div>
-         <div style="flex:1;"></div>
-         <div class="pf-seg">
-           <button class="{{ viewCardsCls }}" onclick="{{ onViewCards }}">카드</button>
-           <button class="{{ viewTableCls }}" onclick="{{ onViewTable }}">표</button>
-         </div>
-       </div>
-
+        <!-- 묶는 기준 — 표 바로 위. 무엇을 바꾸는 스위치인지 눈으로 이어져야 한다. -->
+        <div class="pf-seg" style="align-self:flex-start;">
+          <button class="{{ grpAcctCls }}" onclick="{{ onGroupAcct }}">계좌별</button>
+          <button class="{{ grpClsCls }}" onclick="{{ onGroupCls }}">자산군별</button>
+        </div>
+      </div>
        <!-- ── 카드 보기 — 읽는 화면. 입력칸이 없고, 고치는 일은 ✎ 가 여는 폼 하나가 맡는다. -->
        <sc-if value="{{ showCards }}" hint-placeholder-val="{{ true }}">
         <div class="pf-tbl-2" style="display:flex;flex-direction:column;gap:10px;padding:0 var(--pf-sec-pad,18px);">
@@ -2196,7 +2208,9 @@
               <sc-if value="{{ g.gPlain }}" hint-placeholder-val="{{ false }}"><span class="pf-gsub">{{ g.gSub }}</span></sc-if>
               <div style="flex:1;"></div>
               <span class="pf-money pf-gsum">{{ g.subtotalShort }}</span>
+              <span class="pf-gw">{{ g.gWeightStr }}</span>
             </div>
+            <div class="pf-wbar pf-gwbar"><i style="width:{{ g.gWeightBar }};"></i></div>
             <sc-for list="{{ g.rows }}" as="r" hint-placeholder-count="3">
               <div class="pf-hcard" data-tour="{{ r.tourTag }}">
                 <div class="pf-hrow">
@@ -2211,7 +2225,11 @@
                       <span title="{{ r.staleTitle }}" style="width:6px;height:6px;border-radius:50%;background:{{ r.staleColor }};flex:none;"></span>
                       <span class="pf-money pf-hval">{{ r.valueStr }}</span>
                     </span>
-                    <span class="pf-hpl" style="color:{{ r.plColor }};">{{ r.plStr }} · {{ r.weightStr }}</span>
+                    <span style="display:flex;align-items:baseline;gap:6px;">
+                      <span class="pf-hw">{{ r.weightStr }}</span>
+                      <span class="pf-hpl" style="color:{{ r.plColor }};">{{ r.plStr }}</span>
+                    </span>
+                    <span class="pf-wbar pf-hwbar"><i style="width:{{ r.weightBar }};"></i></span>
                     <sc-if value="{{ r.hasCurNote }}" hint-placeholder-val="{{ false }}"><span class="pf-money" style="font-size:10.5px;color:var(--text-tertiary,#999);white-space:nowrap;">{{ r.curNote }}</span></sc-if>
                   </div>
                   <button class="pf-edit" onclick="{{ r.onEdit }}" title="수정">✎</button>
@@ -2247,6 +2265,7 @@
               <sc-if value="{{ g.gPlain }}" hint-placeholder-val="{{ false }}"><span class="pf-gsub">{{ g.gSub }}</span></sc-if>
               <div style="flex:1;"></div>
               <span style="font-size:11.5px;color:var(--text-tertiary,#999);white-space:nowrap;flex:none;">합계 <b class="pf-money" style="color:var(--text-primary,#000);font-size:12.5px;">{{ g.subtotalStr }}</b></span>
+              <span class="pf-gw">{{ g.gWeightStr }}</span>
             </div>
             <div class="pf-tbl-body">
             <sc-for list="{{ g.rows }}" as="r" hint-placeholder-count="6">
@@ -2274,7 +2293,7 @@
                   <span class="pf-num pf-money" style="font-size:12.5px;font-weight:600;text-align:right;flex:1;">{{ r.valueStr }}</span>
                   <sc-if value="{{ r.valueReview }}" hint-placeholder-val="{{ false }}"><span class="pf-tap" data-tip="{{ r.valueTitle }}" tabindex="0" style="font-size:9px;font-weight:700;color:#b8860b;background:#fff3cd;border:1px solid #f0d48a;padding:0 3px;border-radius:3px;flex:none;cursor:pointer;">⚠</span></sc-if>
                 </div>
-                <span class="pf-num" style="font-size:12.5px;text-align:right;color:var(--text-secondary,#6e6e6e);">{{ r.weightStr }}</span>
+                <span class="pf-num pf-tw"><span>{{ r.weightStr }}</span><span class="pf-wbar"><i style="width:{{ r.weightBar }};"></i></span></span>
                 <span class="pf-num" style="font-size:12.5px;font-weight:600;text-align:right;color:{{ r.plColor }};">{{ r.plStr }}</span>
                 <button class="pf-tap" onclick="{{ r.onEdit }}" title="수정" style="border:none;background:transparent;color:var(--ig-gray-40,#b4b4b4);cursor:pointer;font-size:13px;padding:0;line-height:1;" style-hover="color:var(--ig-blue,#1fa1ff);">✎</button>
               </div>
@@ -2649,7 +2668,6 @@ class Component extends DCLogic {
       inviteHidden: false,
       tour: null,                 // 튜토리얼 단계 index(TOUR) — null 이면 안 돎. 저장하지 않는다.
       devOpen: false,             // 헤더 ⚙ — 개발 전용 도구는 전부 여기 안에만 있다
-      advOpen: false,             // STEP2 고급(환율 수동·기준시점)
       // 지속 트래킹 — 직전 갱신 시점의 총자산. 재평가 직전에 찍어 '직전 대비 변화'를 만든다(저장됨).
       prevTotal: null,
       prevAt: null,
@@ -2679,6 +2697,7 @@ class Component extends DCLogic {
       legendOpen: typeof window !== 'undefined' && window.innerWidth > 640,
       // 현재가 재평가(STEP2)
       capInput: '',
+      fxEdit: false,              // 트랙라인의 환율을 눌러 고치는 중인가
       repriceMsg: '',
       repriceSummary: null
     };
@@ -3180,6 +3199,7 @@ class Component extends DCLogic {
   openAssetForm(id) {
     const h = id ? (this.state.holdings || []).find(x => x.id === id) : null;
     const n = v => v == null ? '' : String(v);
+    this._lockScroll(true);
     this.setState({ assetForm: h ? {
       id: h.id, broker: h.broker || '', brokerNew: '', accountType: h.accountType || '일반',
       name: h.name || '', cls: h.cls || 'growth', currency: h.currency === 'USD' ? 'USD' : 'KRW',
@@ -3191,7 +3211,27 @@ class Component extends DCLogic {
       name: '', cls: 'growth', currency: 'KRW', qty: '', price: '', avg: '', value: '', err: ''
     } });
   }
-  closeAssetForm() { this.setState({ assetForm: null }); }
+  closeAssetForm() { this._lockScroll(false); this.setState({ assetForm: null }); }
+
+  // 폼이 떠 있는 동안 **뒤가 스크롤되면 안 된다** — 손가락이 시트를 미는지 표를 미는지 알 수 없고,
+  // 닫았을 때 화면이 엉뚱한 곳에 있다. overflow:hidden 만으로는 모바일 사파리가 배경을 계속 민다.
+  // body 를 position:fixed 로 박되, 그러면 스크롤 위치가 0 으로 튀므로 top 에 현재 위치를 넣고
+  // 풀 때 그대로 되돌린다. 잠금·해제는 여기 한 곳이다(열기/닫기/저장/삭제가 전부 이걸 지난다).
+  _lockScroll(on) {
+    const b = document.body;
+    if (on) {
+      if (this._lockY != null) return;
+      this._lockY = window.scrollY || window.pageYOffset || 0;
+      b.style.position = 'fixed';
+      b.style.top = (-this._lockY) + 'px';
+      b.style.left = '0'; b.style.right = '0'; b.style.width = '100%';
+    } else {
+      if (this._lockY == null) return;
+      const y = this._lockY; this._lockY = null;
+      b.style.position = ''; b.style.top = ''; b.style.left = ''; b.style.right = ''; b.style.width = '';
+      window.scrollTo(0, y);
+    }
+  }
   setAssetForm(patch) { this.setState({ assetForm: { ...(this.state.assetForm || {}), ...patch, err: '' } }); }
 
   saveAssetForm() {
@@ -3220,13 +3260,13 @@ class Component extends DCLogic {
     };
     if (f.id) this.set({ holdings: this.state.holdings.map(h => h.id === f.id ? { ...h, ...patch } : h) });
     else this.set({ holdings: [...this.state.holdings, { id: 'h' + Date.now(), ...patch }] });
-    this.setState({ assetForm: null });
+    this.closeAssetForm();
   }
 
   deleteAssetForm() {
     const f = this.state.assetForm; if (!f || !f.id) return;
     this.set({ holdings: this.state.holdings.filter(h => h.id !== f.id) });
-    this.setState({ assetForm: null });
+    this.closeAssetForm();
   }
 
   // STEP1 프리뷰(review) 인라인 편집 — 확인 대기 중인 streamPending 을 갱신한다. commitStream 이
@@ -3345,15 +3385,6 @@ class Component extends DCLogic {
     }
   }
 
-  repriceSummaryText() {
-    const s = this.state.repriceSummary; if (!s) return '';
-    const fmt = t => { if (!t) return '—'; const d = new Date(t); return isNaN(d) ? String(t) : d.toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }); };
-    const srcLabel = s.capSrc === 'exif' ? ' (EXIF)' : s.capSrc === 'manual' ? ' (직접지정)' : s.capSrc === 'fallback' ? ' (기준일)' : '';
-    let out = '수량 기준 ' + fmt(s.capUsed) + srcLabel + ' · 평가 기준 ' + fmt(s.at) + ' (환율 ' + s.fx + ')';
-    if (s.est && s.est.length) out += ' · 추정수량 ' + s.est.length + '건';
-    return out;
-  }
-
   // 수량 신뢰 등급(단일 출처) — 화면 정수·교차계좌 = 확정(none), 캡처시세 역산은
   // 확신(estimated)=est / 정확도낮음(estimated-low)=low, 유도 실패(빈칸+사유) = miss.
   // confidence는 STEP1에서 문자열, STEP2에서 숫자(confNum)로 오므로 둘 다 처리한다.
@@ -3452,6 +3483,10 @@ class Component extends DCLogic {
     // 빈 상태에는 줄 자체를 내지 않는다(text:null) — 히어로가 이미 무엇을 하는 앱인지와 체험 버튼을
     // 보여주고, STEP1 카드가 무엇을 올릴지 말한다. 여기 한 줄을 더하면 화면 위가 세 번 같은 소리를 한다.
     if (!(S.holdings || []).length) return { step: 1, text: null };
+    // 확신 낮은 값이 남아 있으면 그게 먼저다 — 시세가 새것인지보다 **내 숫자가 맞는지**가 먼저다.
+    // 판정은 표의 배지와 같은 출처(reviewFlag)를 쓴다. 그 행을 고치면(=확인하면) 저절로 사라진다.
+    const low = (S.holdings || []).filter(h => this.reviewFlag(h).qtyBadge).length;
+    if (low) return { step: 2, icon: '⚠', text: '확신이 낮은 항목이 ' + low + '건 있어요 — STEP 2 에서 [확인 권장] 배지가 붙은 행의 값을 확인해 주세요' };
     if (this.isStale(S.holdings)) return { step: 2, icon: '🔄', text: '시세가 하루 넘게 지났어요 — STEP 2에서 [현재가·환율 갱신]을 눌러 주세요' };
     const sum = this.ALLOC.reduce((s, c) => s + (S.target[c.key] || 0), 0);
     if (sum !== 100) return { step: 3, icon: '🎯', text: 'STEP 3 목표 비중 합계가 ' + sum + '% 예요 — 100%로 맞춰 주세요' };
@@ -3567,6 +3602,8 @@ class Component extends DCLogic {
       const gcm = cmap[g.cls] || cmap.growth;
       out.push({ broker: g.broker, atype: g.accountType,
         atypeColor: (amap[g.accountType] || amap['일반']).color, subtotalStr: this.fmtW(g.sub), subtotalShort: this.fmtShort(g.sub), rows,
+        gWeightStr: total > 0 ? (g.sub / total * 100).toFixed(1) + '%' : '—',
+        gWeightPct: total > 0 ? (g.sub / total * 100) : 0,
         // 계좌별: 증권사 / 계좌알약 · 자산군별: 자산군 / N종목. 색점은 각각 계좌색·자산군색.
         gTitle: byCls ? gcm.label : g.broker,
         gSub: byCls ? (g.items.length + '종목') : g.accountType,
@@ -3603,6 +3640,7 @@ class Component extends DCLogic {
           cur: this.curSym(h.currency),
           valueStr: this.fmtW(v),
           weightStr: total > 0 ? (v / total * 100).toFixed(1) + '%' : '—',
+          weightPct: total > 0 ? (v / total * 100) : 0,
           plStr: pl == null ? '—' : (pl >= 0 ? '+' : '') + pl.toFixed(1) + '%',
           plColor: pl == null ? '#999' : pl >= 0 ? '#ed4956' : '#3897f0',
           // 외화 현금 — 예전엔 이 칸이 **입력**이라 원통화 금액을 담아야 했고(사용자가 화면에서 본
@@ -3631,8 +3669,10 @@ class Component extends DCLogic {
           hasMetaCls: !byCls,
           metaTail: (h.cls === 'cash' ? ''
             : (byCls ? '' : ' · ') + (h.qty == null ? '수량 미확인'
-               : this.fmtNum(h.qty) + '주 × ' + this.curSym(h.currency)
-                 + this.fmtNum(Math.round((h.price != null ? h.price : 0) * 100) / 100))),
+               : this.fmtNum(h.qty) + '주'
+                 + (h.price == null ? ' · 현재가 미확인'
+                    : ' × 현재 ' + this.curSym(h.currency)
+                      + this.fmtNum(Math.round(h.price * 100) / 100)))),
           hasMeta: !byCls || h.cls !== 'cash',
           onEdit: () => this.openAssetForm(h.id),
           editable: ed, readonly: !ed,
@@ -3663,6 +3703,16 @@ class Component extends DCLogic {
           onKeyEnter: e => { if (e.key === 'Enter') e.target.blur(); }
         });
       });
+    });
+    // 비중 막대 — 이 앱의 핵심 축이라 숫자 옆에 길이로도 낸다. 다만 절대 스케일(0~100%)로 그리면
+    // 13.4% 가 막대의 1/8 이라 아무것도 안 보인다. **같은 층의 최댓값을 가득 참으로** 잡는다
+    // (행은 행끼리, 그룹은 그룹끼리 — 층을 넘어 길이를 비교할 일은 없다). 색은 쓰지 않는다:
+    // 파랑·빨강은 손익의 것이고, 비중에 색을 주면 두 축이 섞여 읽힌다.
+    const maxG = out.reduce((m, g) => Math.max(m, g.gWeightPct || 0), 0) || 1;
+    const maxR = out.reduce((m, g) => g.rows.reduce((mm, r) => Math.max(mm, r.weightPct || 0), m), 0) || 1;
+    out.forEach(g => {
+      g.gWeightBar = Math.max(2, Math.round(g.gWeightPct / maxG * 100)) + '%';
+      g.rows.forEach(r => { r.weightBar = Math.max(2, Math.round(r.weightPct / maxR * 100)) + '%'; });
     });
     return out;
   }
@@ -3910,6 +3960,7 @@ class Component extends DCLogic {
     if (!s) return false;
     this._demoSnap = null;
     this.setState({ extracting: false, extractStatus: '', extractError: null, extractInfo: '',
+      queue: [], shotNames: [], shotDone: [], shotBusy: null, shotCounts: {},
       streamStage: '', streamRows: [], streamPending: null, streamNote: '', streamCapture: '',
       gateReport: null, gateOpen: false, brandInput: {} });
     this.set({ holdings: s.holdings, target: s.target, fx: s.fx });
@@ -3979,7 +4030,11 @@ class Component extends DCLogic {
     this.setState({ extracting: true, extractError: null, extractInfo: null,
       streamStage: 'live', streamRows: [], gateReport: null, streamPending: null, streamNote: '',
       extractStatus: '예시 · 캡처 읽는 중… (0/' + N + ')' });
-    this._shotsInit(waves.map((w, i) => '예시 캡처 ' + (i + 1) + '.png'));
+    // 체험도 **같은 화면**을 보여야 한다 — 진행이 썸네일 위에 얹히므로 자리표시 큐를 만든다.
+    // url 이 빈 문자열이면 background-image 선언이 무효라 통째로 버려지고 회색 바탕만 남는다.
+    const demoNames = waves.map((w, i) => '예시 캡처 ' + (i + 1) + '.png');
+    this.setState({ queue: demoNames.map((n, i) => ({ id: 'dq' + i, url: '', name: n, demo: true })) });
+    this._shotsInit(demoNames);
     this._shotsProgress([], [], 1);
     this._pushStream(waves[0].rows);
     let t = 0;
@@ -3992,7 +4047,10 @@ class Component extends DCLogic {
         this._pushStream(waves[idx].rows);
       } }, delay))(i, t);
     }
-    setTimeout(() => { if (this.state.streamStage === 'live') this._finishStream(finalRows, gate, pending, ''); }, t + 1000);
+    setTimeout(() => { if (this.state.streamStage === 'live') {
+      this.setState({ queue: [] });                       // 자리표시 큐 정리 — 확인 단계에 잔상 금지
+      this._finishStream(finalRows, gate, pending, '');
+    } }, t + 1000);
     // 체험은 곧 튜토리얼이다 — 진입이 하나이므로 시작도 여기 한 곳이다(히어로 버튼·⚙ 둘 다 이리로 온다).
     this.startTour();
   }
@@ -4167,9 +4225,7 @@ class Component extends DCLogic {
       const scopeOf = x => norm(x.broker) + '|' + x.accountType;
       const scopes = new Set(newPending.map(scopeOf));
       let holdings = this.state.holdings.map(h => ({ ...h }));
-      let updated = 0, added = 0, lowConf = 0;
       newPending.forEach(p => {
-        if (p.confidence < 0.8 || p.checkFail) lowConf++;
         const h = holdings.find(x => scopeOf(x) === scopeOf(p) && norm(x.name) === norm(p.name) && norm(p.name).length > 1);
         if (h) {
           if (p.qty != null) h.qty = p.qty;
@@ -4192,7 +4248,6 @@ class Component extends DCLogic {
           h._seen = true;
           // 데모 행이 실값으로 갱신되면 더는 데모가 아니다 — id를 실자산 꼴로 바꿔 다음 스냅샷의 시드 청소를 면한다
           if (isDemo(h)) h.id = 'h' + Date.now() + Math.random().toString(36).slice(2, 6);
-          updated++;
         } else {
           holdings.push({
             id: 'h' + Date.now() + Math.random().toString(36).slice(2, 6),
@@ -4206,19 +4261,15 @@ class Component extends DCLogic {
             demo: !!p.demo,
             updatedAt: Date.now(), _seen: true
           });
-          added++;
         }
       });
-      const before = holdings.length;
       holdings = holdings.filter(h => !isDemo(h) && (!scopes.has(scopeOf(h)) || h._seen || h.broker === '직접입력'));
-      const removed = before - holdings.length;
       holdings.forEach(h => { delete h._seen; });
       this.set({ holdings });
-      this.setState({
-        extracting: false, extractStatus: '',
-        extractInfo: '스냅샷 반영 완료 — 갱신 ' + updated + ' · 신규 ' + added + (removed ? ' · 제거 ' + removed : '') +
-          (lowConf ? ' · ⚠ 확신 낮은 항목 ' + lowConf + '건은 표에서 값을 확인하세요' : '') + (extraNote || '')
-      });
+      // 반영 결과를 문장으로 다시 말하지 않는다 — 갱신/신규 수는 트랙라인(종목 N개)과 표가 이미
+      // 말하고, 확신 낮은 항목은 **그 행의 배지**가 어느 행인지까지 가리킨다. 문장은 어느 행인지
+      // 말하지 못하면서 자리만 차지했다. 남은 '할 일' 성격은 아래 nextAction 이 한 줄로 낸다.
+      this.setState({ extracting: false, extractStatus: '', extractInfo: '' });
     }
   }
 
@@ -4367,8 +4418,9 @@ class Component extends DCLogic {
     const lastAt = this.lastUpdatedAt(S.holdings);
     const fxTag = S.fxStatus || (S.fxUpdatedAt ? ('자동 · ' + this.timeAgo(S.fxUpdatedAt)) : '저장값');
     // 보유가 없으면 이 줄은 아예 렌더되지 않는다(빈 상태의 STEP2 는 설명 두 줄이 전부).
-    const trackStatus = '마지막 갱신 ' + (lastAt ? this.timeAgo(lastAt) : '—') + ' · 환율 ' + this.fmtNum(S.fx)
-      + ' (' + fxTag + ') · ' + this._summaryStr(this._tierCounts(S.holdings), 0);
+    // 환율은 **보는 곳에서 바로 고친다** — 값 하나를 두 곳(트랙라인 표시 · 고급 입력)에 두지 않는다.
+    const trackPre = '마지막 갱신 ' + (lastAt ? this.timeAgo(lastAt) : '—') + ' · 환율 ';
+    const trackPost = ' (' + fxTag + ') · ' + this._summaryStr(this._tierCounts(S.holdings), 0);
     // 둘째 줄은 **항상 한 줄**이다(비면 블록 높이가 오르내린다). 먼저 걸리는 것 하나만:
     // 진행/결과 메시지 → 신선도 경고 → 직전 갱신 대비 변화 → 안내.
     let trackDelta = '갱신하면 직전 갱신 대비 변화가 여기 표시됩니다', trackDeltaColor = 'var(--text-tertiary,#999)';
@@ -4424,7 +4476,10 @@ class Component extends DCLogic {
       privLine: pv.line, privIcon: pv.icon, privColor: pv.color, privDetail: pv.detail,
       privOpen: S.privOpen, privCaret: S.privOpen ? '▾' : '▸',
       onPriv: () => this.setState({ privOpen: !S.privOpen }),
-      trackStatus, trackDelta, trackDeltaColor,
+      trackPre, trackPost, trackDelta, trackDeltaColor,
+      fxStr: this.fmtNum(S.fx), fxEdit: !!S.fxEdit, fxRead: !S.fxEdit,
+      onFxEdit: () => this.setState({ fxEdit: true }),
+      onFxDone: () => this.setState({ fxEdit: false }),
       fx: S.fx,
       onFxChange: e => this.set({ fx: this.parseNum(e.target.value) || S.fx }),
       // 환율 갱신 시각·상태는 위 trackStatus 한 줄로 흡수됐다(fxTag) — 같은 말을 두 곳에 내지 않는다.
@@ -4449,14 +4504,26 @@ class Component extends DCLogic {
       onGuide: () => this.setState({ guideOpen: !S.guideOpen }),
       devOpen: S.devOpen, onDevToggle: () => this.setState({ devOpen: !S.devOpen }),
       onResetAll: () => this.resetAll(),
-      advOpen: S.advOpen, advCaret: S.advOpen ? '▾' : '▸',
-      onAdv: () => this.setState({ advOpen: !S.advOpen }),
       // 첨부 큐 — 파일명을 그대로 보여준다(짧게 줄이되 원본은 탭하면 뜬다).
-      queue: (S.queue || []).map(q => ({
-        id: q.id, url: q.url, name: q.name,
-        short: q.name.length > 22 ? (q.name.slice(0, 11) + '…' + q.name.slice(-10)) : q.name,
-        onRemove: () => this.dequeue(q.id)
-      })),
+      // 진행 표시는 **올린 이미지 그 자리**에 얹는다. 예전엔 썸네일 목록과 진행 목록이 따로 있어
+      // 같은 캡처가 화면에 두 번 나왔다. 완료 판정은 서버가 준 장 번호(shotDone)에서만 온다.
+      queue: (S.queue || []).map((q, i) => {
+        const k = i + 1;
+        const done = S.extracting && (S.shotDone || []).indexOf(k) >= 0;
+        const busy = S.extracting && !done && S.shotBusy === k;
+        const c = (S.shotCounts || {})[k];
+        return {
+          id: q.id, url: q.url, name: q.name,
+          short: q.name.length > 22 ? (q.name.slice(0, 11) + '…' + q.name.slice(-10)) : q.name,
+          onRemove: () => this.dequeue(q.id),
+          ph: q.url ? '' : '1',      // 체험의 자리표시 — 빈 흰 상자는 고장난 것처럼 보인다
+          canRemove: !S.extracting,          // 분석 중에 빼면 장 번호와 썸네일이 어긋난다
+          busy, done, waiting: !!S.extracting && !done && !busy,
+          stateAttr: done ? 'done' : (busy ? 'busy' : (S.extracting ? 'wait' : '')),
+          hasCount: !!(done && c > 0), count: (c || 0) + '행',
+          tip: done ? (q.name + ' — 읽기 완료') : (busy ? (q.name + ' — 읽는 중') : q.name)
+        };
+      }),
       hasQueue: (S.queue || []).length > 0,
       analyzeLabel: S.extracting ? '분석 중…' : ('분석 시작 (' + (S.queue || []).length + '장)'),
       // 파괴적 규칙(스냅샷 대체)은 상시 설명문이 아니라 **누르기 직전**에 둔다. 마크업에서 앞에
@@ -4472,7 +4539,6 @@ class Component extends DCLogic {
       onCapChange: e => this.setState({ capInput: e.target.value }),
       onReprice: () => this.repriceNow(),
       // repriceMsg 는 위 trackDelta 한 줄로 흡수됐다 — 같은 말을 두 곳에 내지 않는다.
-      repriceSummaryText: this.repriceSummaryText(), hasRepriceSummary: !!S.repriceSummary,
       // 라이브 추출 프리뷰(STEP1)
       // live: 스트리밍 중 원시행(streamRows)을 읽기전용으로. review: id 를 가진 streamPending 을
       // 편집 가능하게 — 여기서 고친 값이 곧 commitStream 이 넘길 커밋 데이터다(단일 출처).
@@ -4528,18 +4594,6 @@ class Component extends DCLogic {
       acctChips,
       extracting: S.extracting, notExtracting: !S.extracting,
       extractStatus: S.extractStatus,
-      // 장별 진행 — 완료는 서버가 준 장 번호로만 정한다. '읽는 중' 스피너는 그 장을 실제로
-      // 아는 경로(순차)에서만 켠다(에이전트는 병렬이라 shotBusy 가 null 이다).
-      hasShots: !!S.extracting && (S.shotNames || []).length > 0,
-      shots: (S.shotNames || []).map((n, i) => {
-        const k = i + 1;
-        const done = (S.shotDone || []).indexOf(k) >= 0;
-        const busy = !done && S.shotBusy === k;
-        const c = (S.shotCounts || {})[k];
-        return { label: n, icon: done ? '✓' : (busy ? '👁' : '·'), doneAttr: done ? '1' : '',
-          status: done ? '읽기 완료' : (busy ? '종목·수량·금액을 읽는 중…' : '차례 기다리는 중'),
-          busy, hasCount: done && c > 0, count: (c || 0) + '행' };
-      }),
       hasError: !!S.extractError, extractError: S.extractError,
       // 첨부는 '담기'까지만 한다 — 추출은 [분석 시작]이 연다(여러 번 담아 한 배치로 보내기 위해).
       onFiles: e => { this.enqueue(e.target.files); e.target.value = ''; },
