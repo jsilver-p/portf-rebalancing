@@ -1731,7 +1731,11 @@
     /* 좁은 화면에서만 16px 로 올리는 입력들(포커스 확대 방지). 기본값은 여기 한 곳. */
     .pf-fit16{font-size:13px;}
     .pf-more{display:inline-flex;align-items:center;}
-    .pf-trackline{flex:1 1 240px;min-width:0;display:flex;flex-direction:column;gap:2px;}
+    /* 밴드 바로 밑 줄이라 위 여백이 필요하다 — 밴드 버튼의 확장된 히트영역이 여기 있는
+       환율 숫자(그것도 누르는 값이다)를 덮으면 환율을 못 고친다(narrow_polish 이웃 잠식 게이트). */
+    .pf-trackline{flex:1 1 240px;min-width:0;display:flex;flex-direction:column;gap:2px;
+      padding:7px var(--pf-sec-pad,18px) 0;font-size:11.5px;}
+    .pf-tools .pf-trackline{padding:0;}
     /* 툴바가 세로 스택이 되면서 .pf-trackline 의 flex:1 이 **세로로** 자라 200px 빈칸을 만들었다
        (실측). 이 자리에서는 자기 높이만 갖게 한다. 그리고 상태 문장은 한 줄짜리 행으로 감싼다 —
        .pf-trackline 자신은 column 이라 자식 하나하나가 줄이 됐다(환율 숫자가 제 줄을 가졌다). */
@@ -1739,14 +1743,12 @@
     .pf-toolrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
     /* 주 액션은 이 화면에서 유일한 파랑이다. 진행 중에는 흐려지고 글자가 '업데이트 중…'으로 바뀐다 —
        **무슨 일이 일어나는지는 상단 바 한 곳**이 말하고, 여기 있는 것은 그 버튼의 상태일 뿐이다. */
-    .pf-update{padding:10px 16px;font-size:13px;}
+    .pf-update{padding:8px 14px;font-size:12.5px;min-height:0;}
+    /* 세로 확장은 ±6px 로 줄인다(36+12=48 ≥ 44) — ±13px 이면 바로 아래 환율 값을 덮는다. */
+    .pf-update.pf-tap::before{inset:-6px -12px;}
     .pf-update[disabled]{opacity:0.55;cursor:default;}
     /* 고정 밴드의 총자산·↻ — 밴드는 랩되면 안 되므로 제목만 줄어들고(pf-ell) 이 둘은 flex:none */
     .pf-ell{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-    .pf-dup{opacity:0;pointer-events:none;}
-    .pf-bandsum{font-size:13.5px;font-weight:800;letter-spacing:-0.2px;color:var(--text-primary,#000);white-space:nowrap;}
-    .pf-iconbtn{border:1px solid var(--border-default,#dfdfe8);background:var(--bg-surface,#fff);border-radius:8px;width:29px;height:29px;padding:0;line-height:1;font-size:14px;color:var(--text-secondary,#6e6e6e);cursor:pointer;flex:none;}
-    .pf-iconbtn:hover{color:var(--ig-blue,#1fa1ff);border-color:var(--ig-blue,#1fa1ff);}
     /* 합계 요약 — 읽는 것이다. 테두리·배경을 주지 않는다(칩 모양이면 누르는 것으로 읽힌다). */
     .pf-sum{padding:9px var(--pf-sec-pad,18px) 0;}
     .pf-sum-top{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;}
@@ -1796,6 +1798,9 @@
              다섯 줄이 되어 한 화면에 보이는 종목 수가 반으로 준다 — 그게 더 큰 손해다.
          헤더·바의 높이 예산(≤56 / ≤60)은 이 규칙 덕분에 그대로 통과한다(칩은 29px 그대로 그린다). */
       .pf-btn-primary,.pf-btn-ghost,.pf-dev-btn,.pf-presets button,.pf-tut-btn,.pf-tut-ghost{min-height:44px;}
+      /* 밴드 안의 주 액션만 예외 — 44px 로 그리면 밴드가 58px 이 되어 고정 스택이 표를 더 덮는다.
+         닿는 크기는 pf-tap 의 투명 확장(±13px)이 만든다(그리는 크기와 받는 크기를 나눈다). */
+      .pf-update{min-height:36px;}
       /* 새로 생긴 컨트롤도 같은 규칙 아래로 — 보기 세그먼트·칩·✎ 는 전부 손가락으로 누르는 것이다.
          여기서는 **그리는 크기 자체**를 키운다: 셋 다 이웃과 6~8px 떨어져 있어 히트영역을 넓히면
          서로 잠식한다(넓히기 규칙은 간격이 넉넉한 곳에만 쓴다). */
@@ -2175,18 +2180,39 @@
       <!-- 고정 밴드에는 표를 스크롤하는 내내 필요한 것만 남긴다: 어디인지(제목) · 얼마인지(총자산) ·
            다시 잴 수단(↻). 총자산은 **알약을 벗겼다** — 누르는 것(칩·버튼)과 읽는 것(합계)이 같은
            모양이면 합계가 버튼으로 읽힌다. 손익·계좌별 금액은 바로 아래 요약 블록이 맡는다.
-           ↻ 는 예전엔 툴바에 있어 스크롤하면 사라졌다. 밴드에 넣을 수 있는지는 **재고 넣었다**:
-           390px 안쪽 폭 348 중 제목 134 + 총자산 83 + ↻ 29 + gap 24 = 270 → 한 줄이 유지된다.
-           그래서 flex-wrap 을 끄고(랩되면 밴드가 부풀어 표를 덮는다) 제목만 줄어들게 둔다. -->
+           밴드 오른쪽은 **주 액션 자리**다. 아이콘만 두었더니 무엇을 하는 버튼인지 안 보여서
+           글자를 되살렸고, 그러면 총자산 숫자까지 같이 둘 폭이 없다(390px 안쪽 348 중
+           제목 153 + 버튼 142 + gap 24 = 319 — 실측). 총자산은 바로 아래 요약이 더 크게 맡는다.
+           flex-wrap 은 끈다(랩되면 밴드가 부풀어 표를 덮는다) — 좁아지면 제목만 줄어든다.
+           버튼은 36px 로 그리고 손가락 크기는 pf-tap 의 투명 확장이 맡는다: 여기서 44px 로
+           그리면 밴드가 58px 이 되어 고정 스택(헤더+바+밴드) 예산을 밀어낸다. -->
       <div class="pf-sec-head" data-sechead="2" style="padding:14px var(--pf-sec-pad,18px) 0;display:flex;align-items:center;gap:8px;">
         <span class="pf-step">STEP 2</span>
         <span class="pf-step-title pf-ell">통합 보유 현황</span>
         <button class="{{ note2Cls }}" onclick="{{ onNote2 }}" title="이 단계 설명 보기">i</button>
         <div style="flex:1;min-width:4px;"></div>
         <sc-if value="{{ hasHoldings }}" hint-placeholder-val="{{ true }}">
-          <span class="pf-money pf-num pf-bandsum">{{ totalStr }}</span>
+          <button class="pf-btn-primary pf-update pf-tap" disabled="{{ repricing }}" onclick="{{ onReprice }}" title="에이전트로 현재가·환율을 다시 불러 재평가 (수량 없는 종목은 캡처시점 종가로 역산)">{{ updateLabel }}</button>
         </sc-if>
       </div>
+      <!-- 언제 쟀나 — 그 버튼 **바로 아래**. 버튼과 결과가 떨어져 있으면 어느 동작의 상태인지 안 이어진다. -->
+      <sc-if value="{{ hasHoldings }}" hint-placeholder-val="{{ true }}">
+        <div class="pf-trackline">
+          <span class="pf-trackrow">
+          <span style="color:var(--text-secondary,#6e6e6e);">{{ trackPre }}</span>
+          <sc-if value="{{ fxRead }}" hint-placeholder-val="{{ true }}">
+            <button class="pf-fxval pf-tap" onclick="{{ onFxEdit }}" title="눌러서 환율을 직접 입력">{{ fxStr }}</button>
+          </sc-if>
+          <sc-if value="{{ fxEdit }}" hint-placeholder-val="{{ false }}">
+            <input type="number" value="{{ fx }}" onchange="{{ onFxChange }}" onblur="{{ onFxDone }}" onkeydown="{{ onKeyEnter }}" class="pf-fxin">
+            <button class="pf-fxbtn" onclick="{{ onFxRefresh }}" title="환율만 새로고침">↻</button>
+          </sc-if>
+          </span>
+          <sc-if value="{{ hasTrackMsg }}" hint-placeholder-val="{{ false }}">
+            <span style="font-size:11.5px;color:{{ trackDeltaColor }};">{{ trackDelta }}</span>
+          </sc-if>
+        </div>
+      </sc-if>
       <!-- 합계 요약은 밴드 **밖**이다 — 좁은 화면에서 칩 4개가 세 줄로 랩되며 고정 밴드를 112px 로
            부풀려(실측) 표를 그만큼 영구히 덮었다. 고정으로 남길 것은 총자산 숫자 하나뿐이고,
            손익·계좌별 금액은 같이 스크롤돼도 된다. 튜토리얼도 여기를 가리킨다
@@ -2233,31 +2259,11 @@
            이 단은 '지속 트래킹'의 전부다: 왼쪽은 **지금 상태**(언제 잰 값인가), 오른쪽은 **주 액션**
            (다시 재기) 하나. 파라미터(환율 수동·기준시점)는 고급으로 접는다 — 매번 보는 것이 아니다. -->
       <div data-tour="tools" class="pf-tools" style="padding:0 var(--pf-sec-pad,18px) 10px;font-size:11.5px;">
-        <!-- 이 단계의 주 액션은 하나다: **시세·환율 업데이트**. 예전엔 고정 밴드의 ↻ 아이콘이었는데,
-             '무엇을 하는 버튼인지'가 글자로 없어 눌러야 할 것이 안 보였다. 색도 여기만 파랑이다.
-             그 버튼이 만든 상태(언제 쟀나·결과)는 **바로 아래**에 붙인다 — 버튼과 상태가 떨어져
-             있으면 어느 동작의 결과인지 이어지지 않는다. -->
+        <!-- 한 줄 — 왼쪽은 더하는 것, 오른쪽은 보는 방식(무엇으로 묶나 · 어떻게 그리나).
+             주 액션(시세·환율 업데이트)은 고정 밴드로 올라갔다: 표를 스크롤하는 내내 손이 닿아야
+             하는 것은 그것 하나뿐이다. -->
         <div class="pf-toolrow">
-          <button class="pf-btn-primary pf-update" disabled="{{ repricing }}" onclick="{{ onReprice }}" title="에이전트로 현재가·환율을 다시 불러 재평가 (수량 없는 종목은 캡처시점 종가로 역산)">{{ updateLabel }}</button>
           <button class="pf-btn-ghost" onclick="{{ onAddManual }}">＋ 직접 추가</button>
-        </div>
-        <div class="pf-trackline">
-          <span class="pf-trackrow">
-          <span style="color:var(--text-secondary,#6e6e6e);">{{ trackPre }}</span>
-          <sc-if value="{{ fxRead }}" hint-placeholder-val="{{ true }}">
-            <button class="pf-fxval pf-tap" onclick="{{ onFxEdit }}" title="눌러서 환율을 직접 입력">{{ fxStr }}</button>
-          </sc-if>
-          <sc-if value="{{ fxEdit }}" hint-placeholder-val="{{ false }}">
-            <input type="number" value="{{ fx }}" onchange="{{ onFxChange }}" onblur="{{ onFxDone }}" onkeydown="{{ onKeyEnter }}" class="pf-fxin">
-            <button class="pf-fxbtn" onclick="{{ onFxRefresh }}" title="환율만 새로고침">↻</button>
-          </sc-if>
-          </span>
-          <sc-if value="{{ hasTrackMsg }}" hint-placeholder-val="{{ false }}">
-            <span style="font-size:11.5px;color:{{ trackDeltaColor }};">{{ trackDelta }}</span>
-          </sc-if>
-        </div>
-        <!-- 보기 스위치 — 무엇으로 묶나 · 어떻게 그리나. 둘 다 '보기'라 한 줄을 같이 쓴다. -->
-        <div class="pf-toolrow">
           <div style="flex:1;min-width:0;"></div>
           <div class="pf-seg">
             <button class="{{ grpAcctCls }}" onclick="{{ onGroupAcct }}">계좌별</button>
@@ -2917,15 +2923,6 @@ class Component extends DCLogic {
         if (this._scrimEl) this._scrimEl.classList.remove('pf-scrim');
         this._scrimEl = low;
         if (low) low.classList.add('pf-scrim');
-      }
-      // 밴드의 총자산은 **요약 블록이 화면에서 사라졌을 때만** 켠다 — 둘이 같이 보이면 같은 숫자가
-      // 두 번 적힌다. 끄는 방법은 opacity 다: display 를 건드리면 밴드 폭·높이가 흔들려 고정 스택이
-      // 매 스크롤 프레임마다 다시 계산된다. 재는 대상(.pf-sum)은 sticky 가 아니라 자기 자리를 안다.
-      const bs = document.querySelector('.pf-bandsum'), sum = document.querySelector('.pf-sum');
-      if (bs) {
-        const band = bs.closest('.pf-sec-head');
-        const hide = !!(sum && band && sum.getBoundingClientRect().bottom > band.getBoundingClientRect().bottom + 2);
-        if (hide !== this._bandSumHidden) { this._bandSumHidden = hide; bs.classList.toggle('pf-dup', hide); }
       }
     };
     this._setScrim();
