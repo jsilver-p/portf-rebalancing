@@ -1895,8 +1895,6 @@
         <span class="pf-hero-caret">{{ heroCaret }} 자세히</span>
       </button>
       <sc-if value="{{ heroOpen }}" hint-placeholder-val="{{ false }}">
-        <span class="pf-hero-p">계좌마다 따로 보던 종목·수량·평가금액을 한 표로 합치고, 최신 주가와 환율로 이어서 확인합니다.
-          정해 둔 목표 비중에서 얼마나 벌어졌는지 자산군별로 계산해, 어떻게 되돌릴지 리밸런싱 전략을 제시합니다.</span>
         <!-- 화살표는 앞 칩에 **붙여서** 한 덩어리로 접는다 — 따로 두면 좁은 화면에서 줄 맨 앞에
              덩그러니 '→' 만 남는다(390px 실측). -->
         <span class="pf-hero-flow"><span><b>📸 캡처 올리기</b><i>→</i></span><span><b>🔄 한 표로 확인</b><i>→</i></span><span><b>🎯 목표 정하기</b><i>→</i></span><b>🧭 리밸런싱 전략</b></span>
@@ -1960,7 +1958,7 @@
       <sc-if value="{{ note1Open }}" hint-placeholder-val="{{ true }}">
       <div class="pf-note-wrap">
         <div class="pf-note">
-          <span class="pf-note-goal">계좌마다 따로 보던 종목·수량·평가금액을 한 표로 합칩니다.</span>
+          <span class="pf-note-goal">계좌마다 따로 보던 종목·수량·평가금액을 한 표로 합치고, 확실하지 않은 값은 확인받습니다.</span>
           <span class="pf-note-do"><span class="pf-note-ico">📸</span>사용하는 증권사 앱의 보유 화면을 캡처해 한 번에 올려 주세요.</span>
           <span class="pf-note-tip"><b class="pf-bang">!</b><span>수량과 평가금액(매수금액)이 보이는 화면일수록 정확해요.</span></span>
         </div>
@@ -2192,7 +2190,7 @@
         <button class="{{ note2Cls }}" onclick="{{ onNote2 }}" title="이 단계 설명 보기">i</button>
         <div style="flex:1;min-width:4px;"></div>
         <sc-if value="{{ hasHoldings }}" hint-placeholder-val="{{ true }}">
-          <button class="pf-btn-primary pf-update pf-tap" disabled="{{ repricing }}" onclick="{{ onReprice }}" title="에이전트로 현재가·환율을 다시 불러 재평가 (수량 없는 종목은 캡처시점 종가로 역산)">{{ updateLabel }}</button>
+          <button class="pf-btn-primary pf-update pf-tap" disabled="{{ repricing }}" onclick="{{ onReprice }}" title="현재가·환율을 다시 불러 재평가">{{ updateLabel }}</button>
         </sc-if>
       </div>
       <!-- 언제 쟀나 — 그 버튼 **바로 아래**. 버튼과 결과가 떨어져 있으면 어느 동작의 상태인지 안 이어진다. -->
@@ -2238,14 +2236,15 @@
       <div class="pf-note-wrap">
         <div class="pf-note">
           <span class="pf-note-goal">최신 주가·환율로 다시 계산해, 지금 총자산과 계좌별 비중을 보여줍니다.</span>
-          <span class="pf-note-do"><span class="pf-note-ico">🔄</span>값이 다르면 표에서 바로 고치고, 다시 올 때 [시세·환율 업데이트]를 눌러 주세요.</span>
+          <span class="pf-note-do"><span class="pf-note-ico">🔄</span>값이 다르면 표에서 바로 고치세요. 다음에 다시 올 때는 [{{ LUpd }}] 한 번이면 됩니다.</span>
+          <span class="pf-note-meta">수량이 없는 종목은 캡처 시점 종가로 역산해 채웁니다.</span>
           <sc-if value="{{ hasHoldings }}" hint-placeholder-val="{{ true }}">
             <span class="pf-note-meta">{{ trackDetail }}</span>
           </sc-if>
           <span class="pf-note-legend">
-  <span class="pf-legend-item"><span style="font-size:9px;font-weight:700;color:#8a8a93;background:#f0f0f2;border:1px solid #d8d8de;padding:0 4px;border-radius:3px;">추정</span>화면에 수량이 없어 금액 ÷ 시세로 계산했어요</span>
-  <span class="pf-legend-item"><span style="font-size:9px;font-weight:700;color:#b8860b;background:#fff3cd;border:1px solid #f0d48a;padding:0 4px;border-radius:3px;">확인 권장</span>계산 근거가 약해요 — 값을 확인해 주세요</span>
-  <span class="pf-legend-item"><span style="font-size:9px;font-weight:700;color:#8a8a93;background:#f0f0f2;border:1px solid #d8d8de;padding:0 4px;border-radius:3px;">수량 미확인</span>수량을 알 수 없어요 — 수량이 보이는 화면을 올리면 채워져요</span>
+  <span class="pf-legend-item"><span style="font-size:9px;font-weight:700;color:#8a8a93;background:#f0f0f2;border:1px solid #d8d8de;padding:0 4px;border-radius:3px;">수량 미확인</span>화면에 수량이 없고 역산도 못 했어요 — 수량이 보이는 화면을 올리면 채워져요</span>
+  <span class="pf-legend-item"><span style="font-size:9px;font-weight:700;color:#8a8a93;background:#f0f0f2;border:1px solid #d8d8de;padding:0 4px;border-radius:3px;">추정</span>화면에 수량이 없어 금액 ÷ 시세로 채웠어요 — 정수에 잘 맞았어요</span>
+  <span class="pf-legend-item"><span style="font-size:9px;font-weight:700;color:#b8860b;background:#fff3cd;border:1px solid #f0d48a;padding:0 4px;border-radius:3px;">확인 권장</span>채운 수량이 화면 숫자와 딱 맞지 않아요 — 값을 확인해 주세요</span>
   <span class="pf-legend-item"><span style="font-size:9px;font-weight:700;color:#b8860b;background:#fff3cd;border:1px solid #f0d48a;padding:0 3px;border-radius:3px;">⚠</span>종목명이나 평가금액이 확실하지 않아요</span>
   <span class="pf-legend-item"><span style="width:6px;height:6px;border-radius:50%;background:#b8860b;display:inline-block;flex:none;"></span>시세가 하루 넘게 지났어요 — 재평가해 주세요</span>
             <span style="white-space:nowrap;">· 배지를 탭하면 <b style="color:var(--text-secondary,#6e6e6e);">어떻게 계산했는지</b> 볼 수 있어요</span>
@@ -2395,7 +2394,7 @@
       <sc-if value="{{ note3Open }}" hint-placeholder-val="{{ true }}">
       <div class="pf-note-wrap">
         <div class="pf-note">
-          <span class="pf-note-goal">목표로 삼을 자산 구성을 정합니다. 아래 분석과 전략이 전부 이 기준으로 계산됩니다.</span>
+          <span class="pf-note-goal">여기서 정한 비중을 기준으로 아래 분석과 전략을 전부 계산합니다.</span>
           <span class="pf-note-do"><span class="pf-note-ico">🎯</span>추천 기준을 고르거나 비중을 직접 설정해 주세요.</span>
           <span class="pf-note-tip"><b class="pf-bang">!</b><span>합계가 100%여야 아래 계산이 맞아요.</span></span>
         </div>
@@ -2452,7 +2451,7 @@
       <div class="pf-note-wrap">
         <div class="pf-note">
           <span class="pf-note-goal">목표에서 얼마나 벌어졌는지 자산군별로 계산합니다.</span>
-          <span class="pf-note-do"><span class="pf-note-ico">📊</span>색 막대(지금)와 회색 막대(목표)의 차이를 확인해 주세요.</span>
+          <span class="pf-note-do"><span class="pf-note-ico">📊</span>많이 벌어진 자산군을 보세요 — 되돌리는 방법은 바로 아래 STEP 5가 냅니다.</span>
         </div>
       </div>
       </sc-if>
@@ -2694,6 +2693,9 @@ class Component extends DCLogic {
     // 배분 대상 자산군 — 혼합은 한 종목이 두 자산군에 걸쳐 있어 목표 비중의 단위가 될 수 없다.
     // 도넛·드리프트·목표·액션이 전부 이 구성과 순서를 쓴다.
     this.ALLOC = this.CLASSES.filter(c => c.key !== 'mixed');
+    // 주 액션의 이름 — **이 한 곳**이 출처다. 버튼·STEP2 설명·상단 바·튜토리얼이 전부 이걸 읽는다.
+    // 손으로 복사해 두면 이름을 바꿀 때 한 곳이 남는다(실제로 튜토리얼이 옛 이름으로 썩어 있었다).
+    this.L_UPDATE = '시세·환율 업데이트';
     // 계좌 — 종류·연금여부를 한 곳에서. 연금여부는 액션의 세금 안내가 갈리는 기준이다.
     // **색이 없다**: 색은 자산군 한 축에만 쓴다. 계좌까지 칠하면 같은 파랑 점이 자산군별 보기에선
     // '채권', 계좌별 보기에선 '연금저축'이 돼 같은 화면에서 두 뜻을 갖는다.
@@ -2744,7 +2746,7 @@ class Component extends DCLogic {
       { key: 'total', icon: '💰', spot: '[data-tour="total"]',
         say: '흩어져 있던 계좌가 하나로 합쳐졌습니다. 총자산과 계좌별 금액이 한눈에 보여요.' },
       { key: 'track', icon: '🔄', spot: '[data-tour="tools"]',
-        say: '표의 값은 언제든 고칠 수 있어요. [현재가·환율 갱신]을 누르면 최신 시세로 다시 계산합니다.' },
+        say: '표의 값은 언제든 고칠 수 있어요. [' + this.L_UPDATE + ']를 누르면 최신 시세로 다시 계산합니다.' },
       { key: 'target', icon: '🎯', spot: '[data-tour="preset"]',
         say: '목표로 삼을 자산 비중을 정합니다. 추천 기준을 눌러 보세요 — 직접 넣어도 됩니다.' },
       { key: 'drift', icon: '📊', spot: '[data-tour="drift"]',
@@ -3664,7 +3666,7 @@ class Component extends DCLogic {
     const S = this.state;
     if (S.extracting) return { step: 1, icon: '⏳', text: S.extractStatus || '분석 중…' };
     // 무엇이 돌아가는지는 **여기 한 곳**에서만 말한다 — 캡처 읽기든 시세 업데이트든 같은 자리다.
-    if (S.repricing) return { step: 2, icon: '⏳', text: '시세·환율 업데이트 중… — 수량 추정까지 하느라 수십 초 걸릴 수 있어요' };
+    if (S.repricing) return { step: 2, icon: '⏳', text: this.L_UPDATE + ' 중… — 수량 추정까지 하느라 수십 초 걸릴 수 있어요' };
     if (S.streamStage === 'review') return { step: 1, icon: '👀', text: '추출 결과를 확인하고 [STEP 2에 반영]을 누르세요 — 값은 표에서 바로 고칠 수 있어요' };
     if ((S.queue || []).length) return { step: 1, icon: '📎', text: '스크린샷 ' + S.queue.length + '장 담김 — 더 담거나 [분석 시작]을 누르세요' };
     // 빈 상태에는 줄 자체를 내지 않는다(text:null) — 히어로가 이미 무엇을 하는 앱인지와 체험 버튼을
@@ -3673,8 +3675,8 @@ class Component extends DCLogic {
     // 확신 낮은 값이 남아 있으면 그게 먼저다 — 시세가 새것인지보다 **내 숫자가 맞는지**가 먼저다.
     // 판정은 표의 배지와 같은 출처(reviewFlag)를 쓴다. 그 행을 고치면(=확인하면) 저절로 사라진다.
     const low = (S.holdings || []).filter(h => this.reviewFlag(h).qtyBadge).length;
-    if (low) return { step: 2, icon: '⚠', text: '확신이 낮은 항목이 ' + low + '건 있어요 — STEP 2 에서 [확인 권장] 배지가 붙은 행의 값을 확인해 주세요' };
-    if (this.isStale(S.holdings)) return { step: 2, icon: '🔄', text: '시세가 하루 넘게 지났어요 — STEP 2에서 [시세·환율 업데이트]를 눌러 주세요' };
+    if (low) return { step: 2, icon: '⚠', text: 'STEP 2에서 [확인 권장] 배지가 붙은 ' + low + '건을 확인해 주세요' };
+    if (this.isStale(S.holdings)) return { step: 2, icon: '🔄', text: '시세가 하루 넘게 지났어요 — STEP 2에서 [' + this.L_UPDATE + ']를 눌러 주세요' };
     const sum = this.ALLOC.reduce((s, c) => s + (S.target[c.key] || 0), 0);
     if (sum !== 100) return { step: 3, icon: '🎯', text: 'STEP 3 목표 비중 합계가 ' + sum + '% 예요 — 100%로 맞춰 주세요' };
     // 다 맞은 상태에는 낼 것이 없다(text:null → 바 자체가 사라진다). 예전엔 'STEP 5 를 확인하세요'가
@@ -4386,7 +4388,8 @@ class Component extends DCLogic {
       return true;
     } catch (e) {
       this.setState({ extracting: false, extractStatus: '', streamStage: '', streamRows: [],
-        extractError: '추출에 실패했어요 — 표가 선명하게 보이는 스크린샷으로 다시 시도해 주세요. (' + (e.message || e) + ')' });
+        extractError: '추출에 실패했어요 — ' + (e.message || e)
+          + ' 화면이 선명한 캡처로 다시 올리거나, 헤더의 [에이전트] 연결을 확인해 주세요.' });
       return false;
     }
   }
@@ -4771,7 +4774,8 @@ class Component extends DCLogic {
       plAmt: hasBasis ? ((plSum >= 0 ? '+' : '') + this.fmtW(plSum).replace('₩-', '-₩')) : '',
       plTone: hasBasis ? (plSum >= 0 ? '#ed4956' : '#3897f0') : 'var(--text-tertiary,#999)',
       repricing: !!S.repricing,
-      updateLabel: S.repricing ? '업데이트 중…' : '↻ 시세·환율 업데이트',
+      updateLabel: S.repricing ? '업데이트 중…' : ('↻ ' + this.L_UPDATE),
+      LUpd: this.L_UPDATE,
       trackDetail, hasTrackMsg: !!trackDelta,
       acctChips,
       extracting: S.extracting, notExtracting: !S.extracting,
